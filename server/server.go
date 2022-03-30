@@ -24,7 +24,7 @@ import (
 	pbts "google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/elastic/elastic-agent-libs/logp"
-	pb "github.com/elastic/elastic-agent-shipper/shipper"
+	pb "github.com/elastic/elastic-agent-shipper/api"
 )
 
 type shipperServer struct {

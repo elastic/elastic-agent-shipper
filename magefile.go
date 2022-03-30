@@ -25,10 +25,12 @@ import (
 
 	// mage:import
 	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/common"
+	// mage:import
+	_ "github.com/elastic/elastic-agent-libs/dev-tools/mage"
 )
 
 func GenProto() {
-	sh.Run("protoc", "-Ishipper", "-Ishipper/vendor", "--go_out=./shipper", "--go-grpc_out=./shipper", "--go_opt=paths=source_relative", "--go-grpc_opt=paths=source_relative", "shipper/shipper.proto")
+	sh.Run("protoc", "-Iapi", "-Iapi/vendor", "--go_out=./api", "--go-grpc_out=./api", "--go_opt=paths=source_relative", "--go-grpc_opt=paths=source_relative", "api/shipper.proto")
 }
 
 func Build() {
