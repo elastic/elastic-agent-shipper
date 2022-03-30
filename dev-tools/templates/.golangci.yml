@@ -1,6 +1,3 @@
-# DO NOT EDIT!
-# This file is a rendered template, the source can be found in "./dev-tools/templates/.golangci.yml"
-#
 # options for analysis running
 run:
   # timeout for analysis, e.g. 30s, 5m, default is 1m
@@ -120,7 +117,7 @@ linters-settings:
 
   gosimple:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.17.8"
+    go: "{{.GoVersion}}"
 
   misspell:
     # Correct spellings using locale preferences for US or UK.
@@ -155,12 +152,12 @@ linters-settings:
 
   staticcheck:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.17.8"
+    go: "{{.GoVersion}}"
     checks: ["all"]
 
   stylecheck:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.17.8"
+    go: "{{.GoVersion}}"
     checks: ["all"]
 
   unparam:
@@ -172,4 +169,4 @@ linters-settings:
 
   unused:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.17.8"
+    go: "{{.GoVersion}}"
