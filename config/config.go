@@ -59,10 +59,13 @@ func ReadConfig() (ShipperConfig, error) {
 
 	contents, err := ioutil.ReadFile(path)
 	if err != nil {
-		return ShipperConfig{}, fmt.Errorf("Error reading input file %s: %v", path, err)
+		return ShipperConfig{}, fmt.Errorf("error reading input file %s: %w", path, err)
 	}
 
 	raw, err := config.NewConfigWithYAML(contents, "")
+	if err != nil {
+		return ShipperConfig{}, fmt.Errorf("error reading config from yaml: %w", err)
+	}
 	// TODO: This logging init will need to be a tad more sophisticated, I assume there's something in the libs already
 	config := ShipperConfig{Port: defaultPort, Log: logp.DefaultConfig(logp.DefaultEnvironment)}
 	err = raw.Unpack(&config)

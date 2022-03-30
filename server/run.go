@@ -20,7 +20,6 @@ package server
 import (
 	"fmt"
 	"net"
-	"os"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -41,8 +40,8 @@ func LoadAndRun() error {
 
 	err = logp.Configure(cfg.Log)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to initialize logger: %w", err)
+
 	}
 
 	return Run(cfg)
@@ -53,14 +52,14 @@ func Run(cfg config.ShipperConfig) error {
 	log := logp.L()
 	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", cfg.Port))
 	if err != nil {
-		return fmt.Errorf("failed to listen: %v", err)
+		return fmt.Errorf("failed to listen: %w", err)
 	}
 
 	var opts []grpc.ServerOption
 	if cfg.TLS {
 		creds, err := credentials.NewServerTLSFromFile(cfg.Cert, cfg.Key)
 		if err != nil {
-			return fmt.Errorf("Failed to generate credentials %v", err)
+			return fmt.Errorf("Failed to generate credentials %w", err)
 		}
 		opts = []grpc.ServerOption{grpc.Creds(creds)}
 	}

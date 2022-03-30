@@ -51,7 +51,7 @@ func (serv shipperServer) StreamAcknowledgements(streamReq *pb.StreamAcksRequest
 	err := prd.Send(&evt)
 
 	if err != nil {
-		return fmt.Errorf("Error in StreamAcknowledgements: %w", err)
+		return fmt.Errorf("error in StreamAcknowledgements: %w", err)
 	}
 	return nil
 }
