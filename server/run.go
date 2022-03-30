@@ -59,7 +59,7 @@ func Run(cfg config.ShipperConfig) error {
 	if cfg.TLS {
 		creds, err := credentials.NewServerTLSFromFile(cfg.Cert, cfg.Key)
 		if err != nil {
-			return fmt.Errorf("Failed to generate credentials %w", err)
+			return fmt.Errorf("failed to generate credentials %w", err)
 		}
 		opts = []grpc.ServerOption{grpc.Creds(creds)}
 	}

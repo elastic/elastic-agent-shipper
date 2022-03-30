@@ -66,8 +66,8 @@ func ReadConfig() (ShipperConfig, error) {
 	if err != nil {
 		return ShipperConfig{}, fmt.Errorf("error reading config from yaml: %w", err)
 	}
-	// TODO: This logging init will need to be a tad more sophisticated, I assume there's something in the libs already
-	config := ShipperConfig{Port: defaultPort, Log: logp.DefaultConfig(logp.DefaultEnvironment)}
+	// systemd environment will send us to stdout environment, which we want
+	config := ShipperConfig{Port: defaultPort, Log: logp.DefaultConfig(logp.SystemdEnvironment)}
 	err = raw.Unpack(&config)
 	if err != nil {
 		return config, fmt.Errorf("error unpacking config: %w", err)
