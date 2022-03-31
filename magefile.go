@@ -26,8 +26,15 @@ import (
 	// mage:import
 	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/common"
 	// mage:import
-	_ "github.com/elastic/elastic-agent-libs/dev-tools/mage"
+	"github.com/elastic/elastic-agent-libs/dev-tools/mage"
 )
+
+// Aliases are shortcuts to long target names.
+// nolint: deadcode // it's used by `mage`.
+var Aliases = map[string]interface{}{
+	"llc":  mage.Linter.LastChange,
+	"lint": mage.Linter.All,
+}
 
 func GenProto() {
 	sh.Run("protoc", "-Iapi", "-Iapi/vendor", "--go_out=./api", "--go-grpc_out=./api", "--go_opt=paths=source_relative", "--go-grpc_opt=paths=source_relative", "api/shipper.proto")
