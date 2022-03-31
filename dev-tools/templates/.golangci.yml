@@ -25,9 +25,8 @@ output:
 # Uncomment and add a path if needed to exclude
 # skip-dirs:
 #   - some/path
-# skip-files:
-#   - ".*\\.my\\.go$"
-#   - lib/bad.go
+skip-files:
+  - "*.*pb.go"
 
 # Find the whole list here https://golangci-lint.run/usage/linters/
 linters:
