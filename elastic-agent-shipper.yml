@@ -1,0 +1,10 @@
+# The gRPC port that the shipper will listen on
+port: 50052
+tls: false
+#cert: # path to TLS cert
+#key: # path to TLS keyfile
+
+#log level
+logging.level: debug
+logging.selectors: ["*"]
+logging.to_stderr: true
