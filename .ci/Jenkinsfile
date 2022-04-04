@@ -57,10 +57,6 @@ pipeline {
             name 'PLATFORM'
             values 'ubuntu-20.04 && immutable', 'windows-2019 && windows-immutable'
           }
-          axis {
-            name 'GO_VERSION'
-            values '1.14', '1.15', '1.16'
-          }
         }
         stages {
           stage('build'){
