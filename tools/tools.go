@@ -2,20 +2,14 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package main
+//go:build tools
+// +build tools
+
+package tools
 
 import (
-	"fmt"
-	"os"
+	// mage notice will fail without this, since it'll try and fetch this with `go install`
+	_ "go.elastic.co/go-licence-detector"
 
-	"github.com/elastic/elastic-agent-shipper/cmd"
+	_ "github.com/elastic/elastic-agent-libs/dev-tools/mage"
 )
-
-func main() {
-	command := cmd.NewCommand()
-	if err := command.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
-	}
-
-}
