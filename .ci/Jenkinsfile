@@ -59,10 +59,12 @@ pipeline {
           }
         }
         stages {
-          stage('build'){
+          stage('Build'){
             steps {
               withGithubNotify(context: "Build-${PLATFORM}") {
-                deleteDir()
+                whenTrue(isUnix()) {
+                  deleteDir()
+                }
                 unstash 'source'
                 dir("${BASE_DIR}"){
                   withGoEnv(){
@@ -75,8 +77,6 @@ pipeline {
           stage('Test') {
             steps {
               withGithubNotify(context: "Test-${PLATFORM}") {
-                deleteDir()
-                unstash 'source'
                 dir("${BASE_DIR}"){
                   withGoEnv(){
                     goTestJUnit(options: '-v ./...', output: 'junit-report.xml')
