@@ -61,7 +61,7 @@ pipeline {
         stages {
           stage('build'){
             steps {
-              withGithubNotify(context: "Build-${GO_VERSION}-${PLATFORM}") {
+              withGithubNotify(context: "Build-${PLATFORM}") {
                 deleteDir()
                 unstash 'source'
                 dir("${BASE_DIR}"){
@@ -74,7 +74,7 @@ pipeline {
           }
           stage('Test') {
             steps {
-              withGithubNotify(context: "Test-${GO_VERSION}-${PLATFORM}") {
+              withGithubNotify(context: "Test-${PLATFORM}") {
                 deleteDir()
                 unstash 'source'
                 dir("${BASE_DIR}"){
