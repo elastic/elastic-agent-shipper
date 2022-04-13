@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package = "github.com/elastic/elastic-agent-shipper/shipper";
+option go_package = "github.com/elastic/elastic-agent-shipper/api";
 package elastic.agent.shipper.v1;
 
 
