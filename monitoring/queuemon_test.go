@@ -171,3 +171,14 @@ func TestQueueMetrics(t *testing.T) {
 	assert.True(t, isFull, true)
 
 }
+
+func TestIncorrectOutput(t *testing.T) {
+	goodOutName := "correct-output"
+	reporter.RegisterOutput(goodOutName, NewTestMetricsReporter)
+
+	cfg := initMonWithconfig(1, "bad-output", t)
+	queue := NewTestQueue(5)
+	_, err := NewFromConfig(cfg, queue)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), goodOutName)
+}

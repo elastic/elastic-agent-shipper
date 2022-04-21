@@ -55,3 +55,15 @@ func OutputForName(name string) (OutputInit, error) {
 	}
 	return init, nil
 }
+
+//GetOutputList returns a list of registered outputs for debugging
+func GetOutputList() []string {
+	globalOutputReg.mut.Lock()
+	defer globalOutputReg.mut.Unlock()
+
+	outList := []string{}
+	for k := range globalOutputReg.outMap {
+		outList = append(outList, k)
+	}
+	return outList
+}

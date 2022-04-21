@@ -165,7 +165,8 @@ func initOutputs(cfg Config) ([]reporter.Reporter, error) {
 	for _, output := range cfg.OutputConfig {
 		init, err := reporter.OutputForName(output.Name())
 		if err != nil {
-			return nil, fmt.Errorf("error finding output %s: %w", output.Name(), err)
+			outList := reporter.GetOutputList()
+			return nil, fmt.Errorf("error finding output %s: %w. Valid metrics reporter outputs are: %v", output.Name(), err, outList)
 		}
 		reporter, err := init(output)
 		if err != nil {
