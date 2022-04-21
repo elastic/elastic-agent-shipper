@@ -33,11 +33,12 @@ func init() {
 
 //ShipperConfig defines the options present in the config file
 type ShipperConfig struct {
-	Log  logp.Config `config:"logging"`
-	TLS  bool        `config:"tls"`
-	Cert string      `config:"cert"` //TLS cert file, if TLS is enabled
-	Key  string      `config:"key"`  //TLS Keyfile, if specified
-	Port int         `config:"port"` //Port to listen on
+	Log   logp.Config `config:"logging"`
+	TLS   bool        `config:"tls"`
+	Cert  string      `config:"cert"`  //TLS cert file, if TLS is enabled
+	Key   string      `config:"key"`   //TLS Keyfile, if specified
+	Port  int         `config:"port"`  //Port to listen on
+	Queue *config.C   `config:"queue"` //Shipper queue Settings
 }
 
 // ReadConfig returns the populated config from the specified path
@@ -57,7 +58,7 @@ func ReadConfig() (ShipperConfig, error) {
 	config := ShipperConfig{Port: defaultPort, Log: logp.DefaultConfig(logp.SystemdEnvironment)}
 	err = raw.Unpack(&config)
 	if err != nil {
-		return config, fmt.Errorf("error unpacking config: %w", err)
+		return config, fmt.Errorf("error unpacking shipper config: %w", err)
 	}
 
 	return config, nil

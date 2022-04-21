@@ -8,3 +8,15 @@ tls: false
 logging.level: debug
 logging.selectors: ["*"]
 logging.to_stderr: true
+
+queue:
+  test: #There is no actual "test" queue type, remove this later.
+    events: 512
+  metrics:
+    enabled: true
+    interval: 5s
+    outputs:
+      - log:
+          enabled: true
+      - expvar:
+          address: "localhost:8282"

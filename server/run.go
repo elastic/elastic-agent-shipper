@@ -13,6 +13,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper/config"
+	"github.com/elastic/elastic-agent-shipper/monitoring"
 
 	pb "github.com/elastic/elastic-agent-shipper/api"
 )
@@ -42,6 +43,15 @@ func Run(cfg config.ShipperConfig) error {
 		return fmt.Errorf("failed to listen: %w", err)
 	}
 
+	// Beats won't call the "New*" functions of a queue directly, but instead fetch a queueFactory from the global registers.
+	//However, that requires the publisher/pipeline code as well, and I'm not sure we want that.
+	err = loadOutputs(cfg)
+	if err != nil {
+		return fmt.Errorf("error loading outputs: %w", err)
+	}
+
+	log.Debugf("Loaded outputs, waiting....")
+
 	var opts []grpc.ServerOption
 	if cfg.TLS {
 		creds, err := credentials.NewServerTLSFromFile(cfg.Cert, cfg.Key)
@@ -56,4 +66,34 @@ func Run(cfg config.ShipperConfig) error {
 	log.Debugf("gRPC server is listening on port %d", cfg.Port)
 	return grpcServer.Serve(lis)
 
+}
+
+// Initialize metrics and outputs
+func loadOutputs(cfg config.ShipperConfig) error {
+	//If we had an actual queue hooked up, that would go here
+	//queue := NewTestQueue()
+
+	monConfig := struct {
+		Metrics monitoring.Config `struct:"metrics"`
+	}{
+		Metrics: monitoring.DefaultConfig(),
+	}
+	// Not sure how we'll want to handle the "no special queue config" case once we have an actual queue hooked up.
+	if cfg.Queue != nil {
+		err := cfg.Queue.Unpack(&monConfig)
+		if err != nil {
+			return fmt.Errorf("error unpacking monitoring config: %w", err)
+		}
+	}
+
+	//startup monitor
+	//remove the nil here when we have an actual queue.
+	mon, err := monitoring.NewFromConfig(monConfig.Metrics, nil)
+	if err != nil {
+		return fmt.Errorf("error initializing output monitor: %w", err)
+	}
+
+	mon.Watch()
+
+	return nil
 }
