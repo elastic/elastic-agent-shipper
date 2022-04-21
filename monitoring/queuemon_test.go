@@ -90,11 +90,11 @@ func newReporterFactory(outputChan chan reporter.QueueMetrics) reporter.OutputIn
 	}
 }
 
-func initMonWithconfig(interval int, t *testing.T) Config {
+func initMonWithconfig(interval int, output string, t *testing.T) Config {
 	testConfig := Config{Interval: time.Second * time.Duration(interval), Enabled: true}
 	//Do a little bit of hackiness so we can construct that namespace object
 	input := []map[string]interface{}{
-		{"test": map[string]bool{"enabled": true}},
+		{output: map[string]bool{"enabled": true}},
 	}
 	raw, err := config.NewConfigFrom(input)
 	assert.NoError(t, err)
@@ -107,8 +107,9 @@ func initMonWithconfig(interval int, t *testing.T) Config {
 // actual tests
 
 func TestSetupMonitor(t *testing.T) {
-	reporter.RegisterOutput("test", NewTestMetricsReporter)
-	monitor := initMonWithconfig(1, t)
+	outName := "test"
+	reporter.RegisterOutput(outName, NewTestMetricsReporter)
+	monitor := initMonWithconfig(1, outName, t)
 	queue := NewTestQueue(10)
 	mon, err := NewFromConfig(monitor, queue)
 	assert.NoError(t, err)
@@ -119,9 +120,10 @@ func TestSetupMonitor(t *testing.T) {
 }
 
 func TestReportedEvents(t *testing.T) {
+	outName := "testRep"
 	outChan := make(chan reporter.QueueMetrics)
-	reporter.RegisterOutput("test", newReporterFactory(outChan))
-	monitor := initMonWithconfig(1, t)
+	reporter.RegisterOutput(outName, newReporterFactory(outChan))
+	monitor := initMonWithconfig(1, outName, t)
 
 	var maxEvents uint64 = 10
 	queue := NewTestQueue(maxEvents)
