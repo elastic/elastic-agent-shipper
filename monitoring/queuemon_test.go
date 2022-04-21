@@ -91,7 +91,7 @@ func newReporterFactory(outputChan chan reporter.QueueMetrics) reporter.OutputIn
 }
 
 func initMonWithconfig(interval int, t *testing.T) Config {
-	testConfig := Config{Interval: time.Second * time.Duration(interval)}
+	testConfig := Config{Interval: time.Second * time.Duration(interval), Enabled: true}
 	//Do a little bit of hackiness so we can construct that namespace object
 	input := []map[string]interface{}{
 		{"test": map[string]bool{"enabled": true}},
@@ -109,7 +109,6 @@ func initMonWithconfig(interval int, t *testing.T) Config {
 func TestSetupMonitor(t *testing.T) {
 	reporter.RegisterOutput("test", NewTestMetricsReporter)
 	monitor := initMonWithconfig(1, t)
-
 	queue := NewTestQueue(10)
 	mon, err := NewFromConfig(monitor, queue)
 	assert.NoError(t, err)

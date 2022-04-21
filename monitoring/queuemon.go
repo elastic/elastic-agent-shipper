@@ -31,6 +31,8 @@ type QueueMonitor struct {
 	// handler for the event queue
 	queue outqueue.Queue
 	log   *logp.Logger
+	// A awkward no-op if a user has disabled monitoring
+	bypass bool
 
 	// Count of times the queue has reached a configured limit.
 	queueLimitCount uint64
@@ -55,7 +57,7 @@ func DefaultConfig() Config {
 // NewFromConfig creates a new queue monitor from a pre-filled config struct.
 func NewFromConfig(cfg Config, queue outqueue.Queue) (*QueueMonitor, error) {
 	if !cfg.Enabled {
-		return &QueueMonitor{}, nil
+		return &QueueMonitor{bypass: true}, nil
 	}
 	//init outputs
 	outputs, err := initOutputs(cfg)
@@ -74,17 +76,17 @@ func NewFromConfig(cfg Config, queue outqueue.Queue) (*QueueMonitor, error) {
 // Watch is a non-blocking call that starts up a queue watcher that will report metrics to a given output
 func (mon QueueMonitor) Watch() {
 	// Turn this function into a no-op if nothing is initialized.
-	if mon.queue == nil {
+	if mon.bypass {
 		return
 	}
 	ticker := time.NewTicker(mon.interval)
-	mon.log.Debugf("Starting queue metrics watcher.")
 	go func() {
 		for {
 			select {
 			case <-mon.done:
 				return
 			case <-ticker.C:
+				//We're assuming that the `Metrics()` call from the queue won't hard-block.
 				err := mon.updateMetrics()
 				if err != nil {
 					mon.log.Errorf("Error updating metrics: %w", err)
@@ -95,7 +97,11 @@ func (mon QueueMonitor) Watch() {
 }
 
 // End closes the watcher
+// As of now this isn't being called outside of tests, as don't have any kind of signal catch/shutdown in the shipper itself.
 func (mon QueueMonitor) End() {
+	if mon.bypass {
+		return
+	}
 	mon.done <- struct{}{}
 }
 
@@ -188,6 +194,11 @@ func getLimits(raw outqueue.Metrics) (uint64, uint64, bool, error) {
 		// As @faec has noted, calculating limits can be a bit awkward when we're dealing with reporting/configuration in bytes.
 		//All we have now is total queue size in bytes, which doesn't tell us how many more events could fit before we hit the queue limit.
 		//So until we have something better, mark anything as 90% or more full as "full"
+
+		// I'm assuming that limit can be zero here, as perhaps a user can configure a queue without a limit, and it gets passed down to us.
+		if limit == 0 {
+			return count, limit, false, nil
+		}
 		level := float64(count) / float64(limit)
 		return count, limit, level > 0.9, nil
 	}
