@@ -73,22 +73,9 @@ func loadOutputs(cfg config.ShipperConfig) error {
 	//If we had an actual queue hooked up, that would go here
 	//queue := NewTestQueue()
 
-	monConfig := struct {
-		Metrics monitoring.Config `struct:"metrics"`
-	}{
-		Metrics: monitoring.DefaultConfig(),
-	}
-	// Not sure how we'll want to handle the "no special queue config" case once we have an actual queue hooked up.
-	if cfg.Queue != nil {
-		err := cfg.Queue.Unpack(&monConfig)
-		if err != nil {
-			return fmt.Errorf("error unpacking monitoring config: %w", err)
-		}
-	}
-
 	//startup monitor
-	//remove the nil here when we have an actual queue.
-	mon, err := monitoring.NewFromConfig(monConfig.Metrics, nil)
+	//remove the nil in the second argument here when we have an actual queue.
+	mon, err := monitoring.NewFromConfig(cfg.Monitor, nil)
 	if err != nil {
 		return fmt.Errorf("error initializing output monitor: %w", err)
 	}

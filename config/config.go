@@ -12,6 +12,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-shipper/monitoring"
 )
 
 const (
@@ -33,12 +34,13 @@ func init() {
 
 //ShipperConfig defines the options present in the config file
 type ShipperConfig struct {
-	Log   logp.Config `config:"logging"`
-	TLS   bool        `config:"tls"`
-	Cert  string      `config:"cert"`  //TLS cert file, if TLS is enabled
-	Key   string      `config:"key"`   //TLS Keyfile, if specified
-	Port  int         `config:"port"`  //Port to listen on
-	Queue *config.C   `config:"queue"` //Shipper queue Settings
+	Log     logp.Config       `config:"logging"`
+	TLS     bool              `config:"tls"`
+	Cert    string            `config:"cert"`    //TLS cert file, if TLS is enabled
+	Key     string            `config:"key"`     //TLS Keyfile, if specified
+	Port    int               `config:"port"`    //Port to listen on
+	Queue   *config.C         `config:"queue"`   //Shipper queue Settings
+	Monitor monitoring.Config `config:"metrics"` //Queue monitoring settings
 }
 
 // ReadConfig returns the populated config from the specified path
