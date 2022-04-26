@@ -12,12 +12,14 @@ logging.to_stderr: true
 queue:
   test: #There is no actual "test" queue type, remove this later.
     events: 512
-    
+
 metrics:
   enabled: true
   interval: 5s
   outputs:
-    - log:
-        enabled: true
-    - expvar:
-        address: "localhost:8282"
+    log:
+      enabled: true
+    expvar:
+      enabled: true
+      address: "localhost:8282"
+      name: "queue"

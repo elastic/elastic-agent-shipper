@@ -84,7 +84,7 @@ func (tq *TestMetricsQueue) Metrics() (queue.Metrics, error) {
 // ============ mocked output reporter
 
 // simple wrapper to return a generic config object
-func initMonWithconfig(interval int) Config {
+func initMonWithconfig(interval int, name string) Config {
 	return Config{
 		Interval: time.Second * time.Duration(interval),
 		Enabled:  true,
@@ -92,6 +92,7 @@ func initMonWithconfig(interval int) Config {
 			ExpvarOutput: expvar.ExpvarsConfig{
 				Enabled: true,
 				Addr:    ":8081",
+				Name:    name,
 			},
 		},
 	}
@@ -121,7 +122,7 @@ func fetchExpVars(t *testing.T, client http.Client, endpoint string) expvarQueue
 // actual tests
 
 func TestSetupMonitor(t *testing.T) {
-	monitor := initMonWithconfig(1)
+	monitor := initMonWithconfig(1, "test")
 	queue := NewTestQueue(10)
 	mon, err := NewFromConfig(monitor, queue)
 	assert.NoError(t, err)
@@ -132,7 +133,7 @@ func TestSetupMonitor(t *testing.T) {
 }
 
 func TestReportedEvents(t *testing.T) {
-	monitor := initMonWithconfig(1)
+	monitor := initMonWithconfig(1, "queue")
 
 	var maxEvents uint64 = 10
 	queue := NewTestQueue(maxEvents)

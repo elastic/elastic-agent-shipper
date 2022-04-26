@@ -18,6 +18,7 @@ import (
 type ExpvarsConfig struct {
 	Enabled bool   `config:"enabled"`
 	Addr    string `config:"address"`
+	Name    string `config:"name"`
 }
 
 // Expvars is the simple manager for the expvars web interface
@@ -34,7 +35,7 @@ func NewExpvarReporter(cfg ExpvarsConfig) reporter.Reporter {
 		metrics: reporter.QueueMetrics{},
 	}
 	exp.log.Debugf("Starting expvar monitoring...")
-	expvar.Publish("queue", expvar.Func(exp.format))
+	expvar.Publish(cfg.Name, expvar.Func(exp.format))
 	exp.runFrontend(cfg)
 	return &exp
 }

@@ -58,6 +58,7 @@ func DefaultConfig() Config {
 			ExpvarOutput: expvar.ExpvarsConfig{
 				Enabled: false,
 				Addr:    ":8080",
+				Name:    "queue",
 			},
 		},
 
@@ -68,7 +69,8 @@ func DefaultConfig() Config {
 
 // NewFromConfig creates a new queue monitor from a pre-filled config struct.
 func NewFromConfig(cfg Config, queue outqueue.Queue) (*QueueMonitor, error) {
-	if !cfg.Enabled {
+	// the queue == nil is largely a shim to make things not panic while we wait for the queues to get hooked up.
+	if !cfg.Enabled || queue == nil {
 		return &QueueMonitor{bypass: true}, nil
 	}
 	//init outputs

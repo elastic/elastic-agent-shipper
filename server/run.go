@@ -72,7 +72,7 @@ func Run(cfg config.ShipperConfig) error {
 func loadOutputs(cfg config.ShipperConfig) error {
 	//If we had an actual queue hooked up, that would go here
 	//queue := NewTestQueue()
-
+	fmt.Printf("Got monitoring config: %#v\n", cfg.Monitor)
 	//startup monitor
 	//remove the nil in the second argument here when we have an actual queue.
 	mon, err := monitoring.NewFromConfig(cfg.Monitor, nil)
