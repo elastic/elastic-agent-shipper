@@ -9,16 +9,11 @@ import (
 	"time"
 
 	"github.com/elastic/beats/v7/libbeat/common"
-	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/transform/typeconv"
 	"github.com/elastic/elastic-agent-shipper/monitoring/reporter"
 )
-
-func init() {
-	reporter.RegisterOutput("log", NewLoggerReporter)
-}
 
 // LoggerReporter handles the metrics reporter that writes directly to the configured logging output
 // This uses the pre-existing global logger
@@ -26,15 +21,20 @@ type LoggerReporter struct {
 	log *logp.Logger
 }
 
-// NewLoggerReporter returns a new reporter interface for the logger
-func NewLoggerReporter(_ config.Namespace) (reporter.Reporter, error) {
-	log := logp.L()
-	log.Debugf("Starting metrics logging...")
-	return LoggerReporter{log: logp.L()}, nil
+// Config is the config object for the log output
+type Config struct {
+	Enabled bool `config:"enabled"`
 }
 
-// Update satisfies the reporter interface
-func (rep LoggerReporter) Update(stats reporter.QueueMetrics) error {
+// NewLoggerReporter returns a new reporter interface for the logger
+func NewLoggerReporter() reporter.Reporter {
+	log := logp.L()
+	log.Debugf("Starting metrics logging...")
+	return LoggerReporter{log: logp.L()}
+}
+
+// ReportQueueMetrics satisfies the reporter interface
+func (rep LoggerReporter) ReportQueueMetrics(stats reporter.QueueMetrics) error {
 	conv, err := toKeyValuePairs(stats)
 	if err != nil {
 		return fmt.Errorf("error updating metrics: %w", err)

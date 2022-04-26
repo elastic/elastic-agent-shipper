@@ -5,6 +5,10 @@
 package monitoring
 
 import (
+	"encoding/json"
+	"io"
+	"net/http"
+	"runtime"
 	"testing"
 	"time"
 
@@ -13,9 +17,17 @@ import (
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/libbeat/opt"
 	"github.com/elastic/beats/v7/libbeat/publisher/queue"
-	"github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent-shipper/monitoring/reporter"
+	"github.com/elastic/elastic-agent-shipper/monitoring/reporter/expvar"
 )
+
+// emulates what the expvar queue metrics look like on the other end
+
+type expvarQueue struct {
+	CurrentLevel int  `json:"current_queue_level"`
+	Maxlevel     int  `json:"max_queue_level"`
+	IsFull       bool `json:"queue_is_currently_full"`
+	LimitCount   int  `json:"queue_limit_reached_count"`
+}
 
 // ======= mocked test input queue
 
@@ -59,6 +71,7 @@ func (tq TestMetricsQueue) Close() error {
 
 // Metrics spoofs the metrics output
 func (tq *TestMetricsQueue) Metrics() (queue.Metrics, error) {
+	//fmt.Printf("Got queue state: %#v\n", tq)
 	tq.metricState.EventCount = opt.UintWith(tq.metricState.EventCount.ValueOr(0) + 1)
 
 	if tq.metricState.EventCount.ValueOr(0) > tq.limit {
@@ -70,46 +83,45 @@ func (tq *TestMetricsQueue) Metrics() (queue.Metrics, error) {
 
 // ============ mocked output reporter
 
-type TestMetricsReporter struct {
-	mon chan reporter.QueueMetrics
-}
-
-func NewTestMetricsReporter(_ config.Namespace) (reporter.Reporter, error) {
-	// This default init function just has a dummy channel
-	return TestMetricsReporter{mon: make(chan reporter.QueueMetrics, 10)}, nil
-}
-
-func (tr TestMetricsReporter) Update(data reporter.QueueMetrics) error {
-	tr.mon <- data
-	return nil
-}
-
-func newReporterFactory(outputChan chan reporter.QueueMetrics) reporter.OutputInit {
-	return func(_ config.Namespace) (reporter.Reporter, error) {
-		return TestMetricsReporter{mon: outputChan}, nil
+// simple wrapper to return a generic config object
+func initMonWithconfig(interval int) Config {
+	return Config{
+		Interval: time.Second * time.Duration(interval),
+		Enabled:  true,
+		Outputs: OutputConfig{
+			ExpvarOutput: expvar.ExpvarsConfig{
+				Enabled: true,
+				Addr:    ":8081",
+			},
+		},
 	}
+
 }
 
-func initMonWithconfig(interval int, output string, t *testing.T) Config {
-	testConfig := Config{Interval: time.Second * time.Duration(interval), Enabled: true}
-	//Do a little bit of hackiness so we can construct that namespace object
-	input := []map[string]interface{}{
-		{output: map[string]bool{"enabled": true}},
-	}
-	raw, err := config.NewConfigFrom(input)
+// fetch the expvar data from the http endpoint and return the final queue object to test the metrics outputs
+func fetchExpVars(t *testing.T, client http.Client, endpoint string) expvarQueue {
+	resp, err := client.Get(endpoint) //nolint:noctx //this is a test, with a timeout
 	assert.NoError(t, err)
-	err = raw.Unpack(&testConfig.OutputConfig)
+	defer resp.Body.Close()
+	assert.Equal(t, resp.StatusCode, 200, "expvar endpoint did not return 200: %#v", resp)
+	httpResp, err := io.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	raw := struct {
+		Memstats runtime.MemStats
+		Cmdline  []string
+		Queue    expvarQueue
+	}{}
+	err = json.Unmarshal(httpResp, &raw)
+
 	assert.NoError(t, err)
 
-	return testConfig
+	return raw.Queue
 }
 
 // actual tests
 
 func TestSetupMonitor(t *testing.T) {
-	outName := "test"
-	reporter.RegisterOutput(outName, NewTestMetricsReporter)
-	monitor := initMonWithconfig(1, outName, t)
+	monitor := initMonWithconfig(1)
 	queue := NewTestQueue(10)
 	mon, err := NewFromConfig(monitor, queue)
 	assert.NoError(t, err)
@@ -120,40 +132,44 @@ func TestSetupMonitor(t *testing.T) {
 }
 
 func TestReportedEvents(t *testing.T) {
-	outName := "testRep"
-	outChan := make(chan reporter.QueueMetrics)
-	reporter.RegisterOutput(outName, newReporterFactory(outChan))
-	monitor := initMonWithconfig(1, outName, t)
+	monitor := initMonWithconfig(1)
 
 	var maxEvents uint64 = 10
 	queue := NewTestQueue(maxEvents)
 	mon, err := NewFromConfig(monitor, queue)
 	assert.NoError(t, err)
 	mon.Watch()
-	events := 0
-	t.Logf("listening for events...")
-	// once we have maxEvents, we can properly
-	gotQueueIsFull := false
+
+	var limitCount int
+	var gotQueueIsFull bool
 	var queueFullCount int
 
+	t.Logf("listening for events...")
+	// once we have maxEvents, we can properly
+
+	// use the expvar endpoint to check the output
+	client := http.Client{
+		Timeout: 5 * time.Second,
+	}
+	endpoint := "http://localhost:8081/debug/vars"
+
+	// Sit and wait until we have interesting data we can test
 	for {
-		evt := <-outChan
-		events = events + 1
-
-		if evt.QueueIsCurrentlyFull {
+		result := fetchExpVars(t, client, endpoint)
+		t.Logf("Got raw result: %#v", result)
+		if result.IsFull {
 			gotQueueIsFull = true
-		}
-
-		queueFullCount = int(evt.QueueLimitReachedCount.ValueOr(0))
-
-		if events == int(maxEvents) {
-			t.Logf("Got %d events, exiting listener.", events)
+			queueFullCount = result.CurrentLevel
+			limitCount = result.LimitCount
 			break
 		}
+
+		time.Sleep(time.Second)
 	}
 
 	assert.True(t, gotQueueIsFull, "Did not report a full queue")
-	assert.NotZero(t, queueFullCount, "Got a queue full count of 0")
+	assert.NotZero(t, limitCount, "Got a queue full count of 0")
+	assert.Equal(t, int(maxEvents), queueFullCount)
 }
 
 func TestQueueMetrics(t *testing.T) {
@@ -170,15 +186,4 @@ func TestQueueMetrics(t *testing.T) {
 	assert.Equal(t, limit, fullLimitBytes)
 	assert.True(t, isFull, true)
 
-}
-
-func TestIncorrectOutput(t *testing.T) {
-	goodOutName := "correct-output"
-	reporter.RegisterOutput(goodOutName, NewTestMetricsReporter)
-
-	cfg := initMonWithconfig(1, "bad-output", t)
-	queue := NewTestQueue(5)
-	_, err := NewFromConfig(cfg, queue)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), goodOutName)
 }

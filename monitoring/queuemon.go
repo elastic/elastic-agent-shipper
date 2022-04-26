@@ -9,16 +9,13 @@ import (
 	"time"
 
 	outqueue "github.com/elastic/beats/v7/libbeat/publisher/queue"
-	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/opt"
 
 	"github.com/elastic/elastic-agent-shipper/monitoring/reporter"
 
-	//import the expvar queue metrics output
-	_ "github.com/elastic/elastic-agent-shipper/monitoring/reporter/expvar"
-	//import the log queue metrics output
-	_ "github.com/elastic/elastic-agent-shipper/monitoring/reporter/log"
+	"github.com/elastic/elastic-agent-shipper/monitoring/reporter/expvar"
+	"github.com/elastic/elastic-agent-shipper/monitoring/reporter/log"
 )
 
 //QueueMonitor is the main handler object for the queue monitor, and will be responsible for startup, shutdown, handling config, and persistent tracking of metrics.
@@ -40,17 +37,32 @@ type QueueMonitor struct {
 
 //Config is the intermediate struct representation of the queue monitor config
 type Config struct {
-	OutputConfig []config.Namespace `config:"outputs"`
-	Interval     time.Duration      `config:"interval"`
-	Enabled      bool               `config:"enabled"`
+	Outputs  OutputConfig  `config:"outputs"`
+	Interval time.Duration `config:"interval"`
+	Enabled  bool          `config:"enabled"`
+}
+
+// OutputConfig is the main config subsection for the
+type OutputConfig struct {
+	LogOutput    log.Config           `config:"log"`
+	ExpvarOutput expvar.ExpvarsConfig `config:"expvar"`
 }
 
 // DefaultConfig returns the default settings for the queue monitor
 func DefaultConfig() Config {
 	return Config{
-		OutputConfig: nil,
-		Enabled:      true,
-		Interval:     time.Second * 30,
+		Outputs: OutputConfig{
+			LogOutput: log.Config{
+				Enabled: true,
+			},
+			ExpvarOutput: expvar.ExpvarsConfig{
+				Enabled: false,
+				Addr:    ":8080",
+			},
+		},
+
+		Enabled:  true,
+		Interval: time.Second * 30,
 	}
 }
 
@@ -60,10 +72,7 @@ func NewFromConfig(cfg Config, queue outqueue.Queue) (*QueueMonitor, error) {
 		return &QueueMonitor{bypass: true}, nil
 	}
 	//init outputs
-	outputs, err := initOutputs(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing queue metrics outputs: %w", err)
-	}
+	outputs := initOutputs(cfg)
 	return &QueueMonitor{
 		interval: cfg.Interval,
 		queue:    queue,
@@ -128,15 +137,15 @@ func (mon *QueueMonitor) updateMetrics() error {
 		QueueLimitReachedCount: opt.UintWith(mon.queueLimitCount),
 		// Running on a philosophy that the outputs should be dumb and unopinionated,
 		//so we're doing the type conversion here.
-		OldestActiveEvent: raw.OldestActiveTimestamp.String(),
+		OldestActiveTimestamp: raw.OldestActiveTimestamp.String(),
 	})
 
 	return nil
 }
 
-func (mon QueueMonitor) sendToOutputs(evt reporter.QueueMetrics) {
+func (mon QueueMonitor) sendToOutputs(metrics reporter.QueueMetrics) {
 	for _, out := range mon.outputs {
-		err := out.Update(evt)
+		err := out.ReportQueueMetrics(metrics)
 		//Assuming we don't want to make this a hard error, since one broken output doesn't mean they're all broken.
 		if err != nil {
 			mon.log.Errorf("Error sending to output: %w", err)
@@ -146,35 +155,20 @@ func (mon QueueMonitor) sendToOutputs(evt reporter.QueueMetrics) {
 }
 
 // Load the raw config and look for monitoring outputs to initialize.
-func initOutputs(cfg Config) ([]reporter.Reporter, error) {
+func initOutputs(cfg Config) []reporter.Reporter {
 	outputList := []reporter.Reporter{}
 
-	if cfg.OutputConfig == nil {
-		logger, err := reporter.OutputForName("log")
-		if err != nil {
-			return nil, fmt.Errorf("no default logger 'log' registered")
-		}
-		// logging output doesn't have a config
-		def, err := logger(config.Namespace{})
-		if err != nil {
-			return nil, fmt.Errorf("error starting up default metrics logger: %w", err)
-		}
-		return []reporter.Reporter{def}, nil
-	}
-
-	for _, output := range cfg.OutputConfig {
-		init, err := reporter.OutputForName(output.Name())
-		if err != nil {
-			outList := reporter.GetOutputList()
-			return nil, fmt.Errorf("error finding output %s: %w. Valid metrics reporter outputs are: %v", output.Name(), err, outList)
-		}
-		reporter, err := init(output)
-		if err != nil {
-			return nil, fmt.Errorf("error initializing output %s: %w", output.Name(), err)
-		}
+	if cfg.Outputs.LogOutput.Enabled {
+		reporter := log.NewLoggerReporter()
 		outputList = append(outputList, reporter)
 	}
-	return outputList, nil
+
+	if cfg.Outputs.ExpvarOutput.Enabled {
+		reporter := expvar.NewExpvarReporter(cfg.Outputs.ExpvarOutput)
+		outputList = append(outputList, reporter)
+	}
+
+	return outputList
 }
 
 // This is a wrapper to deal with the multiple queue metric "types",
@@ -182,13 +176,7 @@ func initOutputs(cfg Config) ([]reporter.Reporter, error) {
 // The reporting interfaces assumes we only want one.
 func getLimits(raw outqueue.Metrics) (uint64, uint64, bool, error) {
 
-	//Can some queues have both? Bias towards event count, since it's a little simpler.
-	if raw.EventCount.Exists() && raw.EventLimit.Exists() {
-		count := raw.EventCount.ValueOr(0)
-		limit := raw.EventLimit.ValueOr(0)
-		return count, limit, count >= limit, nil
-	}
-
+	//bias towards byte count, as it's a little more granular.
 	if raw.ByteCount.Exists() && raw.ByteLimit.Exists() {
 		count := raw.ByteCount.ValueOr(0)
 		limit := raw.ByteLimit.ValueOr(0)
@@ -202,6 +190,12 @@ func getLimits(raw outqueue.Metrics) (uint64, uint64, bool, error) {
 		}
 		level := float64(count) / float64(limit)
 		return count, limit, level > 0.9, nil
+	}
+
+	if raw.EventCount.Exists() && raw.EventLimit.Exists() {
+		count := raw.EventCount.ValueOr(0)
+		limit := raw.EventLimit.ValueOr(0)
+		return count, limit, count >= limit, nil
 	}
 
 	return 0, 0, false, fmt.Errorf("could not find valid byte or event metrics in queue")

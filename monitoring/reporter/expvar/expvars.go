@@ -6,23 +6,18 @@ package expvar
 
 import (
 	"expvar"
-	"fmt"
 	"net/http"
 
-	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/transform/typeconv"
 	"github.com/elastic/elastic-agent-shipper/monitoring/reporter"
 )
 
-func init() {
-	reporter.RegisterOutput("expvar", NewExpvarReporter)
-}
-
 //ExpvarsConfig is the config struct for marshalling whatever we get from the config file
 type ExpvarsConfig struct {
-	Addr string `config:"address"`
+	Enabled bool   `config:"enabled"`
+	Addr    string `config:"address"`
 }
 
 // Expvars is the simple manager for the expvars web interface
@@ -32,22 +27,16 @@ type Expvars struct {
 }
 
 // NewExpvarReporter initializes the expvar interface, and starts the http frontend.
-func NewExpvarReporter(cfg config.Namespace) (reporter.Reporter, error) {
-	expCfg := ExpvarsConfig{Addr: ":8080"}
-	err := cfg.Config().Unpack(&expCfg)
-	if err != nil {
-		return nil, fmt.Errorf("error unpacking expvar reporter config: %w", err)
-	}
-
+func NewExpvarReporter(cfg ExpvarsConfig) reporter.Reporter {
 	exp := Expvars{
 		log: logp.L(),
 
 		metrics: reporter.QueueMetrics{},
 	}
 	exp.log.Debugf("Starting expvar monitoring...")
-	expvar.Publish("queue.metrics", expvar.Func(exp.format))
-	exp.runFrontend(expCfg)
-	return &exp, nil
+	expvar.Publish("queue", expvar.Func(exp.format))
+	exp.runFrontend(cfg)
+	return &exp
 }
 
 func (exp Expvars) runFrontend(cfg ExpvarsConfig) {
@@ -72,9 +61,8 @@ func (exp *Expvars) format() interface{} {
 	return to
 }
 
-// Update updates the queue metrics in the output
-func (exp *Expvars) Update(queue reporter.QueueMetrics) error {
-	//exp.log.Debugf("Got new queue: %#v", queue)
+// ReportQueueMetrics updates the queue metrics in the output
+func (exp *Expvars) ReportQueueMetrics(queue reporter.QueueMetrics) error {
 	exp.metrics = queue
 
 	return nil

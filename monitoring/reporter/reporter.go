@@ -14,18 +14,18 @@ import (
 // We're keeping this as a struct to prevent the metrics from becoming a free-for-all; the values here should be as self-documenting as possible, and give users quick insight into the state of the queue.
 type QueueMetrics struct {
 	//QueueLimitReachedCount is the number of times the queue has reached its user-configured limit.
-	QueueLimitReachedCount opt.Uint `struct:"queue_limit_reached_count,omitempty"`
+	QueueLimitReachedCount opt.Uint `struct:"queue_limit_reached_count,omitempty" json:"queue_limit_reached_count"`
 	//QueueIsCurrentlyFull reports if the queue is currently at its user-configured limit
-	QueueIsCurrentlyFull bool `struct:"queue_is_currently_full,omitempty"`
+	QueueIsCurrentlyFull bool `struct:"queue_is_currently_full,omitempty" json:"queue_is_currently_full"`
 	//CurrentQueueLevel reports the current fill state of the queue, in the native user-configured limits of the queue
-	CurrentQueueLevel opt.Uint `struct:"current_queue_level,omitempty"`
+	CurrentQueueLevel opt.Uint `struct:"current_queue_level,omitempty" json:"current_queue_level"`
 	//QueueMaxLevel reports the user-configured max level of the queue, in the native user-configured limiits
-	QueueMaxLevel opt.Uint `struct:"max_queue_level,omitempty"`
-	//OldestActiveEvent reports the timestamp of the oldest event in the queue
-	OldestActiveEvent string `struct:"oldest_active_event,omitempty"`
+	QueueMaxLevel opt.Uint `struct:"max_queue_level,omitempty" json:"max_queue_level"`
+	//OldestActiveTimestamp reports the timestamp of the oldest event in the queue
+	OldestActiveTimestamp string `struct:"oldest_active_event,omitempty" json:"oldest_active_event"`
 }
 
 // Reporter is the bare interface that will be implemented by the various outputs
 type Reporter interface {
-	Update(QueueMetrics) error
+	ReportQueueMetrics(QueueMetrics) error
 }
