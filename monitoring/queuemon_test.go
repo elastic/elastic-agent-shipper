@@ -163,7 +163,7 @@ func TestReportedEvents(t *testing.T) {
 		}
 
 	}
-
+	mon.End()
 	assert.True(t, gotQueueIsFull, "Did not report a full queue")
 	assert.NotZero(t, limitCount, "Got a queue full count of 0")
 	assert.Equal(t, int(maxEvents), queueFullCount)
