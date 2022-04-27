@@ -42,7 +42,7 @@ func NewExpvarReporter(cfg Config) reporter.Reporter {
 		srv:     &http.Server{Addr: hostname},
 		metrics: reporter.QueueMetrics{},
 	}
-	exp.log.Debugf("Starting expvar monitoring...")
+	exp.log.Debugf("Starting expvar monitoring on %s", exp.srv.Addr)
 	expvar.Publish(cfg.Name, expvar.Func(exp.format))
 	exp.runFrontend()
 	return &exp
