@@ -101,11 +101,11 @@ func Run(cfg config.ShipperConfig) error {
 // Initialize metrics and outputs
 func loadMonitoring(cfg config.ShipperConfig) (*monitoring.QueueMonitor, error) {
 	//If we had an actual queue hooked up, that would go here
-	queue := NewTestQueue()
+	//queue := NewTestQueue()
 
 	//startup monitor
 	//remove the nil in the second argument here when we have an actual queue.
-	mon, err := monitoring.NewFromConfig(cfg.Monitor, queue)
+	mon, err := monitoring.NewFromConfig(cfg.Monitor, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing output monitor: %w", err)
 	}
