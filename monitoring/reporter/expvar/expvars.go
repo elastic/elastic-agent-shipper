@@ -5,6 +5,7 @@
 package expvar
 
 import (
+	"errors"
 	"expvar"
 	"net/http"
 	"time"
@@ -48,7 +49,7 @@ func (exp Expvars) runFrontend(cfg Config) {
 	srv := &http.Server{Addr: cfg.Addr}
 	go func() {
 		err := srv.ListenAndServe()
-		if err != nil {
+		if !errors.Is(err, http.ErrServerClosed) {
 			// Error type isn't happy with %w here
 			exp.log.Errorf("Error starting HTTP expvar server: %s", err)
 			return

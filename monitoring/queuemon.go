@@ -20,8 +20,8 @@ import (
 
 //QueueMonitor is the main handler object for the queue monitor, and will be responsible for startup, shutdown, handling config, and persistent tracking of metrics.
 type QueueMonitor struct {
-	// An array of user-configured outputs
-	outputs []reporter.Reporter
+	// An array of user-configured reporters
+	reporters []reporter.Reporter
 	//user-configured reporting interval
 	interval time.Duration
 	done     chan struct{}
@@ -37,9 +37,9 @@ type QueueMonitor struct {
 
 //Config is the intermediate struct representation of the queue monitor config
 type Config struct {
-	Outputs  ReporterConfig `config:"outputs"`
-	Interval time.Duration  `config:"interval"`
-	Enabled  bool           `config:"enabled"`
+	Reporters ReporterConfig `config:"reporters"`
+	Interval  time.Duration  `config:"interval"`
+	Enabled   bool           `config:"enabled"`
 }
 
 // ReporterConfig is the main config subsection for the queue monitor
@@ -51,7 +51,7 @@ type ReporterConfig struct {
 // DefaultConfig returns the default settings for the queue monitor
 func DefaultConfig() Config {
 	return Config{
-		Outputs: ReporterConfig{
+		Reporters: ReporterConfig{
 			LogOutput: log.Config{
 				Enabled: true,
 			},
@@ -76,11 +76,11 @@ func NewFromConfig(cfg Config, queue outqueue.Queue) (*QueueMonitor, error) {
 	//init outputs
 	outputs := initReporters(cfg)
 	return &QueueMonitor{
-		interval: cfg.Interval,
-		queue:    queue,
-		done:     make(chan struct{}),
-		log:      logp.L(),
-		outputs:  outputs,
+		interval:  cfg.Interval,
+		queue:     queue,
+		done:      make(chan struct{}),
+		log:       logp.L(),
+		reporters: outputs,
 	}, nil
 }
 
@@ -113,7 +113,7 @@ func (mon QueueMonitor) End() {
 		return
 	}
 	mon.log.Infof("Shutting down metrics monitor...")
-	for _, out := range mon.outputs {
+	for _, out := range mon.reporters {
 		out.Close()
 	}
 	mon.done <- struct{}{}
@@ -149,7 +149,7 @@ func (mon *QueueMonitor) updateMetrics() error {
 }
 
 func (mon QueueMonitor) sendToReporters(metrics reporter.QueueMetrics) {
-	for _, out := range mon.outputs {
+	for _, out := range mon.reporters {
 		err := out.ReportQueueMetrics(metrics)
 		//Assuming we don't want to make this a hard error, since one broken output doesn't mean they're all broken.
 		if err != nil {
@@ -161,19 +161,19 @@ func (mon QueueMonitor) sendToReporters(metrics reporter.QueueMetrics) {
 
 // Load the raw config and look for monitoring outputs to initialize.
 func initReporters(cfg Config) []reporter.Reporter {
-	outputList := []reporter.Reporter{}
+	outReporters := []reporter.Reporter{}
 
-	if cfg.Outputs.LogOutput.Enabled {
+	if cfg.Reporters.LogOutput.Enabled {
 		reporter := log.NewLoggerReporter()
-		outputList = append(outputList, reporter)
+		outReporters = append(outReporters, reporter)
 	}
 
-	if cfg.Outputs.ExpvarOutput.Enabled {
-		reporter := expvar.NewExpvarReporter(cfg.Outputs.ExpvarOutput)
-		outputList = append(outputList, reporter)
+	if cfg.Reporters.ExpvarOutput.Enabled {
+		reporter := expvar.NewExpvarReporter(cfg.Reporters.ExpvarOutput)
+		outReporters = append(outReporters, reporter)
 	}
 
-	return outputList
+	return outReporters
 }
 
 // This is a wrapper to deal with the multiple queue metric "types",

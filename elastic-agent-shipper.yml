@@ -16,7 +16,7 @@ queue:
 metrics:
   enabled: true
   interval: 5s
-  outputs:
+  reporters:
     log:
       enabled: true
     expvar:

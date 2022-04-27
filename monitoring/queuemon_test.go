@@ -86,9 +86,9 @@ func (tq *TestMetricsQueue) Metrics() (queue.Metrics, error) {
 // simple wrapper to return a generic config object
 func initMonWithconfig(interval int, name string) Config {
 	return Config{
-		Interval: time.Second * time.Duration(interval),
+		Interval: time.Millisecond * time.Duration(interval),
 		Enabled:  true,
-		Outputs: ReporterConfig{
+		Reporters: ReporterConfig{
 			ExpvarOutput: expvar.Config{
 				Enabled: true,
 				Addr:    ":8081",
@@ -127,7 +127,6 @@ func TestSetupMonitor(t *testing.T) {
 	mon, err := NewFromConfig(monitor, queue)
 	assert.NoError(t, err)
 	mon.Watch()
-	time.Sleep(time.Second)
 	mon.End()
 
 }
@@ -147,7 +146,6 @@ func TestReportedEvents(t *testing.T) {
 
 	t.Logf("listening for events...")
 	// once we have maxEvents, we can properly
-
 	// use the expvar endpoint to check the output
 	client := http.Client{
 		Timeout: 5 * time.Second,
@@ -165,7 +163,6 @@ func TestReportedEvents(t *testing.T) {
 			break
 		}
 
-		time.Sleep(time.Second)
 	}
 
 	assert.True(t, gotQueueIsFull, "Did not report a full queue")
