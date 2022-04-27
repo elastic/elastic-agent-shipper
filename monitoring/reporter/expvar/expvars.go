@@ -49,7 +49,6 @@ func NewExpvarReporter(cfg Config) reporter.Reporter {
 }
 
 func (exp Expvars) runFrontend() {
-
 	go func() {
 		err := exp.srv.ListenAndServe()
 		if !errors.Is(err, http.ErrServerClosed) {
@@ -59,7 +58,6 @@ func (exp Expvars) runFrontend() {
 		}
 
 	}()
-
 }
 
 func (exp *Expvars) format() interface{} {

@@ -91,7 +91,7 @@ func initMonWithconfig(interval int, name string) Config {
 		ExpvarOutput: expvar.Config{
 			Enabled: true,
 			Port:    8081,
-			Host:    "localhost",
+			Host:    "",
 			Name:    name,
 		},
 	}
