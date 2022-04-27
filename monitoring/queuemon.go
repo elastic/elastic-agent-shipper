@@ -37,25 +37,25 @@ type QueueMonitor struct {
 
 //Config is the intermediate struct representation of the queue monitor config
 type Config struct {
-	Outputs  OutputConfig  `config:"outputs"`
-	Interval time.Duration `config:"interval"`
-	Enabled  bool          `config:"enabled"`
+	Outputs  ReporterConfig `config:"outputs"`
+	Interval time.Duration  `config:"interval"`
+	Enabled  bool           `config:"enabled"`
 }
 
-// OutputConfig is the main config subsection for the
-type OutputConfig struct {
-	LogOutput    log.Config           `config:"log"`
-	ExpvarOutput expvar.ExpvarsConfig `config:"expvar"`
+// ReporterConfig is the main config subsection for the queue monitor
+type ReporterConfig struct {
+	LogOutput    log.Config    `config:"log"`
+	ExpvarOutput expvar.Config `config:"expvar"`
 }
 
 // DefaultConfig returns the default settings for the queue monitor
 func DefaultConfig() Config {
 	return Config{
-		Outputs: OutputConfig{
+		Outputs: ReporterConfig{
 			LogOutput: log.Config{
 				Enabled: true,
 			},
-			ExpvarOutput: expvar.ExpvarsConfig{
+			ExpvarOutput: expvar.Config{
 				Enabled: false,
 				Addr:    ":8080",
 				Name:    "queue",
@@ -74,7 +74,7 @@ func NewFromConfig(cfg Config, queue outqueue.Queue) (*QueueMonitor, error) {
 		return &QueueMonitor{bypass: true}, nil
 	}
 	//init outputs
-	outputs := initOutputs(cfg)
+	outputs := initReporters(cfg)
 	return &QueueMonitor{
 		interval: cfg.Interval,
 		queue:    queue,
@@ -107,11 +107,14 @@ func (mon QueueMonitor) Watch() {
 	}()
 }
 
-// End closes the watcher
-// As of now this isn't being called outside of tests, as don't have any kind of signal catch/shutdown in the shipper itself.
+// End closes the metrics reporter and associated interfaces.
 func (mon QueueMonitor) End() {
 	if mon.bypass {
 		return
+	}
+	mon.log.Infof("Shutting down metrics monitor...")
+	for _, out := range mon.outputs {
+		out.Close()
 	}
 	mon.done <- struct{}{}
 }
@@ -132,7 +135,7 @@ func (mon *QueueMonitor) updateMetrics() error {
 		mon.queueLimitCount = mon.queueLimitCount + 1
 	}
 
-	mon.sendToOutputs(reporter.QueueMetrics{
+	mon.sendToReporters(reporter.QueueMetrics{
 		CurrentQueueLevel:      opt.UintWith(count),
 		QueueMaxLevel:          opt.UintWith(limit),
 		QueueIsCurrentlyFull:   queueIsFull,
@@ -145,7 +148,7 @@ func (mon *QueueMonitor) updateMetrics() error {
 	return nil
 }
 
-func (mon QueueMonitor) sendToOutputs(metrics reporter.QueueMetrics) {
+func (mon QueueMonitor) sendToReporters(metrics reporter.QueueMetrics) {
 	for _, out := range mon.outputs {
 		err := out.ReportQueueMetrics(metrics)
 		//Assuming we don't want to make this a hard error, since one broken output doesn't mean they're all broken.
@@ -157,7 +160,7 @@ func (mon QueueMonitor) sendToOutputs(metrics reporter.QueueMetrics) {
 }
 
 // Load the raw config and look for monitoring outputs to initialize.
-func initOutputs(cfg Config) []reporter.Reporter {
+func initReporters(cfg Config) []reporter.Reporter {
 	outputList := []reporter.Reporter{}
 
 	if cfg.Outputs.LogOutput.Enabled {

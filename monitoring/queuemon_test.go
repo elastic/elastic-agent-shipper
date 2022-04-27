@@ -88,8 +88,8 @@ func initMonWithconfig(interval int, name string) Config {
 	return Config{
 		Interval: time.Second * time.Duration(interval),
 		Enabled:  true,
-		Outputs: OutputConfig{
-			ExpvarOutput: expvar.ExpvarsConfig{
+		Outputs: ReporterConfig{
+			ExpvarOutput: expvar.Config{
 				Enabled: true,
 				Addr:    ":8081",
 				Name:    name,

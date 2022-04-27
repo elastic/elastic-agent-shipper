@@ -28,4 +28,5 @@ type QueueMetrics struct {
 // Reporter is the bare interface that will be implemented by the various outputs
 type Reporter interface {
 	ReportQueueMetrics(QueueMetrics) error
+	Close() error
 }

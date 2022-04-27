@@ -6,9 +6,7 @@ package log
 
 import (
 	"fmt"
-	"time"
 
-	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/transform/typeconv"
@@ -39,8 +37,12 @@ func (rep LoggerReporter) ReportQueueMetrics(stats reporter.QueueMetrics) error 
 	if err != nil {
 		return fmt.Errorf("error updating metrics: %w", err)
 	}
-	rep.log.Infof("Raw formatted stats: %v", common.Time(time.Now()))
 	rep.log.Infow("Queue Statistics", logp.Reflect("queue", conv))
+	return nil
+}
+
+// Close just satisfies the Reporter Interface
+func (rep LoggerReporter) Close() error {
 	return nil
 }
 

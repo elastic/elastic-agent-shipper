@@ -7,6 +7,9 @@ package expvar
 import (
 	"expvar"
 	"net/http"
+	"time"
+
+	"golang.org/x/net/context"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
@@ -14,8 +17,8 @@ import (
 	"github.com/elastic/elastic-agent-shipper/monitoring/reporter"
 )
 
-//ExpvarsConfig is the config struct for marshalling whatever we get from the config file
-type ExpvarsConfig struct {
+//Config is the config struct for marshalling whatever we get from the config file
+type Config struct {
 	Enabled bool   `config:"enabled"`
 	Addr    string `config:"address"`
 	Name    string `config:"name"`
@@ -25,13 +28,14 @@ type ExpvarsConfig struct {
 type Expvars struct {
 	log     *logp.Logger
 	metrics reporter.QueueMetrics
+	srv     *http.Server
 }
 
 // NewExpvarReporter initializes the expvar interface, and starts the http frontend.
-func NewExpvarReporter(cfg ExpvarsConfig) reporter.Reporter {
+func NewExpvarReporter(cfg Config) reporter.Reporter {
 	exp := Expvars{
-		log: logp.L(),
-
+		log:     logp.L(),
+		srv:     &http.Server{Addr: cfg.Addr},
 		metrics: reporter.QueueMetrics{},
 	}
 	exp.log.Debugf("Starting expvar monitoring...")
@@ -40,14 +44,18 @@ func NewExpvarReporter(cfg ExpvarsConfig) reporter.Reporter {
 	return &exp
 }
 
-func (exp Expvars) runFrontend(cfg ExpvarsConfig) {
+func (exp Expvars) runFrontend(cfg Config) {
+	srv := &http.Server{Addr: cfg.Addr}
 	go func() {
-		err := http.ListenAndServe(cfg.Addr, nil)
+		err := srv.ListenAndServe()
 		if err != nil {
 			// Error type isn't happy with %w here
 			exp.log.Errorf("Error starting HTTP expvar server: %s", err)
+			return
 		}
+
 	}()
+
 }
 
 func (exp *Expvars) format() interface{} {
@@ -66,5 +74,17 @@ func (exp *Expvars) format() interface{} {
 func (exp *Expvars) ReportQueueMetrics(queue reporter.QueueMetrics) error {
 	exp.metrics = queue
 
+	return nil
+}
+
+// Close stops the HTTP handler
+func (exp *Expvars) Close() error {
+	exp.log.Debugf("Closing expvar server...")
+	timeout, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	err := exp.srv.Shutdown(timeout)
+	if err != nil {
+		exp.log.Errorf("error in expvar server shutdown: %w", err)
+	}
 	return nil
 }
