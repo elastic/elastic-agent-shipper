@@ -88,12 +88,11 @@ func initMonWithconfig(interval int, name string) Config {
 	return Config{
 		Interval: time.Millisecond * time.Duration(interval),
 		Enabled:  true,
-		Reporters: ReporterConfig{
-			ExpvarOutput: expvar.Config{
-				Enabled: true,
-				Addr:    ":8081",
-				Name:    name,
-			},
+		ExpvarOutput: expvar.Config{
+			Enabled: true,
+			Port:    8081,
+			Host:    "localhost",
+			Name:    name,
 		},
 	}
 

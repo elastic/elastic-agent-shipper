@@ -36,10 +36,10 @@ func init() {
 type ShipperConfig struct {
 	Log     logp.Config       `config:"logging"`
 	TLS     bool              `config:"tls"`
-	Cert    string            `config:"cert"`    //TLS cert file, if TLS is enabled
-	Key     string            `config:"key"`     //TLS Keyfile, if specified
-	Port    int               `config:"port"`    //Port to listen on
-	Monitor monitoring.Config `config:"metrics"` //Queue monitoring settings
+	Cert    string            `config:"cert"`       //TLS cert file, if TLS is enabled
+	Key     string            `config:"key"`        //TLS Keyfile, if specified
+	Port    int               `config:"port"`       //Port to listen on
+	Monitor monitoring.Config `config:"monitoring"` //Queue monitoring settings
 }
 
 // ReadConfig returns the populated config from the specified path
@@ -65,7 +65,6 @@ func ReadConfig() (ShipperConfig, error) {
 	if err != nil {
 		return config, fmt.Errorf("error unpacking shipper config: %w", err)
 	}
-
 	return config, nil
 }
 

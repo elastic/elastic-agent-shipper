@@ -74,7 +74,7 @@ func Run(cfg config.ShipperConfig) error {
 		return fmt.Errorf("error loading outputs: %w", err)
 	}
 
-	log.Debugf("Loaded outputs, waiting....")
+	log.Debugf("Loaded monitoring outputs")
 
 	var opts []grpc.ServerOption
 	if cfg.TLS {

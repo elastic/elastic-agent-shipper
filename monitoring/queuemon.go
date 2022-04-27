@@ -37,33 +37,24 @@ type QueueMonitor struct {
 
 //Config is the intermediate struct representation of the queue monitor config
 type Config struct {
-	Reporters ReporterConfig `config:"reporters"`
-	Interval  time.Duration  `config:"interval"`
-	Enabled   bool           `config:"enabled"`
-}
-
-// ReporterConfig is the main config subsection for the queue monitor
-type ReporterConfig struct {
-	LogOutput    log.Config    `config:"log"`
-	ExpvarOutput expvar.Config `config:"expvar"`
+	LogOutput    bool          `config:"logs"`
+	ExpvarOutput expvar.Config `config:"http"`
+	Interval     time.Duration `config:"interval"`
+	Enabled      bool          `config:"enabled"`
 }
 
 // DefaultConfig returns the default settings for the queue monitor
 func DefaultConfig() Config {
 	return Config{
-		Reporters: ReporterConfig{
-			LogOutput: log.Config{
-				Enabled: true,
-			},
-			ExpvarOutput: expvar.Config{
-				Enabled: false,
-				Addr:    ":8080",
-				Name:    "queue",
-			},
+		ExpvarOutput: expvar.Config{
+			Enabled: false,
+			Port:    8080,
+			Host:    "localhost",
+			Name:    "queue",
 		},
-
-		Enabled:  true,
-		Interval: time.Second * 30,
+		LogOutput: true,
+		Enabled:   true,
+		Interval:  time.Second * 30,
 	}
 }
 
@@ -163,13 +154,13 @@ func (mon QueueMonitor) sendToReporters(metrics reporter.QueueMetrics) {
 func initReporters(cfg Config) []reporter.Reporter {
 	outReporters := []reporter.Reporter{}
 
-	if cfg.Reporters.LogOutput.Enabled {
+	if cfg.LogOutput {
 		reporter := log.NewLoggerReporter()
 		outReporters = append(outReporters, reporter)
 	}
 
-	if cfg.Reporters.ExpvarOutput.Enabled {
-		reporter := expvar.NewExpvarReporter(cfg.Reporters.ExpvarOutput)
+	if cfg.ExpvarOutput.Enabled {
+		reporter := expvar.NewExpvarReporter(cfg.ExpvarOutput)
 		outReporters = append(outReporters, reporter)
 	}
 

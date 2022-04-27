@@ -13,13 +13,12 @@ queue:
   test: #There is no actual "test" queue type, remove this later.
     events: 512
 
-metrics:
+monitoring:
   enabled: true
   interval: 5s
-  reporters:
-    log:
-      enabled: true
-    expvar:
-      enabled: true
-      address: "localhost:8282"
-      name: "queue"
+  log: true
+  http:
+    enabled: true
+    host: "localhost"
+    port: 8282
+    name: "queue"

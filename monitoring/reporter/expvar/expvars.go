@@ -7,6 +7,7 @@ package expvar
 import (
 	"errors"
 	"expvar"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -21,7 +22,8 @@ import (
 //Config is the config struct for marshalling whatever we get from the config file
 type Config struct {
 	Enabled bool   `config:"enabled"`
-	Addr    string `config:"address"`
+	Host    string `config:"Host"`
+	Port    int    `config:"port"`
 	Name    string `config:"name"`
 }
 
@@ -34,21 +36,22 @@ type Expvars struct {
 
 // NewExpvarReporter initializes the expvar interface, and starts the http frontend.
 func NewExpvarReporter(cfg Config) reporter.Reporter {
+	hostname := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
 	exp := Expvars{
 		log:     logp.L(),
-		srv:     &http.Server{Addr: cfg.Addr},
+		srv:     &http.Server{Addr: hostname},
 		metrics: reporter.QueueMetrics{},
 	}
 	exp.log.Debugf("Starting expvar monitoring...")
 	expvar.Publish(cfg.Name, expvar.Func(exp.format))
-	exp.runFrontend(cfg)
+	exp.runFrontend()
 	return &exp
 }
 
-func (exp Expvars) runFrontend(cfg Config) {
-	srv := &http.Server{Addr: cfg.Addr}
+func (exp Expvars) runFrontend() {
+
 	go func() {
-		err := srv.ListenAndServe()
+		err := exp.srv.ListenAndServe()
 		if !errors.Is(err, http.ErrServerClosed) {
 			// Error type isn't happy with %w here
 			exp.log.Errorf("Error starting HTTP expvar server: %s", err)
