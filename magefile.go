@@ -10,7 +10,6 @@ package main
 import (
 	"path/filepath"
 
-	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 
 	// mage:import
@@ -38,9 +37,8 @@ func GenProto() {
 }
 
 func Build() {
-	mg.Deps(common.Fmt)
 	sh.Run("go", "build")
-
+	common.Fmt()
 }
 
 // Notice generates a NOTICE.txt file for the module.
