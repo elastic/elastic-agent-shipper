@@ -10,10 +10,11 @@ package main
 import (
 	"path/filepath"
 
+	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 
 	// mage:import
-	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/common"
+	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
 	// mage:import
 	"github.com/elastic/elastic-agent-libs/dev-tools/mage"
 
@@ -37,7 +38,9 @@ func GenProto() {
 }
 
 func Build() {
+	mg.Deps(common.Fmt)
 	sh.Run("go", "build")
+
 }
 
 // Notice generates a NOTICE.txt file for the module.
