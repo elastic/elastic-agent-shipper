@@ -34,11 +34,12 @@ var Aliases = map[string]interface{}{
 
 func GenProto() {
 	sh.Run("protoc", "-Iapi", "-Iapi/vendor", "--go_out=./api", "--go-grpc_out=./api", "--go_opt=paths=source_relative", "--go-grpc_opt=paths=source_relative", "api/shipper.proto")
+	common.Fmt()
 }
 
 func Build() {
 	sh.Run("go", "build")
-	common.Fmt()
+
 }
 
 // Notice generates a NOTICE.txt file for the module.
