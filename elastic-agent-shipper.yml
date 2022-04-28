@@ -1,3 +1,8 @@
+###################### Shipper Configuration Example #########################
+
+# This file is an example configuration file highlighting only the most common
+# options.
+
 # The gRPC port that the shipper will listen on
 port: 50052
 tls: false
@@ -8,3 +13,17 @@ tls: false
 logging.level: debug
 logging.selectors: ["*"]
 logging.to_stderr: true
+
+queue:
+  test: #There is no actual "test" queue type, remove this later.
+    events: 512
+
+monitoring:
+  enabled: true
+  interval: 5s
+  log: true
+  http:
+    enabled: true
+    host: "localhost"
+    port: 8282
+    name: "queue"
