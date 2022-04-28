@@ -1,3 +1,8 @@
+###################### Shipper Configuration Example #########################
+
+# This file is an example configuration file highlighting only the most common
+# options.
+
 # The gRPC port that the shipper will listen on
 port: 50052
 tls: false

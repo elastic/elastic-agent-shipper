@@ -20,16 +20,16 @@ import (
 
 //QueueMonitor is the main handler object for the queue monitor, and will be responsible for startup, shutdown, handling config, and persistent tracking of metrics.
 type QueueMonitor struct {
-	// An array of user-configured reporters
+	// reporters is an array of user-configured reporters
 	reporters []reporter.Reporter
-	//user-configured reporting interval
+	// interval is the user-configured reporting interval
 	interval time.Duration
 	done     chan struct{}
 	// handler for the event queue
 	queue outqueue.Queue
 	log   *logp.Logger
-	// A awkward no-op if a user has disabled monitoring
-	bypass bool
+	// enabled is a awkward no-op if a user has disabled monitoring
+	enabled bool
 
 	// Count of times the queue has reached a configured limit.
 	queueLimitCount uint64
@@ -62,23 +62,23 @@ func DefaultConfig() Config {
 func NewFromConfig(cfg Config, queue outqueue.Queue) (*QueueMonitor, error) {
 	// the queue == nil is largely a shim to make things not panic while we wait for the queues to get hooked up.
 	if !cfg.Enabled || queue == nil {
-		return &QueueMonitor{bypass: true}, nil
+		return &QueueMonitor{enabled: true}, nil
 	}
-	//init outputs
-	outputs := initReporters(cfg)
+	//init reporters
+	reporters := initReporters(cfg)
 	return &QueueMonitor{
 		interval:  cfg.Interval,
 		queue:     queue,
 		done:      make(chan struct{}),
 		log:       logp.L(),
-		reporters: outputs,
+		reporters: reporters,
 	}, nil
 }
 
 // Watch is a non-blocking call that starts up a queue watcher that will report metrics to a given output
 func (mon QueueMonitor) Watch() {
 	// Turn this function into a no-op if nothing is initialized.
-	if mon.bypass {
+	if mon.enabled {
 		return
 	}
 	ticker := time.NewTicker(mon.interval)
@@ -100,7 +100,7 @@ func (mon QueueMonitor) Watch() {
 
 // End closes the metrics reporter and associated interfaces.
 func (mon QueueMonitor) End() {
-	if mon.bypass {
+	if mon.enabled {
 		return
 	}
 	mon.log.Infof("Shutting down metrics monitor...")
@@ -119,7 +119,7 @@ func (mon *QueueMonitor) updateMetrics() error {
 
 	count, limit, queueIsFull, err := getLimits(raw)
 	if err != nil {
-		return fmt.Errorf("could not get limits: %w", err)
+		return fmt.Errorf("could not get queue metrics limits: %w", err)
 	}
 
 	if queueIsFull {
@@ -127,10 +127,10 @@ func (mon *QueueMonitor) updateMetrics() error {
 	}
 
 	mon.sendToReporters(reporter.QueueMetrics{
-		CurrentQueueLevel:      opt.UintWith(count),
-		QueueMaxLevel:          opt.UintWith(limit),
-		QueueIsCurrentlyFull:   queueIsFull,
-		QueueLimitReachedCount: opt.UintWith(mon.queueLimitCount),
+		CurrentLevel:      opt.UintWith(count),
+		MaxLevel:          opt.UintWith(limit),
+		IsFull:            queueIsFull,
+		LimitReachedCount: opt.UintWith(mon.queueLimitCount),
 		// Running on a philosophy that the outputs should be dumb and unopinionated,
 		//so we're doing the type conversion here.
 		OldestActiveTimestamp: raw.OldestActiveTimestamp.String(),
@@ -147,7 +147,6 @@ func (mon QueueMonitor) sendToReporters(metrics reporter.QueueMetrics) {
 			mon.log.Errorf("Error sending to output: %w", err)
 		}
 	}
-
 }
 
 // Load the raw config and look for monitoring outputs to initialize.

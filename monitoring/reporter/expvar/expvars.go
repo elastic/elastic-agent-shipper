@@ -34,7 +34,7 @@ type Expvars struct {
 	srv     *http.Server
 }
 
-// NewExpvarReporter initializes the expvar interface, and starts the http frontend.
+// NewExpvarReporter initializes the expvar reporter, and starts the http frontend.
 func NewExpvarReporter(cfg Config) reporter.Reporter {
 	hostname := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
 	exp := Expvars{
@@ -60,11 +60,11 @@ func (exp Expvars) runFrontend() {
 	}()
 }
 
+//format is function is a callback sent to expvar.Func, so this is probably the best way to handle errors.
 func (exp *Expvars) format() interface{} {
 	to := mapstr.M{}
 
 	err := typeconv.Convert(&to, exp.metrics)
-	// This function is a callback sent to expvar.Func, so this is probably the best way to handle errors.
 	if err != nil {
 		exp.log.Errorf("Error formatting queue metrics: %w", err)
 	}

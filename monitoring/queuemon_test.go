@@ -6,7 +6,9 @@ package monitoring
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"runtime"
 	"testing"
@@ -20,13 +22,16 @@ import (
 	"github.com/elastic/elastic-agent-shipper/monitoring/reporter/expvar"
 )
 
-// emulates what the expvar queue metrics look like on the other end
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
+//expvarQueue emulates what the expvar queue metrics look like on the other end
 type expvarQueue struct {
-	CurrentLevel int  `json:"current_queue_level"`
-	Maxlevel     int  `json:"max_queue_level"`
-	IsFull       bool `json:"queue_is_currently_full"`
-	LimitCount   int  `json:"queue_limit_reached_count"`
+	CurrentLevel int  `json:"current_level"`
+	Maxlevel     int  `json:"max_level"`
+	IsFull       bool `json:"is_full"`
+	LimitCount   int  `json:"limit_reached_count"`
 }
 
 // ======= mocked test input queue
@@ -71,7 +76,6 @@ func (tq TestMetricsQueue) Close() error {
 
 // Metrics spoofs the metrics output
 func (tq *TestMetricsQueue) Metrics() (queue.Metrics, error) {
-	//fmt.Printf("Got queue state: %#v\n", tq)
 	tq.metricState.EventCount = opt.UintWith(tq.metricState.EventCount.ValueOr(0) + 1)
 
 	if tq.metricState.EventCount.ValueOr(0) > tq.limit {
@@ -81,21 +85,22 @@ func (tq *TestMetricsQueue) Metrics() (queue.Metrics, error) {
 	return tq.metricState, nil
 }
 
-// ============ mocked output reporter
+func getRandPort() int {
+	return rand.Intn(65535-49152) + 49152 //nolint:gosec //This is a test, strong crypto not needed
+}
 
 // simple wrapper to return a generic config object
-func initMonWithconfig(interval int, name string) Config {
+func initMonWithconfig(interval int, name string, port int) Config {
 	return Config{
 		Interval: time.Millisecond * time.Duration(interval),
 		Enabled:  true,
 		ExpvarOutput: expvar.Config{
 			Enabled: true,
-			Port:    8081,
+			Port:    port,
 			Host:    "",
 			Name:    name,
 		},
 	}
-
 }
 
 // fetch the expvar data from the http endpoint and return the final queue object to test the metrics outputs
@@ -121,17 +126,18 @@ func fetchExpVars(t *testing.T, client http.Client, endpoint string) expvarQueue
 // actual tests
 
 func TestSetupMonitor(t *testing.T) {
-	monitor := initMonWithconfig(1, "test")
+	port := getRandPort()
+	monitor := initMonWithconfig(1, "test", port)
 	queue := NewTestQueue(10)
 	mon, err := NewFromConfig(monitor, queue)
 	assert.NoError(t, err)
 	mon.Watch()
 	mon.End()
-
 }
 
 func TestReportedEvents(t *testing.T) {
-	monitor := initMonWithconfig(1, "queue")
+	port := getRandPort()
+	monitor := initMonWithconfig(1, "queue", port)
 
 	var maxEvents uint64 = 10
 	queue := NewTestQueue(maxEvents)
@@ -140,7 +146,6 @@ func TestReportedEvents(t *testing.T) {
 	mon.Watch()
 
 	var limitCount int
-	var gotQueueIsFull bool
 	var queueFullCount int
 
 	t.Logf("listening for events...")
@@ -149,22 +154,23 @@ func TestReportedEvents(t *testing.T) {
 	client := http.Client{
 		Timeout: 5 * time.Second,
 	}
-	endpoint := "http://localhost:8081/debug/vars"
+
+	endpoint := fmt.Sprintf("http://localhost:%d/debug/vars", port)
 
 	// Sit and wait until we have interesting data we can test
 	for {
 		result := fetchExpVars(t, client, endpoint)
 		t.Logf("Got raw result: %#v", result)
 		if result.IsFull {
-			gotQueueIsFull = true
 			queueFullCount = result.CurrentLevel
 			limitCount = result.LimitCount
+
 			break
 		}
 
 	}
 	mon.End()
-	assert.True(t, gotQueueIsFull, "Did not report a full queue")
+
 	assert.NotZero(t, limitCount, "Got a queue full count of 0")
 	assert.Equal(t, int(maxEvents), queueFullCount)
 }
