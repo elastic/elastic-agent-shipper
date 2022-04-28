@@ -13,7 +13,7 @@ import (
 	"github.com/magefile/mage/sh"
 
 	// mage:import
-	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/common"
+	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
 	// mage:import
 	"github.com/elastic/elastic-agent-libs/dev-tools/mage"
 
@@ -34,6 +34,7 @@ var Aliases = map[string]interface{}{
 
 func GenProto() {
 	sh.Run("protoc", "-Iapi", "-Iapi/vendor", "--go_out=./api", "--go-grpc_out=./api", "--go_opt=paths=source_relative", "--go-grpc_opt=paths=source_relative", "api/shipper.proto")
+	common.Fmt()
 }
 
 func Build() {
@@ -47,5 +48,4 @@ func Notice() error {
 		filepath.Join("dev-tools", "templates", "notice", "rules.json"),
 		filepath.Join("dev-tools", "templates", "notice", "NOTICE.txt.tmpl"),
 	)
-
 }
