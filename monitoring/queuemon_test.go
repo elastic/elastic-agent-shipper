@@ -6,10 +6,12 @@ package monitoring
 
 import (
 	"encoding/json"
+	"expvar"
 	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
+	"net/http/httptest"
 	"runtime"
 	"testing"
 	"time"
@@ -19,7 +21,7 @@ import (
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/libbeat/opt"
 	"github.com/elastic/beats/v7/libbeat/publisher/queue"
-	"github.com/elastic/elastic-agent-shipper/monitoring/reporter/expvar"
+	expvarReport "github.com/elastic/elastic-agent-shipper/monitoring/reporter/expvar"
 )
 
 func init() {
@@ -85,18 +87,14 @@ func (tq *TestMetricsQueue) Metrics() (queue.Metrics, error) {
 	return tq.metricState, nil
 }
 
-func getRandPort() int {
-	return rand.Intn(65535-49152) + 49152 //nolint:gosec //This is a test, strong crypto not needed
-}
-
 // simple wrapper to return a generic config object
-func initMonWithconfig(interval int, name string, port int) Config {
+func initMonWithconfig(interval int, name string) Config {
 	return Config{
 		Interval: time.Millisecond * time.Duration(interval),
 		Enabled:  true,
-		ExpvarOutput: expvar.Config{
+		ExpvarOutput: expvarReport.Config{
 			Enabled: true,
-			Port:    port,
+			Port:    0,
 			Host:    "",
 			Name:    name,
 		},
@@ -104,30 +102,46 @@ func initMonWithconfig(interval int, name string, port int) Config {
 }
 
 // fetch the expvar data from the http endpoint and return the final queue object to test the metrics outputs
-func fetchExpVars(t *testing.T, client http.Client, endpoint string) expvarQueue {
+func fetchExpVars(client http.Client, endpoint string) (expvarQueue, error) {
 	resp, err := client.Get(endpoint) //nolint:noctx //this is a test, with a timeout
-	assert.NoError(t, err)
+	if err != nil {
+		return expvarQueue{}, fmt.Errorf("error in HTTP get: %w", err)
+	}
 	defer resp.Body.Close()
-	assert.Equal(t, resp.StatusCode, 200, "expvar endpoint did not return 200: %#v", resp)
+	if resp.StatusCode != 200 {
+		return expvarQueue{}, fmt.Errorf("expvar endpoint did not return 200: %#v", resp)
+	}
 	httpResp, err := io.ReadAll(resp.Body)
-	assert.NoError(t, err)
+	if err != nil {
+		return expvarQueue{}, fmt.Errorf("error reading response body from expvar endpoint: %w", err)
+	}
 	raw := struct {
 		Memstats runtime.MemStats
 		Cmdline  []string
 		Queue    expvarQueue
 	}{}
 	err = json.Unmarshal(httpResp, &raw)
+	if err != nil {
+		return raw.Queue, fmt.Errorf("error unmarshalling json from expvar: %w", err)
+	}
 
-	assert.NoError(t, err)
+	return raw.Queue, nil
+}
 
-	return raw.Queue
+func startTestServer() string {
+	// Start an http test server on a random port and re-register expvar's global endpoint
+	// The only part of the library this bypasses is the "regular" http test server, as we're still
+	// hitting all the code that we register via expvar
+	ts := httptest.NewUnstartedServer(nil)
+	ts.Config.Handler = expvar.Handler()
+	ts.Start()
+	return ts.URL
 }
 
 // actual tests
 
 func TestSetupMonitor(t *testing.T) {
-	port := getRandPort()
-	monitor := initMonWithconfig(1, "test", port)
+	monitor := initMonWithconfig(1, "test")
 	queue := NewTestQueue(10)
 	mon, err := NewFromConfig(monitor, queue)
 	assert.NoError(t, err)
@@ -136,8 +150,8 @@ func TestSetupMonitor(t *testing.T) {
 }
 
 func TestReportedEvents(t *testing.T) {
-	port := getRandPort()
-	monitor := initMonWithconfig(1, "queue", port)
+
+	monitor := initMonWithconfig(1, "queue")
 
 	var maxEvents uint64 = 10
 	queue := NewTestQueue(maxEvents)
@@ -155,11 +169,15 @@ func TestReportedEvents(t *testing.T) {
 		Timeout: 5 * time.Second,
 	}
 
-	endpoint := fmt.Sprintf("http://localhost:%d/debug/vars", port)
-
+	//endpoint := fmt.Sprintf("http://localhost:%d/debug/vars", port)
+	endpoint := startTestServer()
+	t.Logf("Addr: %s", endpoint)
 	// Sit and wait until we have interesting data we can test
 	for {
-		result := fetchExpVars(t, client, endpoint)
+		result, err := fetchExpVars(client, endpoint)
+		if err != nil {
+			t.Fatalf("Error fetching expvars: %s", err)
+		}
 		t.Logf("Got raw result: %#v", result)
 		if result.IsFull {
 			queueFullCount = result.CurrentLevel
