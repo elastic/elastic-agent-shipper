@@ -24,6 +24,7 @@ echo "Update go version ${GO_RELEASE_VERSION}"
 echo "${GO_RELEASE_VERSION}" > .go-version
 git add .go-version
 
+go install github.com/magefile/mage@v1.13.0
 mage linter:updateGoVersion
 git add .golangci.yml
 
