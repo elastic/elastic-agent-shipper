@@ -32,7 +32,7 @@ func New() (*Queue, error) {
 	return &Queue{}, nil
 }
 
-func (queue *Queue) PublishOrSomething(event *api.Event) {
+func (queue *Queue) Publish(event *api.Event) {
 
 }
 

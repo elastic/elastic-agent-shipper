@@ -28,7 +28,7 @@ func (serv shipperServer) PublishEvents(_ context.Context, req *pb.PublishReques
 	results := []*pb.EventResult{}
 	for _, evt := range req.Events {
 		serv.logger.Infof("Got event %s: %#v", evt.EventId, evt.Fields.AsMap())
-		serv.queue.PublishOrSomething(evt)
+		serv.queue.Publish(evt)
 		res := pb.EventResult{EventId: evt.EventId, Timestamp: pbts.Now()}
 		results = append(results, &res)
 	}
