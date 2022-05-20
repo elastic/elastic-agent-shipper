@@ -16,7 +16,7 @@ import (
 type Queue struct {
 	eventQueue beatsqueue.Queue
 
-	producer beatsqueue.Producer
+	//producer beatsqueue.Producer
 }
 
 type Metrics beatsqueue.Metrics
@@ -28,6 +28,20 @@ type MetricsSource interface {
 	Metrics() (Metrics, error)
 }
 
+func New() (*Queue, error) {
+	return &Queue{}, nil
+}
+
 func (queue *Queue) PublishOrSomething(event *api.Event) {
+
+}
+
+func (queue *Queue) Metrics() (Metrics, error) {
+	metrics, err := queue.eventQueue.Metrics()
+	// We need to do the explicit cast, otherwise this isn't recognized as the same type
+	return Metrics(metrics), err
+}
+
+func (queue *Queue) Close() {
 
 }
