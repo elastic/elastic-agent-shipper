@@ -16,6 +16,7 @@ require (
 	github.com/magefile/mage v1.13.0
 	github.com/stretchr/testify v1.7.0
 	go.elastic.co/go-licence-detector v0.5.0
+	golang.org/x/net v0.0.0-20220412020605-290c469a71a5
 )
 
 require (
@@ -65,7 +66,6 @@ require (
 	go.uber.org/zap v1.21.0 // indirect
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3 // indirect
-	golang.org/x/net v0.0.0-20220412020605-290c469a71a5 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
 	golang.org/x/sys v0.0.0-20220412211240-33da011f77ad // indirect
 	golang.org/x/text v0.3.7 // indirect
@@ -81,3 +81,5 @@ replace (
 	github.com/dop251/goja => github.com/andrewkroh/goja v0.0.0-20190128172624-dd2ac4456e20
 	github.com/dop251/goja_nodejs => github.com/dop251/goja_nodejs v0.0.0-20171011081505-adff31b136e6
 )
+
+replace github.com/elastic/beats => /Users/fae/go/src/github.com/elastic/beats
