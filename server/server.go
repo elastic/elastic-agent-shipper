@@ -12,10 +12,14 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	pb "github.com/elastic/elastic-agent-shipper/api"
+	"github.com/elastic/elastic-agent-shipper/queue"
 )
 
 type shipperServer struct {
 	logger *logp.Logger
+
+	queue *queue.Queue
+
 	pb.UnimplementedProducerServer
 }
 
@@ -24,6 +28,7 @@ func (serv shipperServer) PublishEvents(_ context.Context, req *pb.PublishReques
 	results := []*pb.EventResult{}
 	for _, evt := range req.Events {
 		serv.logger.Infof("Got event %s: %#v", evt.EventId, evt.Fields.AsMap())
+		serv.queue.PublishOrSomething(evt)
 		res := pb.EventResult{EventId: evt.EventId, Timestamp: pbts.Now()}
 		results = append(results, &res)
 	}

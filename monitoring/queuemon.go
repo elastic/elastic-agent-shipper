@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"time"
 
-	outqueue "github.com/elastic/beats/v7/libbeat/publisher/queue"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/opt"
 
 	"github.com/elastic/elastic-agent-shipper/monitoring/reporter"
+	"github.com/elastic/elastic-agent-shipper/queue"
 
 	"github.com/elastic/elastic-agent-shipper/monitoring/reporter/expvar"
 	"github.com/elastic/elastic-agent-shipper/monitoring/reporter/log"
@@ -26,8 +26,8 @@ type QueueMonitor struct {
 	interval time.Duration
 	done     chan struct{}
 	// handler for the event queue
-	queue outqueue.Queue
-	log   *logp.Logger
+	target queue.MetricsSource
+	log    *logp.Logger
 	// enabled is a awkward no-op if a user has disabled monitoring
 	enabled bool
 
@@ -59,16 +59,16 @@ func DefaultConfig() Config {
 }
 
 // NewFromConfig creates a new queue monitor from a pre-filled config struct.
-func NewFromConfig(cfg Config, queue outqueue.Queue) (*QueueMonitor, error) {
+func NewFromConfig(cfg Config, target queue.MetricsSource) (*QueueMonitor, error) {
 	// the queue == nil is largely a shim to make things not panic while we wait for the queues to get hooked up.
-	if !cfg.Enabled || queue == nil {
+	if !cfg.Enabled || target == nil {
 		return &QueueMonitor{enabled: true}, nil
 	}
 	//init reporters
 	reporters := initReporters(cfg)
 	return &QueueMonitor{
 		interval:  cfg.Interval,
-		queue:     queue,
+		target:    target,
 		done:      make(chan struct{}),
 		log:       logp.L(),
 		reporters: reporters,
@@ -112,7 +112,7 @@ func (mon QueueMonitor) End() {
 
 // updateMetrics is responsible for fetching the metrics from the queue, calculating whatever it needs to, and sending the complete events to the output
 func (mon *QueueMonitor) updateMetrics() error {
-	raw, err := mon.queue.Metrics()
+	raw, err := mon.target.Metrics()
 	if err != nil {
 		return fmt.Errorf("error fetching queue Metrics: %w", err)
 	}
@@ -169,7 +169,7 @@ func initReporters(cfg Config) []reporter.Reporter {
 // This is a wrapper to deal with the multiple queue metric "types",
 // as we could either be dealing with event counts, or bytes.
 // The reporting interfaces assumes we only want one.
-func getLimits(raw outqueue.Metrics) (uint64, uint64, bool, error) {
+func getLimits(raw queue.Metrics) (uint64, uint64, bool, error) {
 
 	//bias towards byte count, as it's a little more granular.
 	if raw.ByteCount.Exists() && raw.ByteLimit.Exists() {
