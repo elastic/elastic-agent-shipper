@@ -10,10 +10,16 @@ import "google/protobuf/struct.proto";
 import "google/rpc/status.proto";
 
 service Producer {
- // Publishes an event via the Elastic agent shipper.
+ // Publishes a list of events via the Elastic agent shipper.
+ // Blocks until all processing steps complete and data is written to the queue.
+ // The order of `PublishRequest.events` always matches `PublishReply.results`.
  //
- // Blocks until all processing steps complete and data is written to the queue. Returns a
- // RESOURCE_EXHAUSTED gRPC status code if the queue is full.
+ // Returns the `codes.ResourceExhausted` gRPC status code if the queue is full and none of the events
+ // can be accepted at the moment.
+ //
+ // If the queue could accept some events from the request, this returns a successful response
+ // containing results for the first K events that were accepted by the queue.
+ // The client is expected to retry sending the rest of the events in a separate request later.
  //
  // Inputs may execute multiple concurrent Produce requests for independent data streams. 
  // The order in which concurrent requests complete is not guaranteed. Use sequential requests to
@@ -69,7 +75,10 @@ message DataStream {
  
 message PublishReply {
  // Results describing messages successfully published to the queue.
- // The output order matches the input order e.g. results[N] maps to events[N].
+ //
+ // The output order matches the input order e.g. `results[N]` maps to `events[N]`,
+ // however, `results` may contain only the first K results for `events`, when
+ // not all the events are accepted by the queue, so the list sizes may not match.
  repeated EventResult results = 1;
 }
 
