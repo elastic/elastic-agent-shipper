@@ -1,6 +1,8 @@
 package queue
 
 import (
+	"fmt"
+
 	beatsqueue "github.com/elastic/beats/v7/libbeat/publisher/queue"
 
 	"github.com/elastic/elastic-agent-shipper/api"
@@ -32,8 +34,8 @@ func New() (*Queue, error) {
 	return &Queue{}, nil
 }
 
-func (queue *Queue) Publish(event *api.Event) {
-
+func (queue *Queue) Publish(event *api.Event) error {
+	return fmt.Errorf("couldn't publish: Queue.Publish is not implemented")
 }
 
 func (queue *Queue) Metrics() (Metrics, error) {
