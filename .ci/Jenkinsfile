@@ -67,8 +67,8 @@ pipeline {
                 }
                 unstash 'source'
                 dir("${BASE_DIR}"){
-                  withGoEnv(){
-                    cmd(label: 'Go build', script: 'go build')
+                  withMageEnv(version: "${env.GO_VERSION}"){
+                    cmd(label: 'Go build', script: 'mage build')
                   }
                 }
               }
