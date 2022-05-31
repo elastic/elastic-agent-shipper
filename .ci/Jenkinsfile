@@ -30,12 +30,13 @@ pipeline {
         deleteDir()
         gitCheckout(basedir: "${BASE_DIR}", githubNotifyFirstTimeContributor: true)
         stash allowEmpty: true, name: 'source', useDefaultExcludes: false
+        setEnvVar('GO_VERSION', readFile(".go-version").trim())
       }
     }
     stage('Check'){
       steps {
         withGithubNotify(context: "Check") {
-          withMageEnv(){
+          withMageEnv(version: "${env.GO_VERSION}"){
             dir("${BASE_DIR}"){
               withGoEnv(){
                 cmd(label: 'mage notice', script: 'mage notice')
