@@ -37,6 +37,7 @@ pipeline {
         withGithubNotify(context: "Check") {
           dir("${BASE_DIR}"){
             withGoEnv(){
+              sh(label: 'mage notice', script: 'mage notice')
               sh(label: 'mage check', script: 'mage check')
             }
           }
