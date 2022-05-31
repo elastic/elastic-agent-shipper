@@ -30,7 +30,9 @@ pipeline {
         deleteDir()
         gitCheckout(basedir: "${BASE_DIR}", githubNotifyFirstTimeContributor: true)
         stash allowEmpty: true, name: 'source', useDefaultExcludes: false
-        setEnvVar('GO_VERSION', readFile(".go-version").trim())
+        dir("${BASE_DIR}"){
+          setEnvVar('GO_VERSION', readFile(".go-version").trim())
+        }
       }
     }
     stage('Check'){
