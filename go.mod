@@ -3,7 +3,7 @@ module github.com/elastic/elastic-agent-shipper
 go 1.17
 
 require (
-	github.com/elastic/elastic-agent-libs v0.1.3-0.20220413135751-74cd22edfd91
+	github.com/elastic/elastic-agent-libs v0.2.5
 	github.com/spf13/cobra v1.3.0
 	google.golang.org/genproto v0.0.0-20220414192740-2d67ff6cf2b4
 	google.golang.org/grpc v1.45.0
@@ -16,6 +16,7 @@ require (
 	github.com/magefile/mage v1.13.0
 	github.com/stretchr/testify v1.7.0
 	go.elastic.co/go-licence-detector v0.5.0
+	golang.org/x/net v0.0.0-20220412020605-290c469a71a5
 )
 
 require (
@@ -30,7 +31,7 @@ require (
 	github.com/elastic/go-licenser v0.4.0 // indirect
 	github.com/elastic/go-structform v0.0.9 // indirect
 	github.com/elastic/go-sysinfo v1.7.1 // indirect
-	github.com/elastic/go-ucfg v0.8.4 // indirect
+	github.com/elastic/go-ucfg v0.8.5 // indirect
 	github.com/elastic/go-windows v1.0.1 // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
@@ -65,7 +66,6 @@ require (
 	go.uber.org/zap v1.21.0 // indirect
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3 // indirect
-	golang.org/x/net v0.0.0-20220412020605-290c469a71a5 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
 	golang.org/x/sys v0.0.0-20220412211240-33da011f77ad // indirect
 	golang.org/x/text v0.3.7 // indirect
@@ -73,7 +73,7 @@ require (
 	golang.org/x/xerrors v0.0.0-20220411194840-2f41105eb62f // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	howett.net/plist v1.0.0 // indirect
 )
 
