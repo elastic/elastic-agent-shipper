@@ -130,7 +130,7 @@ func fetchExpVars(client http.Client, endpoint string) (expvarQueue, error) {
 
 func startTestServer() string {
 	// Start an http test server on a random port and re-register expvar's global endpoint
-	// The only part of the library this bypasses is the "regular" http test server, as we're still
+	// The only part of the monitoring library this bypasses is the "regular" http test server, as we're still
 	// hitting all the code that we register via expvar
 	ts := httptest.NewUnstartedServer(nil)
 	ts.Config.Handler = expvar.Handler()

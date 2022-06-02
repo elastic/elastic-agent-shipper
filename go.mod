@@ -5,17 +5,19 @@ go 1.17
 require (
 	github.com/elastic/elastic-agent-libs v0.1.3-0.20220413135751-74cd22edfd91
 	github.com/spf13/cobra v1.3.0
-	google.golang.org/genproto v0.0.0-20220414192740-2d67ff6cf2b4
-	google.golang.org/grpc v1.45.0
+	google.golang.org/genproto v0.0.0-20220426171045-31bebdecfb46
+	google.golang.org/grpc v1.46.0
 	google.golang.org/protobuf v1.28.0
 )
 
 require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220415201819-296f010b93a3
 	github.com/elastic/elastic-agent v0.0.0-20220330154707-da786a47a0c5
+	github.com/elastic/elastic-agent-client/v7 v7.0.0-20220524131921-43bacbeec516
 	github.com/magefile/mage v1.13.0
 	github.com/stretchr/testify v1.7.0
 	go.elastic.co/go-licence-detector v0.5.0
+	golang.org/x/net v0.0.0-20220425223048-2871e0cb64e4
 )
 
 require (
@@ -26,7 +28,6 @@ require (
 	github.com/dlclark/regexp2 v1.4.0 // indirect
 	github.com/dop251/goja v0.0.0-20220408131256-ffe77e20c6f1 // indirect
 	github.com/dop251/goja_nodejs v0.0.0-20211022123610-8dd9abb0616d // indirect
-	github.com/elastic/elastic-agent-client/v7 v7.0.0-20220413160217-a3cee549fb99 // indirect
 	github.com/elastic/go-licenser v0.4.0 // indirect
 	github.com/elastic/go-structform v0.0.9 // indirect
 	github.com/elastic/go-sysinfo v1.7.1 // indirect
@@ -65,9 +66,8 @@ require (
 	go.uber.org/zap v1.21.0 // indirect
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3 // indirect
-	golang.org/x/net v0.0.0-20220412020605-290c469a71a5 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
-	golang.org/x/sys v0.0.0-20220412211240-33da011f77ad // indirect
+	golang.org/x/sys v0.0.0-20220422013727-9388b58f7150 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/tools v0.1.10 // indirect
 	golang.org/x/xerrors v0.0.0-20220411194840-2f41105eb62f // indirect

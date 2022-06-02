@@ -5,16 +5,19 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper/config"
 	"github.com/elastic/elastic-agent-shipper/monitoring"
@@ -24,6 +27,25 @@ import (
 
 // LoadAndRun loads the config object and runs the gRPC server
 func LoadAndRun() error {
+	client, _, err := client.NewV2FromReader(os.Stdin, client.VersionInfo{Name: "elastic-agent-shipper", Version: "v2"})
+	if err != nil {
+		return fmt.Errorf("error reading control config from agent: %w", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	err = client.Start(ctx)
+	if err != nil {
+		return fmt.Errorf("error starting connection to client")
+	}
+
+	unitChan := client.UnitChanges()
+	for {
+		unitEvent := <-unitChan
+		switch unitEvent.Type {
+
+		}
+	}
+
 	cfg, err := config.ReadConfig()
 	if err != nil {
 		return fmt.Errorf("error reading config: %w", err)
