@@ -20,8 +20,8 @@ import (
 
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/libbeat/opt"
-	"github.com/elastic/beats/v7/libbeat/publisher/queue"
 	expvarReport "github.com/elastic/elastic-agent-shipper/monitoring/reporter/expvar"
+	"github.com/elastic/elastic-agent-shipper/queue"
 )
 
 func init() {
@@ -54,26 +54,6 @@ func NewTestQueue(limit uint64) *TestMetricsQueue {
 		},
 		limit: limit,
 	}
-}
-
-// BufferConfig doesn't do anything
-func (tq TestMetricsQueue) BufferConfig() queue.BufferConfig {
-	return queue.BufferConfig{}
-}
-
-// Producer doesn't do anything
-func (tq TestMetricsQueue) Producer(_ queue.ProducerConfig) queue.Producer {
-	return nil
-}
-
-// Consumer doesn't do anything
-func (tq TestMetricsQueue) Consumer() queue.Consumer {
-	return nil
-}
-
-// Close Doesn't do anything
-func (tq TestMetricsQueue) Close() error {
-	return nil
 }
 
 // Metrics spoofs the metrics output
