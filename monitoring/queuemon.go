@@ -131,6 +131,7 @@ func (mon *QueueMonitor) updateMetrics() error {
 		MaxLevel:          opt.UintWith(limit),
 		IsFull:            queueIsFull,
 		LimitReachedCount: opt.UintWith(mon.queueLimitCount),
+		UnackedRead:       opt.Uint(raw.UnackedConsumedEvents), // The opt.Uint() wrapper is because the libbeat code is using the `opt` type from libbeat, not elastic-agent-libs. Temporary until the libbeat code is updated.
 		// Running on a philosophy that the outputs should be dumb and unopinionated,
 		//so we're doing the type conversion here.
 		OldestActiveTimestamp: raw.OldestActiveTimestamp.String(),

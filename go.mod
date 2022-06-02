@@ -5,18 +5,18 @@ go 1.17
 require (
 	github.com/elastic/elastic-agent-libs v0.2.5
 	github.com/spf13/cobra v1.3.0
-	google.golang.org/genproto v0.0.0-20220414192740-2d67ff6cf2b4
-	google.golang.org/grpc v1.45.0
+	google.golang.org/genproto v0.0.0-20220602131408-e326c6e8e9c8
+	google.golang.org/grpc v1.47.0
 	google.golang.org/protobuf v1.28.0
 )
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220415201819-296f010b93a3
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220602081114-d983d4a00aef
 	github.com/elastic/elastic-agent v0.0.0-20220330154707-da786a47a0c5
 	github.com/magefile/mage v1.13.0
 	github.com/stretchr/testify v1.7.0
 	go.elastic.co/go-licence-detector v0.5.0
-	golang.org/x/net v0.0.0-20220412020605-290c469a71a5
+	golang.org/x/net v0.0.0-20220531201128-c960675eff93
 )
 
 require (
@@ -25,9 +25,9 @@ require (
 	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dlclark/regexp2 v1.4.0 // indirect
-	github.com/dop251/goja v0.0.0-20220408131256-ffe77e20c6f1 // indirect
+	github.com/dop251/goja v0.0.0-20220516123900-4418d4575a41 // indirect
 	github.com/dop251/goja_nodejs v0.0.0-20211022123610-8dd9abb0616d // indirect
-	github.com/elastic/elastic-agent-client/v7 v7.0.0-20220413160217-a3cee549fb99 // indirect
+	github.com/elastic/elastic-agent-client/v7 v7.0.0-20220524131921-43bacbeec516 // indirect
 	github.com/elastic/go-licenser v0.4.0 // indirect
 	github.com/elastic/go-structform v0.0.9 // indirect
 	github.com/elastic/go-sysinfo v1.7.1 // indirect
@@ -58,20 +58,21 @@ require (
 	github.com/santhosh-tekuri/jsonschema v1.2.4 // indirect
 	github.com/sergi/go-diff v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	go.elastic.co/apm/v2 v2.0.0 // indirect
+	go.elastic.co/apm/module/apmhttp/v2 v2.1.0 // indirect
+	go.elastic.co/apm/v2 v2.1.0 // indirect
 	go.elastic.co/ecszap v1.0.1 // indirect
 	go.elastic.co/fastjson v1.1.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/goleak v1.1.12 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
-	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4 // indirect
+	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
-	golang.org/x/sys v0.0.0-20220412211240-33da011f77ad // indirect
+	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/tools v0.1.10 // indirect
-	golang.org/x/xerrors v0.0.0-20220411194840-2f41105eb62f // indirect
+	golang.org/x/xerrors v0.0.0-20220517211312-f3a8303e98df // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
