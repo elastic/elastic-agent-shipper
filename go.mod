@@ -11,7 +11,7 @@ require (
 )
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220602081114-d983d4a00aef
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220603155004-ac7e079a9403
 	github.com/elastic/elastic-agent v0.0.0-20220330154707-da786a47a0c5
 	github.com/magefile/mage v1.13.0
 	github.com/stretchr/testify v1.7.0

@@ -649,6 +649,8 @@ github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220415201819-296f010b93a3 h1:5HG4g
 github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220415201819-296f010b93a3/go.mod h1:PhsCH91qJN33+rN/L8q2jWILmswlezJ6T+MMM6EDc8g=
 github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220602081114-d983d4a00aef h1:1mlMDqjhZNCbPm05h8ICTPk6xfXafZYc7exwKEy9360=
 github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220602081114-d983d4a00aef/go.mod h1:LsBLn+N2GlLLbAcvzdenjs9FIyPv4oAXRPev2NOHxuU=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220603155004-ac7e079a9403 h1:rXt6tqo54KtLySPEXMalD1QqoS97KM9MezT6mMbN0Gc=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220603155004-ac7e079a9403/go.mod h1:LsBLn+N2GlLLbAcvzdenjs9FIyPv4oAXRPev2NOHxuU=
 github.com/elastic/e2e-testing v1.99.2-0.20220117192005-d3365c99b9c4 h1:uYT+Krd8dsvnhnLK9pe/JHZkYtXEGPfbV4Wt1JPPol0=
 github.com/elastic/e2e-testing v1.99.2-0.20220117192005-d3365c99b9c4/go.mod h1:UcNuf4pX/qDVNQr0zybm1NL2YoWik+jKBaINZqQCA40=
 github.com/elastic/elastic-agent v0.0.0-20220330154707-da786a47a0c5 h1:js0dqutP/z6TLmSwKR+0LuN7u+4n5tLhLS0UWw6AbSE=

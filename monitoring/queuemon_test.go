@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/elastic/beats/v7/libbeat/common"
-	"github.com/elastic/beats/v7/libbeat/opt"
+	"github.com/elastic/elastic-agent-libs/opt"
 	expvarReport "github.com/elastic/elastic-agent-shipper/monitoring/reporter/expvar"
 	"github.com/elastic/elastic-agent-shipper/queue"
 )
