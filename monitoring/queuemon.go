@@ -131,6 +131,7 @@ func (mon *QueueMonitor) updateMetrics() error {
 		MaxLevel:          opt.UintWith(limit),
 		IsFull:            queueIsFull,
 		LimitReachedCount: opt.UintWith(mon.queueLimitCount),
+		UnackedRead:       raw.UnackedConsumedEvents,
 		// Running on a philosophy that the outputs should be dumb and unopinionated,
 		//so we're doing the type conversion here.
 		OldestActiveTimestamp: raw.OldestActiveTimestamp.String(),
