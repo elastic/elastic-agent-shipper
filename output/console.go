@@ -39,8 +39,8 @@ func (out *ConsoleOutput) Start() {
 			}
 			// This tells the queue that we're done with these events
 			// and they can be safely discarded. The Beats queue interface
-			// doesn't provide a way to indicate failure, either of the
-			// full batch or of individual events. The plan is for the
+			// doesn't provide a way to indicate failure, of either the
+			// full batch or individual events. The plan is for the
 			// shipper to track events by their queue IDs so outputs
 			// can report status back to the server; see
 			// https://github.com/elastic/elastic-agent-shipper/issues/27.
