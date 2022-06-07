@@ -25,7 +25,8 @@ func (out *ConsoleOutput) Start() {
 		for {
 			batch, err := out.queue.Get(1000)
 			// Once an output receives a batch, it is responsible for
-			// it until all events have been
+			// it until all events have been either successfully sent or
+			// discarded after failure.
 			if err != nil {
 				// queue.Get can only fail if the queue was closed,
 				// time for the output to shut down.
