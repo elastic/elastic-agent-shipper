@@ -12,7 +12,6 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -27,62 +26,66 @@ import (
 
 // LoadAndRun loads the config object and runs the gRPC server
 func LoadAndRun() error {
-	client, _, err := client.NewV2FromReader(os.Stdin, client.VersionInfo{Name: "elastic-agent-shipper", Version: "v2"})
+
+	// This will go away/get moved with the controller
+	// cfg, err := config.ReadConfig()
+	// if err != nil {
+	// 	return fmt.Errorf("error reading config: %w", err)
+
+	// }
+	// err = logp.Configure(cfg.Log)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to initialize logger: %w", err)
+
+	// }
+
+	// Before we initialize the logger via an agent-supplied config, we need some kind of default
+	// This should probably be changed to something "cleaner" for production
+	logp.DevelopmentSetup()
+
+	agentClient, _, err := client.NewV2FromReader(os.Stdin, client.VersionInfo{Name: "elastic-agent-shipper", Version: "v2"})
 	if err != nil {
 		return fmt.Errorf("error reading control config from agent: %w", err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	err = client.Start(ctx)
-	if err != nil {
-		return fmt.Errorf("error starting connection to client")
-	}
+	err = runController(ctx, agentClient)
 
-	unitChan := client.UnitChanges()
-	for {
-		unitEvent := <-unitChan
-		switch unitEvent.Type {
-
-		}
-	}
-
-	cfg, err := config.ReadConfig()
-	if err != nil {
-		return fmt.Errorf("error reading config: %w", err)
-
-	}
-
-	err = logp.Configure(cfg.Log)
-	if err != nil {
-		return fmt.Errorf("failed to initialize logger: %w", err)
-
-	}
-
-	return Run(cfg)
+	return err
 }
 
-func handleShutdown(stopFunc func(), log *logp.Logger) {
+// handle shutdown of the shipper
+func handleShutdown(stopFunc func(), done doneChan) {
 	var callback sync.Once
-
+	log := logp.L()
 	// On termination signals, gracefully stop the Beat
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	go func() {
-		sig := <-sigc
-
-		switch sig {
-		case syscall.SIGINT, syscall.SIGTERM:
-			log.Debug("Received sigterm/sigint, stopping")
-		case syscall.SIGHUP:
-			log.Debug("Received sighup, stopping")
+		//sig := <-sigc
+		for {
+			select {
+			case <-done:
+				log.Debugf("Shutting down from agent controller")
+				callback.Do(stopFunc)
+				return
+			case sig := <-sigc:
+				switch sig {
+				case syscall.SIGINT, syscall.SIGTERM:
+					log.Debug("Received sigterm/sigint, stopping")
+				case syscall.SIGHUP:
+					log.Debug("Received sighup, stopping")
+				}
+				callback.Do(stopFunc)
+				return
+			}
 		}
 
-		callback.Do(stopFunc)
 	}()
 }
 
 // Run starts the gRPC server
-func Run(cfg config.ShipperConfig) error {
+func Run(cfg config.ShipperConfig, unit *client.Unit, done doneChan, shutdownDone sync.WaitGroup) error {
 	log := logp.L()
 	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", cfg.Port))
 	if err != nil {
@@ -96,7 +99,7 @@ func Run(cfg config.ShipperConfig) error {
 		return fmt.Errorf("error loading outputs: %w", err)
 	}
 
-	log.Debugf("Loaded monitoring outputs")
+	unit.UpdateState(client.UnitStateConfiguring, "starting shipper server", nil)
 
 	var opts []grpc.ServerOption
 	if cfg.TLS {
@@ -114,8 +117,19 @@ func Run(cfg config.ShipperConfig) error {
 		grpcServer.GracefulStop()
 		monHandler.End()
 	}
-	handleShutdown(shutdownFunc, log)
+	handleShutdown(shutdownFunc, done)
 	log.Debugf("gRPC server is listening on port %d", cfg.Port)
+	unit.UpdateState(client.UnitStateHealthy, "Shipper Running", nil)
+
+	// This will get sent after the server has shutdown, signaling to the runloop that it can stop.
+	// The shipper has no queues connected right now, but once it does, this function can't run until
+	// after the queues have emptied and/or shutdown. We'll presumably have a better idea of how this
+	// will work once we have queues connected here.
+	defer func() {
+		log.Debugf("shipper has completed shutdown, stopping")
+		shutdownDone.Done()
+	}()
+	shutdownDone.Add(1)
 	return grpcServer.Serve(lis)
 
 }
