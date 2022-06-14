@@ -25,5 +25,5 @@ monitoring:
   http:
     enabled: true
     host: "localhost"
-    port: 8282
+    port: 8383
     name: "queue"

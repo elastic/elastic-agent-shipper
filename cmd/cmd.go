@@ -28,6 +28,7 @@ func NewCommand() *cobra.Command {
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("v"))
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("e"))
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("d"))
+	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("E"))
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("environment"))
 
 	run := runCmd()

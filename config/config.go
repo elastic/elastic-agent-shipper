@@ -21,8 +21,9 @@ const (
 )
 
 var (
-	configPath     string
-	configFilePath string
+	configPath         string
+	configFilePath     string
+	configOverrideShim string // Just doing this to make the agent happy
 )
 
 // A lot of the code here is the same as what's in elastic-agent, but it lives in an internal/ library
@@ -30,6 +31,7 @@ func init() {
 	fs := flag.CommandLine
 	fs.StringVar(&configFilePath, "c", defaultConfigName, "Configuration file, relative to path.config")
 	fs.StringVar(&configPath, "path.config", configPath, "Config path is the directory Agent looks for its config file")
+	fs.StringVar(&configOverrideShim, "E", "", "config value override compat type")
 }
 
 //ShipperConfig defines the options present in the config file
@@ -51,7 +53,11 @@ func ReadConfig() (ShipperConfig, error) {
 		return ShipperConfig{}, fmt.Errorf("error reading input file %s: %w", path, err)
 	}
 
-	raw, err := config.NewConfigWithYAML(contents, "")
+	return ReadConfigFromString(string(contents))
+}
+
+func ReadConfigFromString(in string) (ShipperConfig, error) {
+	raw, err := config.NewConfigWithYAML([]byte(in), "")
 	if err != nil {
 		return ShipperConfig{}, fmt.Errorf("error reading config from yaml: %w", err)
 	}
