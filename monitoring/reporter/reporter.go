@@ -20,6 +20,8 @@ type QueueMetrics struct {
 	CurrentLevel opt.Uint `struct:"current_level,omitempty" json:"current_level"`
 	//MaxLevel reports the user-configured max level of the queue, in the native user-configured limiits
 	MaxLevel opt.Uint `struct:"max_level,omitempty" json:"max_level"`
+	//UnackedRead tracks the number of events that have been read by an output, but not acked by the output
+	UnackedRead opt.Uint `struct:"unacked_read,omitempty" json:"unacked_read"`
 	//OldestActiveTimestamp reports the timestamp of the oldest event in the queue
 	OldestActiveTimestamp string `struct:"oldest_active_event,omitempty" json:"oldest_active_event"`
 }
