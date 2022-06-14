@@ -3,8 +3,9 @@ package queue
 import (
 	"testing"
 
-	"github.com/elastic/elastic-agent-shipper/api"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/elastic/elastic-agent-shipper/api"
 )
 
 func TestSimpleBatch(t *testing.T) {
@@ -15,7 +16,8 @@ func TestSimpleBatch(t *testing.T) {
 	eventCount := 100
 	events := make([]api.Event, eventCount)
 	for i := 0; i < eventCount; i++ {
-		queue.Publish(&events[i])
+		err = queue.Publish(&events[i])
+		assert.NoError(t, err)
 	}
 
 	// Confirm that all events made it through. We ignore the contents

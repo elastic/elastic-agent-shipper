@@ -50,6 +50,7 @@ func (out *ConsoleOutput) Start() {
 }
 
 func (*ConsoleOutput) send(event *api.Event) {
+	//nolint: forbidigo // Console output is intentional
 	fmt.Printf("%v\n", event)
 }
 
