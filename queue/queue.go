@@ -47,18 +47,11 @@ func New() (*Queue, error) {
 		FlushMinEvents: 256,
 		FlushTimeout:   5 * time.Millisecond,
 	})
-	producer := eventQueue.Producer(
-		beatsqueue.ProducerConfig{})
-	if producer == nil {
-		fmt.Printf("\033[94mwhy is the queue producer nil\033[0m\n")
-	}
+	producer := eventQueue.Producer(beatsqueue.ProducerConfig{})
 	return &Queue{eventQueue: eventQueue, producer: producer}, nil
 }
 
 func (queue *Queue) Publish(event *api.Event) error {
-	if queue.producer == nil {
-		fmt.Printf("\033[94mWAT\033[0m\n")
-	}
 	if !queue.producer.Publish(event) {
 		return fmt.Errorf("couldn't publish: queue is full")
 	}
