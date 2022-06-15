@@ -142,6 +142,7 @@ func (s *shipperServer) Stop() {
 	s.queue.Close()
 	// Don't try to gracefully stop monitoring until we deal with expvar
 	//s.monHandler.End()
+
 	// The output will shut down once the queue is closed.
 	// We call Wait to give it a chance to finish with events
 	// it has already read.

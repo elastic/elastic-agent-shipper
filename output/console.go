@@ -48,7 +48,7 @@ func (out *ConsoleOutput) Start() {
 			// shipper to track events by their queue IDs so outputs
 			// can report status back to the server; see
 			// https://github.com/elastic/elastic-agent-shipper/issues/27.
-			batch.ACK()
+			batch.Done()
 		}
 	}()
 }

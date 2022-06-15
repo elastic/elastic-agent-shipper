@@ -5,19 +5,19 @@ go 1.17
 require (
 	github.com/elastic/elastic-agent-libs v0.2.5
 	github.com/spf13/cobra v1.3.0
-	google.golang.org/genproto v0.0.0-20220614165028-45ed7f3ff16e
+	google.golang.org/genproto v0.0.0-20220615141314-f1464d18c36b
 	google.golang.org/grpc v1.47.0
 	google.golang.org/protobuf v1.28.0
 )
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220614164757-2b44bb8da62b
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220615180530-c614236230bf
 	github.com/elastic/elastic-agent v0.0.0-20220330154707-da786a47a0c5
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20220607160924-1a71765a8bbe
 	github.com/magefile/mage v1.13.0
 	github.com/stretchr/testify v1.7.0
 	go.elastic.co/go-licence-detector v0.5.0
-	golang.org/x/net v0.0.0-20220614195744-fb05da6f9022
+	golang.org/x/net v0.0.0-20220615171555-694bf12d69de
 )
 
 require (
@@ -63,7 +63,7 @@ require (
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
-	golang.org/x/sys v0.0.0-20220614162138-6c1b26c55098 // indirect
+	golang.org/x/sys v0.0.0-20220615212526-ff8c426e75fd // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/tools v0.1.11 // indirect
 	golang.org/x/xerrors v0.0.0-20220609144429-65e65417b02f // indirect
