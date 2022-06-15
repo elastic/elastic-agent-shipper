@@ -97,8 +97,8 @@ message EventResult {
 }
  
 message StreamAcksRequest {
- // Optional. Requests acknowledgements originating only from this input ID.
- string input_id = 1;
+ // Optional. Requests acknowledgements originating only from this source.
+ Source source = 1;
  // Optional. Requests acknowledgements for events for this data stream only.
  DataStream data_stream = 2;
 }

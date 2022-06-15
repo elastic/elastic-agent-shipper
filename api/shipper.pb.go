@@ -432,8 +432,8 @@ type StreamAcksRequest struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// Optional. Requests acknowledgements originating only from this input ID.
-	InputId string `protobuf:"bytes,1,opt,name=input_id,json=inputId,proto3" json:"input_id,omitempty"`
+	// Optional. Requests acknowledgements originating only from this source.
+	Source *Source `protobuf:"bytes,1,opt,name=source,proto3" json:"source,omitempty"`
 	// Optional. Requests acknowledgements for events for this data stream only.
 	DataStream *DataStream `protobuf:"bytes,2,opt,name=data_stream,json=dataStream,proto3" json:"data_stream,omitempty"`
 }
@@ -470,11 +470,11 @@ func (*StreamAcksRequest) Descriptor() ([]byte, []int) {
 	return file_shipper_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *StreamAcksRequest) GetInputId() string {
+func (x *StreamAcksRequest) GetSource() *Source {
 	if x != nil {
-		return x.InputId
+		return x.Source
 	}
-	return ""
+	return nil
 }
 
 func (x *StreamAcksRequest) GetDataStream() *DataStream {
@@ -669,10 +669,12 @@ var file_shipper_proto_rawDesc = []byte{
 	0x3d, 0x0a, 0x10, 0x70, 0x72, 0x6f, 0x63, 0x65, 0x73, 0x73, 0x6f, 0x72, 0x5f, 0x65, 0x72, 0x72,
 	0x6f, 0x72, 0x73, 0x18, 0x04, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x6f, 0x6f, 0x67,
 	0x6c, 0x65, 0x2e, 0x72, 0x70, 0x63, 0x2e, 0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x52, 0x0f, 0x70,
-	0x72, 0x6f, 0x63, 0x65, 0x73, 0x73, 0x6f, 0x72, 0x45, 0x72, 0x72, 0x6f, 0x72, 0x73, 0x22, 0x75,
-	0x0a, 0x11, 0x53, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x41, 0x63, 0x6b, 0x73, 0x52, 0x65, 0x71, 0x75,
-	0x65, 0x73, 0x74, 0x12, 0x19, 0x0a, 0x08, 0x69, 0x6e, 0x70, 0x75, 0x74, 0x5f, 0x69, 0x64, 0x18,
-	0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x69, 0x6e, 0x70, 0x75, 0x74, 0x49, 0x64, 0x12, 0x45,
+	0x72, 0x6f, 0x63, 0x65, 0x73, 0x73, 0x6f, 0x72, 0x45, 0x72, 0x72, 0x6f, 0x72, 0x73, 0x22, 0x94,
+	0x01, 0x0a, 0x11, 0x53, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x41, 0x63, 0x6b, 0x73, 0x52, 0x65, 0x71,
+	0x75, 0x65, 0x73, 0x74, 0x12, 0x38, 0x0a, 0x06, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x18, 0x01,
+	0x20, 0x01, 0x28, 0x0b, 0x32, 0x20, 0x2e, 0x65, 0x6c, 0x61, 0x73, 0x74, 0x69, 0x63, 0x2e, 0x61,
+	0x67, 0x65, 0x6e, 0x74, 0x2e, 0x73, 0x68, 0x69, 0x70, 0x70, 0x65, 0x72, 0x2e, 0x76, 0x31, 0x2e,
+	0x53, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x52, 0x06, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x12, 0x45,
 	0x0a, 0x0b, 0x64, 0x61, 0x74, 0x61, 0x5f, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x18, 0x02, 0x20,
 	0x01, 0x28, 0x0b, 0x32, 0x24, 0x2e, 0x65, 0x6c, 0x61, 0x73, 0x74, 0x69, 0x63, 0x2e, 0x61, 0x67,
 	0x65, 0x6e, 0x74, 0x2e, 0x73, 0x68, 0x69, 0x70, 0x70, 0x65, 0x72, 0x2e, 0x76, 0x31, 0x2e, 0x44,
@@ -751,19 +753,20 @@ var file_shipper_proto_depIdxs = []int32{
 	5,  // 6: elastic.agent.shipper.v1.PublishReply.results:type_name -> elastic.agent.shipper.v1.EventResult
 	9,  // 7: elastic.agent.shipper.v1.EventResult.timestamp:type_name -> google.protobuf.Timestamp
 	11, // 8: elastic.agent.shipper.v1.EventResult.processor_errors:type_name -> google.rpc.Status
-	3,  // 9: elastic.agent.shipper.v1.StreamAcksRequest.data_stream:type_name -> elastic.agent.shipper.v1.DataStream
-	8,  // 10: elastic.agent.shipper.v1.StreamAcksReply.acks:type_name -> elastic.agent.shipper.v1.Acknowledgement
-	9,  // 11: elastic.agent.shipper.v1.Acknowledgement.timestamp:type_name -> google.protobuf.Timestamp
-	11, // 12: elastic.agent.shipper.v1.Acknowledgement.error:type_name -> google.rpc.Status
-	0,  // 13: elastic.agent.shipper.v1.Producer.PublishEvents:input_type -> elastic.agent.shipper.v1.PublishRequest
-	6,  // 14: elastic.agent.shipper.v1.Producer.StreamAcknowledgements:input_type -> elastic.agent.shipper.v1.StreamAcksRequest
-	4,  // 15: elastic.agent.shipper.v1.Producer.PublishEvents:output_type -> elastic.agent.shipper.v1.PublishReply
-	7,  // 16: elastic.agent.shipper.v1.Producer.StreamAcknowledgements:output_type -> elastic.agent.shipper.v1.StreamAcksReply
-	15, // [15:17] is the sub-list for method output_type
-	13, // [13:15] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	2,  // 9: elastic.agent.shipper.v1.StreamAcksRequest.source:type_name -> elastic.agent.shipper.v1.Source
+	3,  // 10: elastic.agent.shipper.v1.StreamAcksRequest.data_stream:type_name -> elastic.agent.shipper.v1.DataStream
+	8,  // 11: elastic.agent.shipper.v1.StreamAcksReply.acks:type_name -> elastic.agent.shipper.v1.Acknowledgement
+	9,  // 12: elastic.agent.shipper.v1.Acknowledgement.timestamp:type_name -> google.protobuf.Timestamp
+	11, // 13: elastic.agent.shipper.v1.Acknowledgement.error:type_name -> google.rpc.Status
+	0,  // 14: elastic.agent.shipper.v1.Producer.PublishEvents:input_type -> elastic.agent.shipper.v1.PublishRequest
+	6,  // 15: elastic.agent.shipper.v1.Producer.StreamAcknowledgements:input_type -> elastic.agent.shipper.v1.StreamAcksRequest
+	4,  // 16: elastic.agent.shipper.v1.Producer.PublishEvents:output_type -> elastic.agent.shipper.v1.PublishReply
+	7,  // 17: elastic.agent.shipper.v1.Producer.StreamAcknowledgements:output_type -> elastic.agent.shipper.v1.StreamAcksReply
+	16, // [16:18] is the sub-list for method output_type
+	14, // [14:16] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_shipper_proto_init() }
