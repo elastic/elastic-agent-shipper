@@ -18,7 +18,7 @@ type ConsoleOutput struct {
 	wg sync.WaitGroup
 }
 
-func NewConsoleOutput(queue *queue.Queue) *ConsoleOutput {
+func NewConsole(queue *queue.Queue) *ConsoleOutput {
 	return &ConsoleOutput{queue: queue}
 }
 

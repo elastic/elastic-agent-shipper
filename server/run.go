@@ -73,7 +73,7 @@ func Run(cfg config.ShipperConfig) error {
 	}
 
 	// Make a placeholder console output to read the queue's events
-	out := output.NewConsoleOutput(queue)
+	out := output.NewConsole(queue)
 	out.Start()
 
 	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", cfg.Port))
