@@ -37,40 +37,41 @@ message PublishRequest {
 message Event {
  // Creation timestamp of the event.
  google.protobuf.Timestamp timestamp = 1;
- // Identifies the input that generated the event.
- Input input = 2;
+ // Source of the generated event.
+ Source source = 2;
  // Optional. Producers may specify a unique event ID if the event has a natural unique
  // identifier to simplify acknowledgement tracking. If no such identifier exists, the queue   
  // offset can be used for acknowledgement tracking.
- string event_id = 4;
+ string event_id = 3;
  // Data stream for the event.
- DataStream data_stream = 5;
+ DataStream data_stream = 4;
  // Metadata JSON object (map[string]google.protobuf.Value)
- google.protobuf.Struct metadata = 6;
+ google.protobuf.Struct metadata = 5;
  // Field JSON object (map[string]google.protobuf.Value)
- google.protobuf.Struct fields = 7;
+ google.protobuf.Struct fields = 6;
  // Note: The google.protobuf.Value type should be extended (or re-implemented) with a
  // google.protobuf.Timestamp to avoid the cost of encoding timestamps as strings and then 
  // parsing them back into a date representation.
 }
  
-// Input identifiers from the agent policy, see example configuration.
-message Input {
+// Source information required for proper event tracking, processing and routing
+message Source {
  // Input ID in the agent policy.
- string id = 1;
- // Input name in the agent policy.
- string name = 2;
- // Input type in the agent policy (e.g. logfile, winlog, endpoint, etc.)
- string type = 3;
+ string input_id = 1;
+ // Stream ID in the agent policy (Optional, some inputs don't use streams).
+ // Not to be confused with data streams in Elasticsearch.
+ string stream_id = 2;
 }
  
+// Elastic data stream
 // See https://www.elastic.co/blog/an-introduction-to-the-elastic-data-stream-naming-scheme
 message DataStream {
- // Optional. Stable identifier for the data stream, see example configuration.
- string id = 1;
- string type = 2;
- string dataset = 3;
- string namespace = 4;
+ // Generic type describing the data
+ string type = 1;
+ // Describes the data ingested and its structure
+ string dataset = 2;
+ // User-configurable arbitrary grouping
+ string namespace = 3;
 }
  
 message PublishReply {
@@ -92,7 +93,7 @@ message EventResult {
  string event_id = 3;
  // Optional. List of errors encountered by processors, if any. Processor
  // errors do not indicate the message failed to send.
- repeated google.rpc.Status processor_errors = 5;
+ repeated google.rpc.Status processor_errors = 4;
 }
  
 message StreamAcksRequest {
@@ -101,7 +102,7 @@ message StreamAcksRequest {
  // Optional. Requests acknowledgements for events for this data stream only.
  DataStream data_stream = 2;
 }
- 
+
 message StreamAcksReply {
  repeated Acknowledgement acks = 1;
 }
