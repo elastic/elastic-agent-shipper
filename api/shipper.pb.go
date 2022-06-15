@@ -178,9 +178,13 @@ type Source struct {
 	unknownFields protoimpl.UnknownFields
 
 	// Input ID in the agent policy.
+	// This value should be added to each produced event and forwarded via this proto field.
+	// When running under agent a processor is generated for adding this metadata.
 	InputId string `protobuf:"bytes,1,opt,name=input_id,json=inputId,proto3" json:"input_id,omitempty"`
 	// Stream ID in the agent policy (Optional, some inputs don't use streams).
 	// Not to be confused with data streams in Elasticsearch.
+	// This value should be added to each produced event and forwarded via this proto field.
+	// When running under agent a processor is generated for adding this metadata.
 	StreamId string `protobuf:"bytes,2,opt,name=stream_id,json=streamId,proto3" json:"stream_id,omitempty"`
 }
 
