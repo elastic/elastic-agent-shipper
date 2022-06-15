@@ -20,6 +20,7 @@ import (
 	pb "github.com/elastic/elastic-agent-shipper/api"
 	"github.com/elastic/elastic-agent-shipper/config"
 	"github.com/elastic/elastic-agent-shipper/monitoring"
+	"github.com/elastic/elastic-agent-shipper/output"
 	"github.com/elastic/elastic-agent-shipper/queue"
 )
 
@@ -28,6 +29,7 @@ type shipperServer struct {
 	grpcServer *grpc.Server
 	queue      *queue.Queue
 	monHandler *monitoring.QueueMonitor
+	out        *output.ConsoleOutput
 	pb.UnimplementedProducerServer
 	// This is a temporary hack (hopefully),
 	// expvar keeps a bunch of state globally,
@@ -90,6 +92,9 @@ func (s *shipperServer) Run(cfg config.ShipperConfig, agent client.Client) error
 	}
 	s.queue = queue
 
+	s.out = output.NewConsole(s.queue)
+	s.out.Start()
+
 	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", cfg.Port))
 	if err != nil {
 		return fmt.Errorf("failed to listen: %w", err)
@@ -134,8 +139,13 @@ func (s *shipperServer) Stop() {
 	}
 	s.log.Debugf("Stopping shipper server")
 	s.grpcServer.GracefulStop()
+	s.queue.Close()
 	// Don't try to gracefully stop monitoring until we deal with expvar
 	//s.monHandler.End()
-	s.queue.Close()
+	// The output will shut down once the queue is closed.
+	// We call Wait to give it a chance to finish with events
+	// it has already read.
+	s.out.Wait()
+
 	s.serverIsStarted = false
 }

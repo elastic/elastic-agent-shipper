@@ -6,8 +6,11 @@ package queue
 
 import (
 	"fmt"
+	"time"
 
 	beatsqueue "github.com/elastic/beats/v7/libbeat/publisher/queue"
+	memqueue "github.com/elastic/beats/v7/libbeat/publisher/queue/memqueue"
+	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent-shipper/api"
 )
@@ -22,7 +25,7 @@ import (
 type Queue struct {
 	eventQueue beatsqueue.Queue
 
-	//producer beatsqueue.Producer
+	producer beatsqueue.Producer
 }
 
 type Metrics beatsqueue.Metrics
@@ -34,12 +37,27 @@ type MetricsSource interface {
 	Metrics() (Metrics, error)
 }
 
+var ErrQueueIsFull = fmt.Errorf("couldn't publish: queue is full")
+
 func New() (*Queue, error) {
-	return &Queue{}, nil
+	eventQueue := memqueue.NewQueue(logp.L(), memqueue.Settings{
+		Events: 1024,
+		// The event count and timeout for queue flushes is hard-coded to a placeholder
+		// for now, since that's what the existing Beats API understands. The plan is
+		// for these parameters to instead be controlled by the output as it reads
+		// the queue. See https://github.com/elastic/elastic-agent-shipper/issues/58.
+		FlushMinEvents: 256,
+		FlushTimeout:   5 * time.Millisecond,
+	})
+	producer := eventQueue.Producer(beatsqueue.ProducerConfig{})
+	return &Queue{eventQueue: eventQueue, producer: producer}, nil
 }
 
 func (queue *Queue) Publish(event *api.Event) error {
-	return fmt.Errorf("couldn't publish: Queue.Publish is not implemented")
+	if !queue.producer.Publish(event) {
+		return ErrQueueIsFull
+	}
+	return nil
 }
 
 func (queue *Queue) Metrics() (Metrics, error) {
@@ -49,6 +67,10 @@ func (queue *Queue) Metrics() (Metrics, error) {
 	return Metrics(beatsqueue.Metrics{}), nil
 }
 
-func (queue *Queue) Close() {
+func (queue *Queue) Get(eventCount int) (beatsqueue.Batch, error) {
+	return queue.eventQueue.Get(eventCount)
+}
 
+func (queue *Queue) Close() {
+	queue.eventQueue.Close()
 }
