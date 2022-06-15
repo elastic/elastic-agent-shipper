@@ -45,7 +45,7 @@ func New() (*Queue, error) {
 		// The event count and timeout for queue flushes is hard-coded to a placeholder
 		// for now, since that's what the existing Beats API understands. The plan is
 		// for these parameters to instead be controlled by the output as it reads
-		// the queue.
+		// the queue. See https://github.com/elastic/elastic-agent-shipper/issues/58.
 		FlushMinEvents: 256,
 		FlushTimeout:   5 * time.Millisecond,
 	})
