@@ -37,6 +37,8 @@ type MetricsSource interface {
 	Metrics() (Metrics, error)
 }
 
+var ErrQueueIsFull = fmt.Errorf("couldn't publish: queue is full")
+
 func New() (*Queue, error) {
 	eventQueue := memqueue.NewQueue(logp.L(), memqueue.Settings{
 		Events: 1024,
@@ -53,7 +55,7 @@ func New() (*Queue, error) {
 
 func (queue *Queue) Publish(event *api.Event) error {
 	if !queue.producer.Publish(event) {
-		return fmt.Errorf("couldn't publish: queue is full")
+		return ErrQueueIsFull
 	}
 	return nil
 }
