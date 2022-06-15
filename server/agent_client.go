@@ -49,12 +49,12 @@ func NewShipperFromClient(clientInit clientInitFunc) (*AgentClient, error) {
 // OnConfig is called by the agent on a requested config change
 func (client *AgentClient) OnConfig(in string) {
 	client.log.Infof("Got config update, (re)starting the shipper")
-	client.client.Status(proto.StateObserved_CONFIGURING, "configuring from OnConfig", nil)
+	_ = client.client.Status(proto.StateObserved_CONFIGURING, "configuring from OnConfig", nil)
 
 	cfg, err := config.ReadConfigFromString(in)
 	if err != nil {
 		errString := fmt.Errorf("error reading string config: %w", err)
-		client.client.Status(proto.StateObserved_FAILED, errString.Error(), nil)
+		_ = client.client.Status(proto.StateObserved_FAILED, errString.Error(), nil)
 	}
 
 	go func() {
@@ -64,7 +64,7 @@ func (client *AgentClient) OnConfig(in string) {
 		err := client.shipper.Run(cfg, client.client)
 		if err != nil {
 			errString := fmt.Errorf("error starting shipper: %w", err)
-			client.client.Status(proto.StateObserved_FAILED, errString.Error(), nil)
+			_ = client.client.Status(proto.StateObserved_FAILED, errString.Error(), nil)
 			return
 		}
 	}()
@@ -74,7 +74,7 @@ func (client *AgentClient) OnConfig(in string) {
 // OnStop is called by the agent to stop the shipper
 func (client *AgentClient) OnStop() {
 	client.log.Debugf("Stopping client")
-	client.client.Status(proto.StateObserved_STOPPING, "Stopping shipper", nil)
+	_ = client.client.Status(proto.StateObserved_STOPPING, "Stopping shipper", nil)
 	// do we need to worry about this being a blocking call? No idea.
 	client.shipper.Stop()
 	client.stop <- struct{}{}

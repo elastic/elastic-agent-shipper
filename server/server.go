@@ -126,7 +126,7 @@ func (s *shipperServer) Run(cfg config.ShipperConfig, agent client.Client) error
 
 	pb.RegisterProducerServer(s.grpcServer, s)
 
-	agent.Status(proto.StateObserved_HEALTHY, "Started server, grpc listening", nil)
+	_ = agent.Status(proto.StateObserved_HEALTHY, "Started server, grpc listening", nil)
 	s.log.Infof("gRPC server is listening on port %d", cfg.Port)
 	s.serverIsStarted = true
 	return s.grpcServer.Serve(lis)
