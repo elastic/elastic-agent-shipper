@@ -22,7 +22,7 @@ import (
 //Config is the config struct for marshalling whatever we get from the config file
 type Config struct {
 	Enabled bool   `config:"enabled"`
-	Host    string `config:"Host"`
+	Host    string `config:"host"`
 	Port    int    `config:"port"`
 	Name    string `config:"name"`
 }

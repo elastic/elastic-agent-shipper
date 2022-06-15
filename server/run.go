@@ -23,17 +23,17 @@ type stopFunc func()
 
 // LoadAndRun loads the config object and runs the gRPC server, this is what gets called by the CLI library on start.
 func LoadAndRun() error {
-	// cfg, err := config.ReadConfig()
-	// if err != nil {
-	// 	return fmt.Errorf("error reading config: %w", err)
+	// Read in a bare config that allows us to pull from the -E flags
+	cfg, err := config.GetLoggingConfig()
+	if err != nil {
+		return fmt.Errorf("error reading config: %w", err)
+	}
 
-	// }
-
-	err := logp.Configure(logp.DefaultConfig(logp.Environment(logp.DebugLevel)))
+	// globally set the logger
+	err = logp.Configure(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to initialize logger: %w", err)
 	}
-	//logp.DevelopmentSetup()
 
 	stdinWrapper := func(agentClient client.StateInterface) (client.Client, error) {
 		return client.NewFromReader(os.Stdin, agentClient)
@@ -43,8 +43,6 @@ func LoadAndRun() error {
 	if err != nil {
 		return fmt.Errorf("error starting shipper client: %w", err)
 	}
-
-	runAgentClient(context.Background(), client)
 
 	return runAgentClient(context.Background(), client)
 }
@@ -60,16 +58,16 @@ func runAgentClient(ctx context.Context, ac *AgentClient) error {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Debugf("Got context done, stopping")
+			log.Infof("Got context done, stopping")
 			return nil
 		case <-ac.stop:
-			log.Debugf("Got shutdown, stopping")
+			log.Infof("Got shutdown, stopping")
 			return nil
 		}
 	}
 }
 
-func handleShutdown(stopFunc func(), log *logp.Logger) {
+func handleShutdown(stop stopFunc, log *logp.Logger) {
 	var callback sync.Once
 	log.Debugf("registering signal handler")
 	// On termination signals, gracefully stop the Beat
@@ -85,7 +83,7 @@ func handleShutdown(stopFunc func(), log *logp.Logger) {
 			log.Debug("Received sighup, stopping")
 		}
 
-		callback.Do(stopFunc)
+		callback.Do(stop)
 	}()
 }
 

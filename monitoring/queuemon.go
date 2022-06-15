@@ -91,7 +91,7 @@ func (mon QueueMonitor) Watch() {
 				//We're assuming that the `Metrics()` call from the queue won't hard-block.
 				err := mon.updateMetrics()
 				if err != nil {
-					mon.log.Errorf("Error updating metrics: %w", err)
+					mon.log.Errorf("Error updating metrics: %s", err)
 				}
 			}
 		}

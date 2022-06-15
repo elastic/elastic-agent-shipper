@@ -1,3 +1,7 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package server
 
 import (
@@ -8,13 +12,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/beats/v7/libbeat/logp"
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-client/v7/pkg/client/mock"
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/client/mock"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
 
 func TestAgentClient(t *testing.T) {
@@ -77,7 +81,7 @@ func TestAgentClient(t *testing.T) {
 
 	testCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	logp.DevelopmentSetup()
+
 	shipper, err := NewShipperFromClient(testWrapper)
 	require.NoError(t, err)
 	// start the server runtime

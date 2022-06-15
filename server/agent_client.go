@@ -1,12 +1,16 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package server
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/elastic/beats/v7/libbeat/logp"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper/config"
 )
 
@@ -44,7 +48,7 @@ func NewShipperFromClient(clientInit clientInitFunc) (*AgentClient, error) {
 
 // OnConfig is called by the agent on a requested config change
 func (client *AgentClient) OnConfig(in string) {
-	client.log.Debugf("Got config update, (re)starting the shipper: %s", in)
+	client.log.Infof("Got config update, (re)starting the shipper")
 	client.client.Status(proto.StateObserved_CONFIGURING, "configuring from OnConfig", nil)
 
 	cfg, err := config.ReadConfigFromString(in)
@@ -57,7 +61,7 @@ func (client *AgentClient) OnConfig(in string) {
 		// stop existing server
 		client.shipper.Stop()
 		//re-run
-		err := client.shipper.Run(cfg)
+		err := client.shipper.Run(cfg, client.client)
 		if err != nil {
 			errString := fmt.Errorf("error starting shipper: %w", err)
 			client.client.Status(proto.StateObserved_FAILED, errString.Error(), nil)

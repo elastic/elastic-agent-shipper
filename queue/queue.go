@@ -43,9 +43,10 @@ func (queue *Queue) Publish(event *api.Event) error {
 }
 
 func (queue *Queue) Metrics() (Metrics, error) {
-	metrics, err := queue.eventQueue.Metrics()
+
+	//metrics, err := queue.eventQueue.Metrics() // this won't run without the actual queue yet
 	// We need to do the explicit cast, otherwise this isn't recognized as the same type
-	return Metrics(metrics), err
+	return Metrics(beatsqueue.Metrics{}), nil
 }
 
 func (queue *Queue) Close() {

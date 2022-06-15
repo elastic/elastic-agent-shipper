@@ -14,6 +14,8 @@ import (
 	"google.golang.org/grpc/credentials"
 	pbts "google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
 	pb "github.com/elastic/elastic-agent-shipper/api"
 	"github.com/elastic/elastic-agent-shipper/config"
@@ -36,7 +38,6 @@ type shipperServer struct {
 }
 
 func newShipper() *shipperServer {
-	logp.DevelopmentSetup() // remove this
 	return &shipperServer{
 		log: logp.L(),
 	}
@@ -76,9 +77,9 @@ func (serv shipperServer) StreamAcknowledgements(streamReq *pb.StreamAcksRequest
 }
 
 // Run is a blocking call that starts the gRPC server
-func (s *shipperServer) Run(cfg config.ShipperConfig) error {
+func (s *shipperServer) Run(cfg config.ShipperConfig, agent client.Client) error {
 	if s.serverIsStarted {
-		return fmt.Errorf("Server is already started")
+		return fmt.Errorf("server is already started")
 	}
 
 	// When there is queue-specific configuration in ShipperConfig, it should
@@ -97,7 +98,7 @@ func (s *shipperServer) Run(cfg config.ShipperConfig) error {
 	// Beats won't call the "New*" functions of a queue directly, but instead fetch a queueFactory from the global registers.
 	//However, that requires the publisher/pipeline code as well, and I'm not sure we want that.
 
-	// see shipperServer type delcaration, this `once` is just to protect expvar for now.
+	// see shipperServer type declaration, this `once` is just to protect expvar for now.
 	s.monWrap.Do(
 		func() {
 			monHandler, err := loadMonitoring(cfg, s.queue)
@@ -107,8 +108,6 @@ func (s *shipperServer) Run(cfg config.ShipperConfig) error {
 			}
 			s.monHandler = monHandler
 		})
-
-	s.log.Debugf("Loaded monitoring outputs")
 
 	var opts []grpc.ServerOption
 	if cfg.TLS {
@@ -122,10 +121,10 @@ func (s *shipperServer) Run(cfg config.ShipperConfig) error {
 
 	pb.RegisterProducerServer(s.grpcServer, s)
 
-	s.log.Debugf("gRPC server is listening on port %d", cfg.Port)
+	agent.Status(proto.StateObserved_HEALTHY, "Started server, grpc listening", nil)
+	s.log.Infof("gRPC server is listening on port %d", cfg.Port)
 	s.serverIsStarted = true
 	return s.grpcServer.Serve(lis)
-
 }
 
 // blocking command to stop all the shipper components

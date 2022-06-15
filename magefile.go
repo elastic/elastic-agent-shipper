@@ -9,8 +9,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/magefile/mage/sh"
 	"path/filepath"
+
+	"github.com/magefile/mage/sh"
 
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
