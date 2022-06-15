@@ -21,21 +21,21 @@ func TestSimpleBatch(t *testing.T) {
 	events := make([]api.Event, eventCount)
 	for i := 0; i < eventCount; i++ {
 		err = queue.Publish(&events[i])
-		assert.NoError(t, err)
+		assert.NoError(t, err, "couldn't publish to queue")
 	}
 
 	// Confirm that all events made it through. We ignore the contents
 	// since it's easier to just confirm the exact pointer values go
 	// through unchanged.
 	batch, err := queue.Get(eventCount)
-	assert.NoError(t, err)
+	assert.NoError(t, err, "couldn't get queue batch")
 
 	assert.Equal(t, batch.Count(), eventCount)
 	for i := 0; i < eventCount; i++ {
 		event, ok := batch.Event(i).(*api.Event)
-		assert.True(t, ok)
+		assert.True(t, ok, "queue output should have the same concrete type as its input")
 		// Need to use assert.True since assert.Equal* uses value comparison
 		// for unequal pointers.
-		assert.True(t, event == &events[i])
+		assert.True(t, event == &events[i], "memory queue should output the same pointer as its input")
 	}
 }
