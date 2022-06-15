@@ -18,6 +18,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper/config"
 	"github.com/elastic/elastic-agent-shipper/monitoring"
+	"github.com/elastic/elastic-agent-shipper/output"
 	"github.com/elastic/elastic-agent-shipper/queue"
 
 	pb "github.com/elastic/elastic-agent-shipper/api"
@@ -71,13 +72,15 @@ func Run(cfg config.ShipperConfig) error {
 		return fmt.Errorf("couldn't create queue: %w", err)
 	}
 
+	// Make a placeholder console output to read the queue's events
+	out := output.NewConsole(queue)
+	out.Start()
+
 	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", cfg.Port))
 	if err != nil {
 		return fmt.Errorf("failed to listen: %w", err)
 	}
 
-	// Beats won't call the "New*" functions of a queue directly, but instead fetch a queueFactory from the global registers.
-	//However, that requires the publisher/pipeline code as well, and I'm not sure we want that.
 	monHandler, err := loadMonitoring(cfg, queue)
 	if err != nil {
 		return fmt.Errorf("error loading outputs: %w", err)
@@ -94,13 +97,20 @@ func Run(cfg config.ShipperConfig) error {
 		opts = []grpc.ServerOption{grpc.Creds(creds)}
 	}
 	grpcServer := grpc.NewServer(opts...)
-	r := shipperServer{logger: log}
+	r := shipperServer{
+		logger: log,
+		queue:  queue,
+	}
 	pb.RegisterProducerServer(grpcServer, r)
 
 	shutdownFunc := func() {
 		grpcServer.GracefulStop()
 		monHandler.End()
 		queue.Close()
+		// The output will shut down once the queue is closed.
+		// We call Wait to give it a chance to finish with events
+		// it has already read.
+		out.Wait()
 	}
 	handleShutdown(shutdownFunc, log)
 	log.Debugf("gRPC server is listening on port %d", cfg.Port)
