@@ -47,7 +47,7 @@ func (serv shipperServer) PublishEvents(_ context.Context, req *pb.PublishReques
 func (serv shipperServer) StreamAcknowledgements(streamReq *pb.StreamAcksRequest, prd pb.Producer_StreamAcknowledgementsServer) error {
 
 	// we have no outputs now, so just send a single dummy event
-	evt := pb.StreamAcksReply{Acks: []*pb.Acknowledgement{{Timestamp: pbts.Now(), EventId: streamReq.DataStream.Id}}}
+	evt := pb.StreamAcksReply{Acks: []*pb.Acknowledgement{{Timestamp: pbts.Now(), EventId: streamReq.Source.GetInputId()}}}
 	err := prd.Send(&evt)
 
 	if err != nil {
