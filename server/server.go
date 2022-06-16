@@ -46,7 +46,7 @@ func newShipper() *shipperServer {
 }
 
 // PublishEvents is the server implementation of the gRPC PublishEvents call
-func (serv shipperServer) PublishEvents(_ context.Context, req *pb.PublishRequest) (*pb.PublishReply, error) {
+func (serv *shipperServer) PublishEvents(_ context.Context, req *pb.PublishRequest) (*pb.PublishReply, error) {
 	results := []*pb.EventResult{}
 	for _, evt := range req.Events {
 		serv.log.Infof("Got event %s: %#v", evt.EventId, evt.Fields.AsMap())
@@ -66,7 +66,7 @@ func (serv shipperServer) PublishEvents(_ context.Context, req *pb.PublishReques
 }
 
 // StreamAcknowledgements is the server implementation of the gRPC StreamAcknowledgements call
-func (serv shipperServer) StreamAcknowledgements(streamReq *pb.StreamAcksRequest, prd pb.Producer_StreamAcknowledgementsServer) error {
+func (serv *shipperServer) StreamAcknowledgements(streamReq *pb.StreamAcksRequest, prd pb.Producer_StreamAcknowledgementsServer) error {
 
 	// we have no outputs now, so just send a single dummy event
 	evt := pb.StreamAcksReply{Acks: []*pb.Acknowledgement{{Timestamp: pbts.Now(), EventId: streamReq.DataStream.Id}}}
@@ -79,8 +79,8 @@ func (serv shipperServer) StreamAcknowledgements(streamReq *pb.StreamAcksRequest
 }
 
 // Run is a blocking call that starts the gRPC server
-func (s *shipperServer) Run(cfg config.ShipperConfig, agent client.Client) error {
-	if s.serverIsStarted {
+func (serv *shipperServer) Run(cfg config.ShipperConfig, agent client.Client) error {
+	if serv.serverIsStarted {
 		return fmt.Errorf("server is already started")
 	}
 
@@ -90,10 +90,10 @@ func (s *shipperServer) Run(cfg config.ShipperConfig, agent client.Client) error
 	if err != nil {
 		return fmt.Errorf("couldn't create queue: %w", err)
 	}
-	s.queue = queue
+	serv.queue = queue
 
-	s.out = output.NewConsole(s.queue)
-	s.out.Start()
+	serv.out = output.NewConsole(serv.queue)
+	serv.out.Start()
 
 	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", cfg.Port))
 	if err != nil {
@@ -104,14 +104,14 @@ func (s *shipperServer) Run(cfg config.ShipperConfig, agent client.Client) error
 	//However, that requires the publisher/pipeline code as well, and I'm not sure we want that.
 
 	// see shipperServer type declaration, this `once` is just to protect expvar for now.
-	s.monWrap.Do(
+	serv.monWrap.Do(
 		func() {
-			monHandler, err := loadMonitoring(cfg, s.queue)
+			monHandler, err := loadMonitoring(cfg, serv.queue)
 			if err != nil {
-				s.log.Errorf("Error starting monitoring: %w", err)
+				serv.log.Errorf("Error starting monitoring: %w", err)
 				return
 			}
-			s.monHandler = monHandler
+			serv.monHandler = monHandler
 		})
 
 	var opts []grpc.ServerOption
@@ -122,31 +122,31 @@ func (s *shipperServer) Run(cfg config.ShipperConfig, agent client.Client) error
 		}
 		opts = []grpc.ServerOption{grpc.Creds(creds)}
 	}
-	s.grpcServer = grpc.NewServer(opts...)
+	serv.grpcServer = grpc.NewServer(opts...)
 
-	pb.RegisterProducerServer(s.grpcServer, s)
+	pb.RegisterProducerServer(serv.grpcServer, serv)
 
 	_ = agent.Status(proto.StateObserved_HEALTHY, "Started server, grpc listening", nil)
-	s.log.Infof("gRPC server is listening on port %d", cfg.Port)
-	s.serverIsStarted = true
-	return s.grpcServer.Serve(lis)
+	serv.log.Infof("gRPC server is listening on port %d", cfg.Port)
+	serv.serverIsStarted = true
+	return serv.grpcServer.Serve(lis)
 }
 
 // blocking command to stop all the shipper components
-func (s *shipperServer) Stop() {
-	if !s.serverIsStarted {
+func (serv *shipperServer) Stop() {
+	if !serv.serverIsStarted {
 		return
 	}
-	s.log.Debugf("Stopping shipper server")
-	s.grpcServer.GracefulStop()
-	s.queue.Close()
+	serv.log.Debugf("Stopping shipper server")
+	serv.grpcServer.GracefulStop()
+	serv.queue.Close()
 	// Don't try to gracefully stop monitoring until we deal with expvar
 	//s.monHandler.End()
 
 	// The output will shut down once the queue is closed.
 	// We call Wait to give it a chance to finish with events
 	// it has already read.
-	s.out.Wait()
+	serv.out.Wait()
 
-	s.serverIsStarted = false
+	serv.serverIsStarted = false
 }
