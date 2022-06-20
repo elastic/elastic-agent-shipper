@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -26,6 +27,8 @@ func TestAgentClient(t *testing.T) {
 	token := "expected_token"
 	baseCfg, err := readMainConfig()
 	require.NoError(t, err)
+	var gotState1, gotState2 bool
+	var state1, state2 proto.StateObserved_Status
 	srv := mock.StubServer{
 		CheckinImpl: func(observed *proto.StateObserved) *proto.StateExpected {
 			m.Lock()
@@ -33,7 +36,9 @@ func TestAgentClient(t *testing.T) {
 			t.Logf("At checkin")
 			if observed.Token == token {
 				if observed.ConfigStateIdx == 0 { // initial state
-					t.Logf("Got ConfigStateIdx 0")
+					t.Logf("Got ConfigStateIdx 0: %v", observed.Status)
+					gotState1 = true
+					state1 = observed.Status
 					//connected = true
 					return &proto.StateExpected{
 						State:          proto.StateExpected_RUNNING,
@@ -41,13 +46,9 @@ func TestAgentClient(t *testing.T) {
 						Config:         baseCfg,
 					}
 				} else if observed.ConfigStateIdx == 1 { // try another update
-					t.Logf("Got ConfigStateIdx 1")
-					// status = observed.Status
-					// message = observed.Message
-					// payload = observed.Payload
-					// if status == proto.StateObserved_HEALTHY {
-					// 	healthyCount++
-					// }
+					t.Logf("Got ConfigStateIdx 1: %v", observed.Status)
+					gotState2 = true
+					state2 = observed.Status
 					return &proto.StateExpected{ // shutdown?
 						State:          proto.StateExpected_RUNNING,
 						ConfigStateIdx: 2,
@@ -70,11 +71,7 @@ func TestAgentClient(t *testing.T) {
 		},
 		ActionsChan: make(chan *mock.PerformAction, 100),
 	}
-
 	require.NoError(t, srv.Start())
-
-	// setup wrapper
-
 	testWrapper := func(agentClient client.StateInterface) (client.Client, error) {
 		return client.New(fmt.Sprintf(":%d", srv.Port), token, agentClient, nil, grpc.WithTransportCredentials(insecure.NewCredentials())), nil
 	}
@@ -87,6 +84,12 @@ func TestAgentClient(t *testing.T) {
 	// start the server runtime
 	err = runAgentClient(testCtx, shipper)
 	require.NoError(t, err)
+
+	// check to make sure we got expected states
+	assert.True(t, gotState1, "first checkin")
+	assert.True(t, gotState2, "second checkin")
+	assert.Equal(t, proto.StateObserved_STARTING, state1)
+	assert.Equal(t, proto.StateObserved_HEALTHY, state2)
 
 }
 

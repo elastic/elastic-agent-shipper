@@ -100,9 +100,6 @@ func (serv *shipperServer) Run(cfg config.ShipperConfig, agent client.Client) er
 		return fmt.Errorf("failed to listen: %w", err)
 	}
 
-	// Beats won't call the "New*" functions of a queue directly, but instead fetch a queueFactory from the global registers.
-	//However, that requires the publisher/pipeline code as well, and I'm not sure we want that.
-
 	// see shipperServer type declaration, this `once` is just to protect expvar for now.
 	serv.monWrap.Do(
 		func() {
@@ -140,8 +137,6 @@ func (serv *shipperServer) Stop() {
 	serv.log.Debugf("Stopping shipper server")
 	serv.grpcServer.GracefulStop()
 	serv.queue.Close()
-	// Don't try to gracefully stop monitoring until we deal with expvar
-	//s.monHandler.End()
 
 	// The output will shut down once the queue is closed.
 	// We call Wait to give it a chance to finish with events
