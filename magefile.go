@@ -61,6 +61,12 @@ func GenProto() {
 }
 
 func Build() {
+	devtools.SetBuildVariableSources(
+		&devtools.BuildVariableSources{
+			BeatVersion: "./version/version.go",
+			GoVersion:   ".go-version",
+			DocBranch:   "./docs/version.asciidoc",
+		})
 	//sh.Run("go", "build")
 	devtools.Build(devtools.DefaultGolangCrossBuildArgs())
 }
