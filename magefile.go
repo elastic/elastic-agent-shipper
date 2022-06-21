@@ -8,17 +8,22 @@
 package main
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"github.com/magefile/mage/sh"
 
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
+
 	// mage:import
 	"github.com/elastic/elastic-agent-libs/dev-tools/mage"
+
 	"github.com/elastic/elastic-agent-libs/dev-tools/mage/gotool"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 )
+
+const packageSpecFile = "dev-tools/packaging/packages.yml"
 
 func init() {
 	devtools.BeatLicense = "Elastic License"
@@ -32,13 +37,38 @@ var Aliases = map[string]interface{}{
 	"lint": mage.Linter.All,
 }
 
+func Package() {
+	devtools.Build(devtools.DefaultGolangCrossBuildArgs())
+	// This seems like it shouldn't be needed, but
+	// the build tooling for beats wants this,
+	// And for now agent is treating it like a beat
+	devtools.SetBuildVariableSources(
+		&devtools.BuildVariableSources{
+			BeatVersion: "./version/version.go",
+			GoVersion:   ".go-version",
+			DocBranch:   "./docs/version.asciidoc",
+		})
+	devtools.MustUsePackaging("elastic_shipper_agent", packageSpecFile)
+	err := devtools.Package()
+	if err != nil {
+		fmt.Printf("Error running package: %s", err)
+	}
+}
+
 func GenProto() {
 	sh.Run("protoc", "-Iapi", "-Iapi/vendor", "--go_out=./api", "--go-grpc_out=./api", "--go_opt=paths=source_relative", "--go-grpc_opt=paths=source_relative", "api/shipper.proto")
 	common.Fmt()
 }
 
 func Build() {
-	sh.Run("go", "build")
+	devtools.SetBuildVariableSources(
+		&devtools.BuildVariableSources{
+			BeatVersion: "./version/version.go",
+			GoVersion:   ".go-version",
+			DocBranch:   "./docs/version.asciidoc",
+		})
+	//sh.Run("go", "build")
+	devtools.Build(devtools.DefaultGolangCrossBuildArgs())
 }
 
 // Notice generates a NOTICE.txt file for the module.

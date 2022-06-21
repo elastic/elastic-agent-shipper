@@ -5,45 +5,71 @@
 package server
 
 import (
+	"context"
 	"fmt"
-	"net"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper/config"
 	"github.com/elastic/elastic-agent-shipper/monitoring"
-	"github.com/elastic/elastic-agent-shipper/output"
 	"github.com/elastic/elastic-agent-shipper/queue"
-
-	pb "github.com/elastic/elastic-agent-shipper/api"
 )
 
-// LoadAndRun loads the config object and runs the gRPC server
+type stopFunc func()
+
+// LoadAndRun loads the config object and runs the gRPC server, this is what gets called by the CLI library on start.
 func LoadAndRun() error {
-	cfg, err := config.ReadConfig()
+	// Read in a bare config that allows us to pull from the -E flags
+	cfg, err := config.GetLoggingConfig()
 	if err != nil {
 		return fmt.Errorf("error reading config: %w", err)
-
 	}
 
-	err = logp.Configure(cfg.Log)
+	// globally set the logger
+	err = logp.Configure(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to initialize logger: %w", err)
-
 	}
 
-	return Run(cfg)
+	stdinWrapper := func(agentClient client.StateInterface) (client.Client, error) {
+		return client.NewFromReader(os.Stdin, agentClient)
+	}
+
+	client, err := NewShipperFromClient(stdinWrapper)
+	if err != nil {
+		return fmt.Errorf("error starting shipper client: %w", err)
+	}
+
+	return runAgentClient(context.Background(), client)
 }
 
-func handleShutdown(stopFunc func(), log *logp.Logger) {
-	var callback sync.Once
+func runAgentClient(ctx context.Context, ac *AgentClient) error {
+	err := ac.StartClient(ctx)
+	if err != nil {
+		return fmt.Errorf("error starting client: %w", err)
+	}
+	log := logp.L()
+	handleShutdown(ac.OnStop, log)
 
+	for {
+		select {
+		case <-ctx.Done():
+			log.Infof("Got context done, stopping")
+			return nil
+		case <-ac.stop:
+			log.Infof("Got shutdown, stopping")
+			return nil
+		}
+	}
+}
+
+func handleShutdown(stop stopFunc, log *logp.Logger) {
+	var callback sync.Once
+	log.Debugf("registering signal handler")
 	// On termination signals, gracefully stop the Beat
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
@@ -57,65 +83,8 @@ func handleShutdown(stopFunc func(), log *logp.Logger) {
 			log.Debug("Received sighup, stopping")
 		}
 
-		callback.Do(stopFunc)
+		callback.Do(stop)
 	}()
-}
-
-// Run starts the gRPC server
-func Run(cfg config.ShipperConfig) error {
-	log := logp.L()
-
-	// When there is queue-specific configuration in ShipperConfig, it should
-	// be passed in here.
-	queue, err := queue.New()
-	if err != nil {
-		return fmt.Errorf("couldn't create queue: %w", err)
-	}
-
-	// Make a placeholder console output to read the queue's events
-	out := output.NewConsole(queue)
-	out.Start()
-
-	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", cfg.Port))
-	if err != nil {
-		return fmt.Errorf("failed to listen: %w", err)
-	}
-
-	monHandler, err := loadMonitoring(cfg, queue)
-	if err != nil {
-		return fmt.Errorf("error loading outputs: %w", err)
-	}
-
-	log.Debugf("Loaded monitoring outputs")
-
-	var opts []grpc.ServerOption
-	if cfg.TLS {
-		creds, err := credentials.NewServerTLSFromFile(cfg.Cert, cfg.Key)
-		if err != nil {
-			return fmt.Errorf("failed to generate credentials %w", err)
-		}
-		opts = []grpc.ServerOption{grpc.Creds(creds)}
-	}
-	grpcServer := grpc.NewServer(opts...)
-	r := shipperServer{
-		logger: log,
-		queue:  queue,
-	}
-	pb.RegisterProducerServer(grpcServer, r)
-
-	shutdownFunc := func() {
-		grpcServer.GracefulStop()
-		monHandler.End()
-		queue.Close()
-		// The output will shut down once the queue is closed.
-		// We call Wait to give it a chance to finish with events
-		// it has already read.
-		out.Wait()
-	}
-	handleShutdown(shutdownFunc, log)
-	log.Debugf("gRPC server is listening on port %d", cfg.Port)
-	return grpcServer.Serve(lis)
-
 }
 
 // Initialize metrics and outputs

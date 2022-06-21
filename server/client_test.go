@@ -1,0 +1,104 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
+package server
+
+import (
+	"context"
+	"fmt"
+	"io/ioutil"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/client/mock"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+)
+
+func TestAgentClient(t *testing.T) {
+	var m sync.Mutex
+	token := "expected_token"
+	baseCfg, err := readMainConfig()
+	require.NoError(t, err)
+	var gotState1, gotState2 bool
+	var state1, state2 proto.StateObserved_Status
+	srv := mock.StubServer{
+		CheckinImpl: func(observed *proto.StateObserved) *proto.StateExpected {
+			m.Lock()
+			defer m.Unlock()
+			t.Logf("At checkin")
+			if observed.Token == token {
+				if observed.ConfigStateIdx == 0 { // initial state
+					t.Logf("Got ConfigStateIdx 0: %v", observed.Status)
+					gotState1 = true
+					state1 = observed.Status
+					//connected = true
+					return &proto.StateExpected{
+						State:          proto.StateExpected_RUNNING,
+						ConfigStateIdx: 1,
+						Config:         baseCfg,
+					}
+				} else if observed.ConfigStateIdx == 1 { // try another update
+					t.Logf("Got ConfigStateIdx 1: %v", observed.Status)
+					gotState2 = true
+					state2 = observed.Status
+					return &proto.StateExpected{ // shutdown?
+						State:          proto.StateExpected_RUNNING,
+						ConfigStateIdx: 2,
+						Config:         baseCfg,
+					}
+				} else if observed.ConfigStateIdx == 2 {
+					return &proto.StateExpected{ // shutdown?
+						State:          proto.StateExpected_STOPPING,
+						ConfigStateIdx: 2,
+						Config:         "",
+					}
+				}
+			}
+			// disconnect
+			return nil
+		},
+		ActionImpl: func(response *proto.ActionResponse) error {
+			// actions not tested here
+			return nil
+		},
+		ActionsChan: make(chan *mock.PerformAction, 100),
+	}
+	require.NoError(t, srv.Start())
+	testWrapper := func(agentClient client.StateInterface) (client.Client, error) {
+		return client.New(fmt.Sprintf(":%d", srv.Port), token, agentClient, nil, grpc.WithTransportCredentials(insecure.NewCredentials())), nil
+	}
+
+	testCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	shipper, err := NewShipperFromClient(testWrapper)
+	require.NoError(t, err)
+	// start the server runtime
+	err = runAgentClient(testCtx, shipper)
+	require.NoError(t, err)
+
+	// check to make sure we got expected states
+	assert.True(t, gotState1, "first checkin")
+	assert.True(t, gotState2, "second checkin")
+	assert.Equal(t, proto.StateObserved_STARTING, state1)
+	assert.Equal(t, proto.StateObserved_HEALTHY, state2)
+
+}
+
+// quick test hack to read in the main config so we send it to the shipper via agent control
+func readMainConfig() (string, error) {
+	cfgPath := "../elastic-agent-shipper.yml"
+	fileBytes, err := ioutil.ReadFile(cfgPath)
+	if err != nil {
+		return "", fmt.Errorf("error reading in %s: %w", cfgPath, err)
+	}
+	return string(fileBytes), nil
+}

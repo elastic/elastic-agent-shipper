@@ -27,7 +27,7 @@ type Config struct {
 // NewLoggerReporter returns a new reporter interface for the logger
 func NewLoggerReporter() reporter.Reporter {
 	log := logp.L()
-	log.Debugf("Starting metrics logging...")
+	log.Debugf("Starting metrics logging")
 	return LoggerReporter{log: logp.L()}
 }
 

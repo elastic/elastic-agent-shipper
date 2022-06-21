@@ -2,17 +2,13 @@
 
 # This file is an example configuration file highlighting only the most common
 # options.
+# Since we're now running under the agent controller, the shipper won't actually read this file, but it serves as an example for what config the shipper will currently expect
 
 # The gRPC port that the shipper will listen on
 port: 50052
 tls: false
 #cert: # path to TLS cert
 #key: # path to TLS keyfile
-
-#log level
-logging.level: debug
-logging.selectors: ["*"]
-logging.to_stderr: true
 
 queue:
   test: #There is no actual "test" queue type, remove this later.
@@ -25,5 +21,5 @@ monitoring:
   http:
     enabled: true
     host: "localhost"
-    port: 8282
+    port: 8383
     name: "queue"
