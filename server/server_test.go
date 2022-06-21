@@ -1,3 +1,7 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package server
 
 import (
@@ -7,21 +11,22 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-client/v7/pkg/client/mock"
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/client/mock"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
 
 func TestAgentControl(t *testing.T) {
 	unitOneID := mock.NewID()
 
 	token := mock.NewID()
-	//gotValid := false
-	//gotInvalid := false
+	var gotConfig, gotHealthy, gotStopped bool
+
 	var mut sync.Mutex
 
 	t.Logf("Creating mock server")
@@ -36,6 +41,7 @@ func TestAgentControl(t *testing.T) {
 
 				// initial checkin
 				if len(observed.Units) == 0 || observed.Units[0].State == proto.State_STARTING {
+					gotConfig = true
 					return &proto.CheckinExpected{
 						Units: []*proto.UnitExpected{
 							{
@@ -48,6 +54,7 @@ func TestAgentControl(t *testing.T) {
 						},
 					}
 				} else if observed.Units[0].State == proto.State_HEALTHY {
+					gotHealthy = true
 					//shutdown
 					return &proto.CheckinExpected{
 						Units: []*proto.UnitExpected{
@@ -61,6 +68,7 @@ func TestAgentControl(t *testing.T) {
 						},
 					}
 				} else if observed.Units[0].State == proto.State_STOPPED {
+					gotStopped = true
 					// remove the unit? I think?
 					return &proto.CheckinExpected{
 						Units: nil,
@@ -97,17 +105,8 @@ func TestAgentControl(t *testing.T) {
 	defer cancel()
 	err := runController(ctx, validClient)
 	assert.NoError(t, err)
-}
 
-func unitsAreHealthy(observed []*proto.UnitObserved) bool {
-	if len(observed) < 1 {
-		return false
-	}
-	for _, unit := range observed {
-		state := unit.State
-		if state != proto.State_HEALTHY {
-			return false
-		}
-	}
-	return true
+	assert.True(t, gotConfig, "config state")
+	assert.True(t, gotHealthy, "healthy state")
+	assert.True(t, gotStopped, "stopped state")
 }

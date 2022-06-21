@@ -28,23 +28,6 @@ import (
 
 // LoadAndRun loads the config object and runs the gRPC server
 func LoadAndRun() error {
-
-	// This will go away/get moved with the controller
-	// cfg, err := config.ReadConfig()
-	// if err != nil {
-	// 	return fmt.Errorf("error reading config: %w", err)
-
-	// }
-	// err = logp.Configure(cfg.Log)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to initialize logger: %w", err)
-
-	// }
-
-	// Before we initialize the logger via an agent-supplied config, we need some kind of default
-	// This should probably be changed to something "cleaner" for production
-	logp.DevelopmentSetup()
-
 	agentClient, _, err := client.NewV2FromReader(os.Stdin, client.VersionInfo{Name: "elastic-agent-shipper", Version: "v2"})
 	if err != nil {
 		return fmt.Errorf("error reading control config from agent: %w", err)
@@ -87,7 +70,7 @@ func handleShutdown(stopFunc func(), done doneChan) {
 }
 
 // Run starts the gRPC server
-func Run(cfg config.ShipperConfig, unit *client.Unit, done doneChan, shutdownDone sync.WaitGroup) error {
+func (c *clientHandler) Run(cfg config.ShipperConfig, unit *client.Unit) error {
 	log := logp.L()
 
 	// When there is queue-specific configuration in ShipperConfig, it should
@@ -111,7 +94,7 @@ func Run(cfg config.ShipperConfig, unit *client.Unit, done doneChan, shutdownDon
 		return fmt.Errorf("error loading outputs: %w", err)
 	}
 
-	unit.UpdateState(client.UnitStateConfiguring, "starting shipper server", nil)
+	_ = unit.UpdateState(client.UnitStateConfiguring, "starting shipper server", nil)
 
 	var opts []grpc.ServerOption
 	if cfg.TLS {
@@ -137,9 +120,9 @@ func Run(cfg config.ShipperConfig, unit *client.Unit, done doneChan, shutdownDon
 		// it has already read.
 		out.Wait()
 	}
-	handleShutdown(shutdownFunc, done)
+	handleShutdown(shutdownFunc, c.shutdownInit)
 	log.Debugf("gRPC server is listening on port %d", cfg.Port)
-	unit.UpdateState(client.UnitStateHealthy, "Shipper Running", nil)
+	_ = unit.UpdateState(client.UnitStateHealthy, "Shipper Running", nil)
 
 	// This will get sent after the server has shutdown, signaling to the runloop that it can stop.
 	// The shipper has no queues connected right now, but once it does, this function can't run until
@@ -147,9 +130,9 @@ func Run(cfg config.ShipperConfig, unit *client.Unit, done doneChan, shutdownDon
 	// will work once we have queues connected here.
 	defer func() {
 		log.Debugf("shipper has completed shutdown, stopping")
-		shutdownDone.Done()
+		c.shutdownComplete.Done()
 	}()
-	shutdownDone.Add(1)
+	c.shutdownComplete.Add(1)
 	return grpcServer.Serve(lis)
 
 }

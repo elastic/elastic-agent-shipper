@@ -1,3 +1,7 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package server
 
 import (
@@ -75,45 +79,51 @@ func (c *clientHandler) startShipper(unit *client.Unit) {
 	if c.shipperIsStopping {
 		c.shipperIsStopping = false
 	}
-	unit.UpdateState(client.UnitStateConfiguring, "reading shipper config", nil)
+	// deciding to omit some of these error checks, as the client update state will only return an error if it has a JSON payload to unmarshall
+	_ = unit.UpdateState(client.UnitStateConfiguring, "reading shipper config", nil)
+
 	// Assuming that if we got here from UnitChangedAdded, we don't need to care about the expected state?
 	_, configString := unit.Expected()
 	cfg, err := config.ReadConfigFromJSON(configString)
 	if err != nil {
 		c.log.Errorf("error unpacking config from agent: %s", err)
-		unit.UpdateState(client.UnitStateFailed, err.Error(), nil)
+		_ = unit.UpdateState(client.UnitStateFailed, err.Error(), nil)
 		return
 	}
 
 	err = logp.Configure(cfg.Log)
 	if err != nil {
 		c.log.Errorf("error unpacking config from agent: %s", err)
-		unit.UpdateState(client.UnitStateFailed, err.Error(), nil)
+		_ = unit.UpdateState(client.UnitStateFailed, err.Error(), nil)
 		return
 	}
 
 	// reset the local logger
 	c.log = logp.L()
 
-	err = Run(cfg, unit, c.shutdownInit, c.shutdownComplete)
+	err = c.Run(cfg, unit)
 	if err != nil {
 		c.log.Errorf("error running shipper: %s", err)
-		unit.UpdateState(client.UnitStateFailed, err.Error(), nil)
+		_ = unit.UpdateState(client.UnitStateFailed, err.Error(), nil)
 		return
 	}
 }
 
 // start an individual input stream
 func (c *clientHandler) startStream(unit *client.Unit) {
+	// when we have individual input streams, that'll go here.
 	c.log.Debugf("Got unit stream for processor: %s", unit.ID())
-	unit.UpdateState(client.UnitStateHealthy, "healthy", nil)
+	_ = unit.UpdateState(client.UnitStateHealthy, "healthy", nil)
+
 }
 
 // update an individual input stream
 func (c *clientHandler) updateStream(unit *client.Unit) {
+	// when we have individual input streams, that'll go here.
 	c.log.Debugf("Got unit input update for processor: %s", unit.ID())
-	unit.UpdateState(client.UnitStateConfiguring, "updating", nil)
-	unit.UpdateState(client.UnitStateHealthy, "healthy", nil)
+	_ = unit.UpdateState(client.UnitStateConfiguring, "updating", nil)
+	_ = unit.UpdateState(client.UnitStateHealthy, "healthy", nil)
+
 }
 
 // handle the UnitChangedAdded event from the V2 API
@@ -150,18 +160,17 @@ func (c *clientHandler) shutdown(shipperUnit *client.Unit) {
 	if c.shipperIsStopping {
 		return
 	}
-	shipperUnit.UpdateState(client.UnitStateStopping, "shutting down shipper output", nil)
+	_ = shipperUnit.UpdateState(client.UnitStateStopping, "shutting down shipper output", nil)
 	c.stopShipper()
 	// The server has successfully shut down
 	// In theory we want this to block, as we should wait for queues & outputs to empty.
 	c.shutdownComplete.Wait()
 	c.log.Debugf("Shutdown complete, sending STOPPPED")
-	shipperUnit.UpdateState(client.UnitStateStopped, "Stopped shipper output", nil)
+	_ = shipperUnit.UpdateState(client.UnitStateStopped, "Stopped shipper output", nil)
 }
 
 // runController is the main runloop for the shipper itself, and managed communication with the agent.
 func runController(ctx context.Context, agentClient client.V2) error {
-	logp.DevelopmentSetup() // hack, remove this later
 	log := logp.L()
 
 	err := agentClient.Start(ctx)
