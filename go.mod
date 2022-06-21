@@ -13,7 +13,7 @@ require (
 require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220603155004-ac7e079a9403
 	github.com/elastic/elastic-agent v0.0.0-20220330154707-da786a47a0c5
-	github.com/elastic/elastic-agent-client/v7 v7.0.0-20220524131921-43bacbeec516
+	github.com/elastic/elastic-agent-client/v7 v7.0.0-20220607160924-1a71765a8bbe
 	github.com/elastic/go-ucfg v0.8.5
 	github.com/magefile/mage v1.13.0
 	github.com/stretchr/testify v1.7.0
@@ -81,5 +81,4 @@ require (
 replace (
 	github.com/dop251/goja => github.com/andrewkroh/goja v0.0.0-20190128172624-dd2ac4456e20
 	github.com/dop251/goja_nodejs => github.com/dop251/goja_nodejs v0.0.0-20171011081505-adff31b136e6
-	github.com/elastic/elastic-agent-client/v7 => ../elastic-agent-client
 )
