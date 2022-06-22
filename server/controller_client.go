@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -29,16 +30,17 @@ type clientHandler struct {
 	// the unit ID for the shipper itself
 	shipperOutputID string
 
-	shipperIsStopping bool
+	shipperIsStopping uint32
 
 	log *logp.Logger
 }
 
 func newClientHandler() clientHandler {
 	return clientHandler{
-		shutdownInit: make(doneChan, 1),
-		log:          logp.L(),
-		units:        make(map[string]*client.Unit),
+		shutdownInit:      make(doneChan, 1),
+		log:               logp.L(),
+		units:             make(map[string]*client.Unit),
+		shipperIsStopping: 0,
 	}
 }
 
@@ -69,16 +71,15 @@ func (c *clientHandler) setShipperUnitID(unit *client.Unit) {
 // async stop of the shipper's GRPC server, and anything else it needs to manually shutdown
 func (c *clientHandler) stopShipper() {
 	c.log.Debugf("Stopping Shipper")
-	c.shipperIsStopping = true
+
 	c.shutdownInit <- struct{}{}
 }
 
 // initialize the startup of the shipper grpc server and backend
 func (c *clientHandler) startShipper(unit *client.Unit) {
 	c.log.Debugf("Starting Shipper")
-	if c.shipperIsStopping {
-		c.shipperIsStopping = false
-	}
+	atomic.CompareAndSwapUint32(&c.shipperIsStopping, 1, 0)
+
 	// deciding to omit some of these error checks, as the client update state will only return an error if it has a JSON payload to unmarshall
 	_ = unit.UpdateState(client.UnitStateConfiguring, "reading shipper config", nil)
 
@@ -157,7 +158,8 @@ func (c *clientHandler) handleUnitUpdated(unit *client.Unit) {
 
 // a blocking call that will wait for the shipper components to gracefully shutdown, then send the unit update
 func (c *clientHandler) shutdown(shipperUnit *client.Unit) {
-	if c.shipperIsStopping {
+	swapped := atomic.CompareAndSwapUint32(&c.shipperIsStopping, 0, 1)
+	if !swapped {
 		return
 	}
 	_ = shipperUnit.UpdateState(client.UnitStateStopping, "shutting down shipper output", nil)
