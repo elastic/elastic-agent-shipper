@@ -13,6 +13,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper/monitoring"
+	"github.com/elastic/go-ucfg/json"
 )
 
 const (
@@ -66,6 +67,25 @@ func ReadConfig() (ShipperConfig, error) {
 		return config, fmt.Errorf("error unpacking shipper config: %w", err)
 	}
 	return config, nil
+}
+
+// ReadConfigFromJSON reads the event in from a JSON config. I believe @blakerouse told me
+// that the V2 controller will send events via JSON, but I could be wrong.
+func ReadConfigFromJSON(raw string) (ShipperConfig, error) {
+	rawCfg, err := json.NewConfig([]byte(raw))
+	if err != nil {
+		return ShipperConfig{}, fmt.Errorf("error parsing string config: %w", err)
+	}
+	shipperConfig := ShipperConfig{
+		Port:    defaultPort,
+		Log:     logp.DefaultConfig(logp.SystemdEnvironment),
+		Monitor: monitoring.DefaultConfig(),
+	}
+	err = rawCfg.Unpack(&shipperConfig)
+	if err != nil {
+		return shipperConfig, fmt.Errorf("error unpacking shipper config: %w", err)
+	}
+	return shipperConfig, err
 }
 
 func configFile() string {

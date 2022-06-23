@@ -13,6 +13,8 @@ require (
 require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220603155004-ac7e079a9403
 	github.com/elastic/elastic-agent v0.0.0-20220330154707-da786a47a0c5
+	github.com/elastic/elastic-agent-client/v7 v7.0.0-20220607160924-1a71765a8bbe
+	github.com/elastic/go-ucfg v0.8.5
 	github.com/magefile/mage v1.13.0
 	github.com/stretchr/testify v1.7.0
 	go.elastic.co/go-licence-detector v0.5.0
@@ -27,11 +29,9 @@ require (
 	github.com/dlclark/regexp2 v1.4.0 // indirect
 	github.com/dop251/goja v0.0.0-20220516123900-4418d4575a41 // indirect
 	github.com/dop251/goja_nodejs v0.0.0-20211022123610-8dd9abb0616d // indirect
-	github.com/elastic/elastic-agent-client/v7 v7.0.0-20220524131921-43bacbeec516 // indirect
 	github.com/elastic/go-licenser v0.4.0 // indirect
 	github.com/elastic/go-structform v0.0.9 // indirect
 	github.com/elastic/go-sysinfo v1.7.1 // indirect
-	github.com/elastic/go-ucfg v0.8.5 // indirect
 	github.com/elastic/go-windows v1.0.1 // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
