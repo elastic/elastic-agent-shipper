@@ -6,9 +6,9 @@ package queue
 
 import (
 	"fmt"
-	"time"
 
 	beatsqueue "github.com/elastic/beats/v7/libbeat/publisher/queue"
+	diskqueue "github.com/elastic/beats/v7/libbeat/publisher/queue/diskqueue"
 	memqueue "github.com/elastic/beats/v7/libbeat/publisher/queue/memqueue"
 	"github.com/elastic/elastic-agent-libs/logp"
 
@@ -44,16 +44,18 @@ type MetricsSource interface {
 
 var ErrQueueIsFull = fmt.Errorf("couldn't publish: queue is full")
 
-func New() (*Queue, error) {
-	eventQueue := memqueue.NewQueue(logp.L(), memqueue.Settings{
-		Events: 1024,
-		// The event count and timeout for queue flushes is hard-coded to a placeholder
-		// for now, since that's what the existing Beats API understands. The plan is
-		// for these parameters to instead be controlled by the output as it reads
-		// the queue. See https://github.com/elastic/elastic-agent-shipper/issues/58.
-		FlushMinEvents: 256,
-		FlushTimeout:   5 * time.Millisecond,
-	})
+func New(c Config) (*Queue, error) {
+	var eventQueue beatsqueue.Queue
+	switch c.Type {
+	case "memory":
+		eventQueue = memqueue.NewQueue(logp.L(), c.MemSettings)
+	case "disk":
+		var err error
+		eventQueue, err = diskqueue.NewQueue(logp.L(), c.DiskSettings)
+		if err != nil {
+			return nil, fmt.Errorf("error creating diskqueue: %w", err)
+		}
+	}
 	producer := eventQueue.Producer(beatsqueue.ProducerConfig{})
 	return &Queue{eventQueue: eventQueue, producer: producer}, nil
 }

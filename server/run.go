@@ -74,7 +74,7 @@ func (c *clientHandler) Run(cfg config.ShipperConfig, unit *client.Unit) error {
 
 	// When there is queue-specific configuration in ShipperConfig, it should
 	// be passed in here.
-	queue, err := queue.New()
+	queue, err := queue.New(cfg.Queue)
 	if err != nil {
 		return fmt.Errorf("couldn't create queue: %w", err)
 	}

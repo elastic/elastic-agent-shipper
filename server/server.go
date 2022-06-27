@@ -6,9 +6,6 @@ package server
 
 import (
 	"context"
-	"fmt"
-
-	pbts "google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	pb "github.com/elastic/elastic-agent-shipper-client/pkg/proto"
@@ -26,33 +23,33 @@ type shipperServer struct {
 
 // PublishEvents is the server implementation of the gRPC PublishEvents call
 func (serv shipperServer) PublishEvents(_ context.Context, req *messages.PublishRequest) (*messages.PublishReply, error) {
-	results := []*messages.EventResult{}
+	reply := &messages.PublishReply{}
 	for _, evt := range req.Events {
-		serv.logger.Infof("Got event %s: %#v", evt.EventId, evt.Fields.Data)
-		_, err := serv.queue.Publish(evt)
+		serv.logger.Infof("Got event: %s", evt.String())
+		entryID, err := serv.queue.Publish(evt)
 		if err != nil {
 			// If we couldn't accept any events, return the error directly. Otherwise,
 			// just return success on however many events we were able to handle.
-			if len(results) == 0 {
+			if reply.AcceptedCount == 0 {
 				return nil, err
 			}
 			break
 		}
-		res := messages.EventResult{EventId: evt.EventId, Timestamp: pbts.Now()}
-		results = append(results, &res)
+		reply.AcceptedCount = reply.AcceptedCount + 1
+		reply.AcceptedIndex = uint64(entryID)
 	}
-	return &messages.PublishReply{Results: results}, nil
+	return reply, nil
 }
 
 // StreamAcknowledgements is the server implementation of the gRPC StreamAcknowledgements call
-func (serv shipperServer) StreamAcknowledgements(streamReq *messages.StreamAcksRequest, prd pb.Producer_StreamAcknowledgementsServer) error {
+// func (serv shipperServer) StreamAcknowledgements(streamReq *messages.StreamAcksRequest, prd pb.Producer_StreamAcknowledgementsServer) error {
 
-	// we have no outputs now, so just send a single dummy event
-	evt := messages.StreamAcksReply{Acks: []*messages.Acknowledgement{{Timestamp: pbts.Now(), EventId: streamReq.Source.GetInputId()}}}
-	err := prd.Send(&evt)
+// 	// we have no outputs now, so just send a single dummy event
+// 	evt := messages.StreamAcksReply{Acks: []*messages.Acknowledgement{{Timestamp: pbts.Now(), EventId: streamReq.Source.GetInputId()}}}
+// 	err := prd.Send(&evt)
 
-	if err != nil {
-		return fmt.Errorf("error in StreamAcknowledgements: %w", err)
-	}
-	return nil
-}
+// 	if err != nil {
+// 		return fmt.Errorf("error in StreamAcknowledgements: %w", err)
+// 	}
+// 	return nil
+// }
