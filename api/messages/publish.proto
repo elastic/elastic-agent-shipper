@@ -31,9 +31,6 @@ message Event {
  messages.Struct metadata = 5;
  // Field JSON object (map[string]google.protobuf.Value)
  messages.Struct fields = 6;
- // Note: The google.protobuf.Value type should be extended (or re-implemented) with a
- // google.protobuf.Timestamp to avoid the cost of encoding timestamps as strings and then
- // parsing them back into a date representation.
 }
 
 // Source information required for proper event tracking, processing and routing
