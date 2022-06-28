@@ -1,0 +1,76 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
+syntax = "proto3";
+
+option go_package = "github.com/elastic/elastic-agent-shipper/api/messages";
+package elastic.agent.shipper.v1.messages;
+
+import "google/protobuf/timestamp.proto";
+import "google/rpc/status.proto";
+import "messages/struct.proto";
+
+message PublishRequest {
+ repeated Event events = 1;
+}
+
+// Event is a translation of beat.Event into protobuf.
+message Event {
+ // Creation timestamp of the event.
+ google.protobuf.Timestamp timestamp = 1;
+ // Source of the generated event.
+ Source source = 2;
+ // Optional. Producers may specify a unique event ID if the event has a natural unique
+ // identifier to simplify acknowledgement tracking. If no such identifier exists, the queue
+ // offset can be used for acknowledgement tracking.
+ string event_id = 3;
+ // Data stream for the event.
+ DataStream data_stream = 4;
+ // Metadata JSON object (map[string]google.protobuf.Value)
+ messages.Struct metadata = 5;
+ // Field JSON object (map[string]google.protobuf.Value)
+ messages.Struct fields = 6;
+}
+
+// Source information required for proper event tracking, processing and routing
+message Source {
+ // Input ID in the agent policy.
+ string input_id = 1;
+ // Stream ID in the agent policy (Optional, some inputs don't use streams).
+ // Not to be confused with data streams in Elasticsearch.
+ string stream_id = 2;
+}
+
+// Elastic data stream
+// See https://www.elastic.co/blog/an-introduction-to-the-elastic-data-stream-naming-scheme
+message DataStream {
+ // Generic type describing the data
+ string type = 1;
+ // Describes the data ingested and its structure
+ string dataset = 2;
+ // User-configurable arbitrary grouping
+ string namespace = 3;
+}
+
+message PublishReply {
+ // Results describing messages successfully published to the queue.
+ //
+ // The output order matches the input order e.g. `results[N]` maps to `events[N]`,
+ // however, `results` may contain only the first K results for `events`, when
+ // not all the events are accepted by the queue, so the list sizes may not match.
+ repeated EventResult results = 1;
+}
+
+message EventResult {
+ // Timestamp of the event that was published.
+ google.protobuf.Timestamp timestamp = 1;
+ // ID derived from the queue offset that uniquely identifies the event within the shipper
+ // system. Used to track the progress of events through the queue system.
+ string queue_id = 2;
+ // Optional. Event ID provided when the event was published, if it exists.
+ string event_id = 3;
+ // Optional. List of errors encountered by processors, if any. Processor
+ // errors do not indicate the message failed to send.
+ repeated google.rpc.Status processor_errors = 4;
+}

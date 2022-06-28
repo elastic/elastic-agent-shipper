@@ -12,7 +12,7 @@ import (
 	memqueue "github.com/elastic/beats/v7/libbeat/publisher/queue/memqueue"
 	"github.com/elastic/elastic-agent-libs/logp"
 
-	"github.com/elastic/elastic-agent-shipper/api"
+	"github.com/elastic/elastic-agent-shipper/api/messages"
 )
 
 // Queue is a shipper-specific wrapper around the bare libbeat queue.
@@ -53,7 +53,7 @@ func New() (*Queue, error) {
 	return &Queue{eventQueue: eventQueue, producer: producer}, nil
 }
 
-func (queue *Queue) Publish(event *api.Event) error {
+func (queue *Queue) Publish(event *messages.Event) error {
 	if !queue.producer.Publish(event) {
 		return ErrQueueIsFull
 	}

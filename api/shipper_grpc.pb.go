@@ -16,6 +16,8 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+
+	messages "github.com/elastic/elastic-agent-shipper/api/messages"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -41,9 +43,9 @@ type ProducerClient interface {
 	// Inputs may execute multiple concurrent Produce requests for independent data streams.
 	// The order in which concurrent requests complete is not guaranteed. Use sequential requests to
 	// control ordering.
-	PublishEvents(ctx context.Context, in *PublishRequest, opts ...grpc.CallOption) (*PublishReply, error)
+	PublishEvents(ctx context.Context, in *messages.PublishRequest, opts ...grpc.CallOption) (*messages.PublishReply, error)
 	// Returns a stream of acknowledgements from outputs.
-	StreamAcknowledgements(ctx context.Context, in *StreamAcksRequest, opts ...grpc.CallOption) (Producer_StreamAcknowledgementsClient, error)
+	StreamAcknowledgements(ctx context.Context, in *messages.StreamAcksRequest, opts ...grpc.CallOption) (Producer_StreamAcknowledgementsClient, error)
 }
 
 type producerClient struct {
@@ -54,8 +56,8 @@ func NewProducerClient(cc grpc.ClientConnInterface) ProducerClient {
 	return &producerClient{cc}
 }
 
-func (c *producerClient) PublishEvents(ctx context.Context, in *PublishRequest, opts ...grpc.CallOption) (*PublishReply, error) {
-	out := new(PublishReply)
+func (c *producerClient) PublishEvents(ctx context.Context, in *messages.PublishRequest, opts ...grpc.CallOption) (*messages.PublishReply, error) {
+	out := new(messages.PublishReply)
 	err := c.cc.Invoke(ctx, "/elastic.agent.shipper.v1.Producer/PublishEvents", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -63,7 +65,7 @@ func (c *producerClient) PublishEvents(ctx context.Context, in *PublishRequest, 
 	return out, nil
 }
 
-func (c *producerClient) StreamAcknowledgements(ctx context.Context, in *StreamAcksRequest, opts ...grpc.CallOption) (Producer_StreamAcknowledgementsClient, error) {
+func (c *producerClient) StreamAcknowledgements(ctx context.Context, in *messages.StreamAcksRequest, opts ...grpc.CallOption) (Producer_StreamAcknowledgementsClient, error) {
 	stream, err := c.cc.NewStream(ctx, &Producer_ServiceDesc.Streams[0], "/elastic.agent.shipper.v1.Producer/StreamAcknowledgements", opts...)
 	if err != nil {
 		return nil, err
@@ -79,7 +81,7 @@ func (c *producerClient) StreamAcknowledgements(ctx context.Context, in *StreamA
 }
 
 type Producer_StreamAcknowledgementsClient interface {
-	Recv() (*StreamAcksReply, error)
+	Recv() (*messages.StreamAcksReply, error)
 	grpc.ClientStream
 }
 
@@ -87,8 +89,8 @@ type producerStreamAcknowledgementsClient struct {
 	grpc.ClientStream
 }
 
-func (x *producerStreamAcknowledgementsClient) Recv() (*StreamAcksReply, error) {
-	m := new(StreamAcksReply)
+func (x *producerStreamAcknowledgementsClient) Recv() (*messages.StreamAcksReply, error) {
+	m := new(messages.StreamAcksReply)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -113,9 +115,9 @@ type ProducerServer interface {
 	// Inputs may execute multiple concurrent Produce requests for independent data streams.
 	// The order in which concurrent requests complete is not guaranteed. Use sequential requests to
 	// control ordering.
-	PublishEvents(context.Context, *PublishRequest) (*PublishReply, error)
+	PublishEvents(context.Context, *messages.PublishRequest) (*messages.PublishReply, error)
 	// Returns a stream of acknowledgements from outputs.
-	StreamAcknowledgements(*StreamAcksRequest, Producer_StreamAcknowledgementsServer) error
+	StreamAcknowledgements(*messages.StreamAcksRequest, Producer_StreamAcknowledgementsServer) error
 	mustEmbedUnimplementedProducerServer()
 }
 
@@ -123,10 +125,10 @@ type ProducerServer interface {
 type UnimplementedProducerServer struct {
 }
 
-func (UnimplementedProducerServer) PublishEvents(context.Context, *PublishRequest) (*PublishReply, error) {
+func (UnimplementedProducerServer) PublishEvents(context.Context, *messages.PublishRequest) (*messages.PublishReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PublishEvents not implemented")
 }
-func (UnimplementedProducerServer) StreamAcknowledgements(*StreamAcksRequest, Producer_StreamAcknowledgementsServer) error {
+func (UnimplementedProducerServer) StreamAcknowledgements(*messages.StreamAcksRequest, Producer_StreamAcknowledgementsServer) error {
 	return status.Errorf(codes.Unimplemented, "method StreamAcknowledgements not implemented")
 }
 func (UnimplementedProducerServer) mustEmbedUnimplementedProducerServer() {}
@@ -143,7 +145,7 @@ func RegisterProducerServer(s grpc.ServiceRegistrar, srv ProducerServer) {
 }
 
 func _Producer_PublishEvents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PublishRequest)
+	in := new(messages.PublishRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -155,13 +157,13 @@ func _Producer_PublishEvents_Handler(srv interface{}, ctx context.Context, dec f
 		FullMethod: "/elastic.agent.shipper.v1.Producer/PublishEvents",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ProducerServer).PublishEvents(ctx, req.(*PublishRequest))
+		return srv.(ProducerServer).PublishEvents(ctx, req.(*messages.PublishRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _Producer_StreamAcknowledgements_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(StreamAcksRequest)
+	m := new(messages.StreamAcksRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
@@ -169,7 +171,7 @@ func _Producer_StreamAcknowledgements_Handler(srv interface{}, stream grpc.Serve
 }
 
 type Producer_StreamAcknowledgementsServer interface {
-	Send(*StreamAcksReply) error
+	Send(*messages.StreamAcksReply) error
 	grpc.ServerStream
 }
 
@@ -177,7 +179,7 @@ type producerStreamAcknowledgementsServer struct {
 	grpc.ServerStream
 }
 
-func (x *producerStreamAcknowledgementsServer) Send(m *StreamAcksReply) error {
+func (x *producerStreamAcknowledgementsServer) Send(m *messages.StreamAcksReply) error {
 	return x.ServerStream.SendMsg(m)
 }
 

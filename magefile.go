@@ -8,6 +8,10 @@
 package main
 
 import (
+	"fmt"
+	"io/ioutil"
+	"log"
+	"path"
 	"path/filepath"
 
 	"github.com/magefile/mage/sh"
@@ -32,9 +36,46 @@ var Aliases = map[string]interface{}{
 	"lint": mage.Linter.All,
 }
 
-func GenProto() {
-	sh.Run("protoc", "-Iapi", "-Iapi/vendor", "--go_out=./api", "--go-grpc_out=./api", "--go_opt=paths=source_relative", "--go-grpc_opt=paths=source_relative", "api/shipper.proto")
+// Add here new packages that have to be compiled.
+// Vendor packages are not included since they already have compiled versions.
+// All `.proto` files in the listed directories will be compiled to Go.
+var protoPackages = []string{
+	"api",
+	"api/messages",
+}
+
+func GenProto() error {
+	var toCompile []string
+
+	for _, p := range protoPackages {
+		log.Printf("Listing the %s package...\n", p)
+
+		files, err := ioutil.ReadDir(p)
+		if err != nil {
+			return fmt.Errorf("failed to read the proto package directory %s: %w", p, err)
+		}
+		for _, f := range files {
+			if path.Ext(f.Name()) != ".proto" {
+				continue
+			}
+			toCompile = append(toCompile, path.Join(p, f.Name()))
+		}
+	}
+
+	args := append(
+		[]string{"-Iapi", "-Iapi/vendor", "--go_out=./api", "--go-grpc_out=./api", "--go_opt=paths=source_relative", "--go-grpc_opt=paths=source_relative"},
+		toCompile...,
+	)
+
+	log.Printf("Compiling %d packages...\n", len(protoPackages))
+	err := sh.Run("protoc", args...)
+	if err != nil {
+		return fmt.Errorf("failed to compile protobuf: %w", err)
+	}
+
+	log.Println("Formatting generated code...")
 	common.Fmt()
+	return nil
 }
 
 func Build() {
