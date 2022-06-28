@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/elastic/elastic-agent-shipper/api"
+	"github.com/elastic/elastic-agent-shipper/api/messages"
 )
 
 func TestSimpleBatch(t *testing.T) {
@@ -18,7 +18,7 @@ func TestSimpleBatch(t *testing.T) {
 	defer queue.Close()
 
 	eventCount := 100
-	events := make([]api.Event, eventCount)
+	events := make([]messages.Event, eventCount)
 	for i := 0; i < eventCount; i++ {
 		err = queue.Publish(&events[i])
 		assert.NoError(t, err, "couldn't publish to queue")
@@ -32,7 +32,7 @@ func TestSimpleBatch(t *testing.T) {
 
 	assert.Equal(t, batch.Count(), eventCount)
 	for i := 0; i < eventCount; i++ {
-		event, ok := batch.Event(i).(*api.Event)
+		event, ok := batch.Event(i).(*messages.Event)
 		assert.True(t, ok, "queue output should have the same concrete type as its input")
 		// Need to use assert.True since assert.Equal* uses value comparison
 		// for unequal pointers.

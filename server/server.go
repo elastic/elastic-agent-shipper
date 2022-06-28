@@ -12,6 +12,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	pb "github.com/elastic/elastic-agent-shipper/api"
+	"github.com/elastic/elastic-agent-shipper/api/messages"
 	"github.com/elastic/elastic-agent-shipper/queue"
 )
 
@@ -24,10 +25,10 @@ type shipperServer struct {
 }
 
 // PublishEvents is the server implementation of the gRPC PublishEvents call
-func (serv shipperServer) PublishEvents(_ context.Context, req *pb.PublishRequest) (*pb.PublishReply, error) {
-	results := []*pb.EventResult{}
+func (serv shipperServer) PublishEvents(_ context.Context, req *messages.PublishRequest) (*messages.PublishReply, error) {
+	results := []*messages.EventResult{}
 	for _, evt := range req.Events {
-		serv.logger.Infof("Got event %s: %#v", evt.EventId, evt.Fields.AsMap())
+		serv.logger.Infof("Got event %s: %#v", evt.EventId, evt.Fields.Fields)
 		err := serv.queue.Publish(evt)
 		if err != nil {
 			// If we couldn't accept any events, return the error directly. Otherwise,
@@ -37,17 +38,17 @@ func (serv shipperServer) PublishEvents(_ context.Context, req *pb.PublishReques
 			}
 			break
 		}
-		res := pb.EventResult{EventId: evt.EventId, Timestamp: pbts.Now()}
+		res := messages.EventResult{EventId: evt.EventId, Timestamp: pbts.Now()}
 		results = append(results, &res)
 	}
-	return &pb.PublishReply{Results: results}, nil
+	return &messages.PublishReply{Results: results}, nil
 }
 
 // StreamAcknowledgements is the server implementation of the gRPC StreamAcknowledgements call
-func (serv shipperServer) StreamAcknowledgements(streamReq *pb.StreamAcksRequest, prd pb.Producer_StreamAcknowledgementsServer) error {
+func (serv shipperServer) StreamAcknowledgements(streamReq *messages.StreamAcksRequest, prd pb.Producer_StreamAcknowledgementsServer) error {
 
 	// we have no outputs now, so just send a single dummy event
-	evt := pb.StreamAcksReply{Acks: []*pb.Acknowledgement{{Timestamp: pbts.Now(), EventId: streamReq.Source.GetInputId()}}}
+	evt := messages.StreamAcksReply{Acks: []*messages.Acknowledgement{{Timestamp: pbts.Now(), EventId: streamReq.Source.GetInputId()}}}
 	err := prd.Send(&evt)
 
 	if err != nil {
