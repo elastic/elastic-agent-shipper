@@ -20,3 +20,5 @@
 {"name": "github.com/elastic/elastic-agent", "licenceType": "Elastic"}
 {"name": "github.com/elastic/elastic-agent-client/v7", "licenceType": "Elastic"}
 {"name": "github.com/elastic/e2e-testing", "licenceType": "Elastic"}
+{"name": "github.com/elastic/elastic-agent-shipper-client", "licenceType": "Elastic"}
+

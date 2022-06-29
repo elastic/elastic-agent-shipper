@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/elastic/elastic-agent-shipper/api/messages"
+	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 	"github.com/elastic/elastic-agent-shipper/queue"
 )
 
