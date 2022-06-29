@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/elastic/elastic-agent-shipper/api/messages"
+	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 )
 
 func TestSimpleBatch(t *testing.T) {
