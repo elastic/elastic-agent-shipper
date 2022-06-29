@@ -10,8 +10,8 @@ package main
 import (
 	"path/filepath"
 
+	//mage:import
 	"github.com/elastic/elastic-agent-libs/dev-tools/mage"
-	devtools "github.com/elastic/elastic-agent-libs/dev-tools/mage"
 	"github.com/elastic/elastic-agent-libs/dev-tools/mage/gotool"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
@@ -34,11 +34,12 @@ func Build() {
 
 // Check runs all the checks
 func Check() {
-	mg.Deps(
+	// these are not allowed in parallel
+	mg.SerialDeps(
 		CheckLicense,
-		devtools.Deps.CheckModuleTidy,
 		Notice,
-		devtools.CheckNoChanges,
+		mage.Deps.CheckModuleTidy,
+		mage.CheckNoChanges,
 	)
 }
 
@@ -69,7 +70,7 @@ func License() error {
 // Notice generates a NOTICE.txt file for the module.
 func Notice() error {
 	// Runs "go mod download all" which may update go.sum unnecessarily.
-	err := devtools.GenerateNotice(
+	err := mage.GenerateNotice(
 		filepath.Join("dev-tools", "templates", "notice", "overrides.json"),
 		filepath.Join("dev-tools", "templates", "notice", "rules.json"),
 		filepath.Join("dev-tools", "templates", "notice", "NOTICE.txt.tmpl"),
