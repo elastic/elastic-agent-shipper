@@ -7,6 +7,10 @@ before:
     # you may remove this if you don't need go generate
     - go generate ./...
 builds:
+  - ldflags:
+      - -s -w -X main.Tag={{.Tag}}
+      - -s -w -X main.CommitHash={{.ShortCommit}}
+      - -s -w -X main.BuildTime={{.Timestamp}}
   - id: darwin
     binary: '{{ .ProjectName }}-{{ .Env.VERSION }}-{{ if .IsSnapshot}}SNAPSHOT{{ end }}-{{ .Os }}-{{ if eq .Arch "amd64" }}x86_64{{ end }}{{ if eq .Arch "arm64" }}aarch64{{ end }}/{{ .ProjectName }}'
     env:
@@ -38,13 +42,6 @@ builds:
       - amd64
       - 386
     no_unique_dist_dir: true
-archives:
-  - replacements:
-      darwin: Darwin
-      linux: Linux
-      windows: Windows
-      386: x86
-      amd64: x86_64
 checksum:
   name_template: 'checksums.txt'
 snapshot:

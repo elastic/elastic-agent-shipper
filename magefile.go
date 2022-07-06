@@ -28,7 +28,7 @@ var Aliases = map[string]interface{}{
 	"lint": mage.Linter.All,
 }
 
-// Build
+// Build will create the project binaries found in /build/binaries
 func Build() {
 	sh.Run("goreleaser", "build", "--rm-dist", "--skip-validate")
 }
