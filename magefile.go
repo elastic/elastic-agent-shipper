@@ -28,8 +28,9 @@ var Aliases = map[string]interface{}{
 	"lint": mage.Linter.All,
 }
 
+// Build
 func Build() {
-	sh.Run("go", "build")
+	sh.Run("goreleaser", "build", "--rm-dist", "--skip-validate")
 }
 
 // Check runs all the checks

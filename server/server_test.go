@@ -7,8 +7,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"github.com/elastic/elastic-agent-libs/dev-tools/mage"
-	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -21,7 +19,6 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client/mock"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-libs/dev-tools/mage/gotool"
 )
 
 func TestAgentControl(t *testing.T) {
@@ -112,24 +109,4 @@ func TestAgentControl(t *testing.T) {
 	assert.True(t, gotConfig, "config state")
 	assert.True(t, gotHealthy, "healthy state")
 	assert.True(t, gotStopped, "stopped state")
-}
-
-func Test(t *testing.T) {
-	gotool.Mod.Tidy()
-
-	// Runs "go mod download all" which may update go.sum unnecessarily.
-	fmt.Println(">> Generating notice")
-	err := mage.GenerateNotice(
-		filepath.Join("dev-tools", "templates", "notice", "overrides.json"),
-		filepath.Join("dev-tools", "templates", "notice", "rules.json"),
-		filepath.Join("dev-tools", "templates", "notice", "NOTICE.txt.tmpl"),
-	)
-	if err != nil {
-		t.Fail()
-	}
-
-	// Run go mod tidy to remove any changes to go.sum that aren't actually needed.
-	// "go mod download all" isn't smart enough to know the minimum set of deps needed.
-	// See https://github.com/golang/go/issues/43994#issuecomment-770053099
-	gotool.Mod.Tidy()
 }
