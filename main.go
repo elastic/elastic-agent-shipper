@@ -11,6 +11,8 @@ import (
 	"github.com/elastic/elastic-agent-shipper/cmd"
 )
 
+const Version = "8.3.0"
+
 func main() {
 	command := cmd.NewCommand()
 	if err := command.Execute(); err != nil {

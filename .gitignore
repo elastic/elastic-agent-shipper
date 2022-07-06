@@ -51,3 +51,4 @@ elastic-agent-shipper
 
 # VSCode
 /.vscode
+dist/

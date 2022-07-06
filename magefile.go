@@ -9,24 +9,19 @@ package main
 
 import (
 	"fmt"
+	"github.com/elastic/elastic-agent-libs/dev-tools/mage"
+	"github.com/elastic/elastic-agent-libs/dev-tools/mage/gotool"
 	"io/ioutil"
 	"log"
 	"path"
 	"path/filepath"
 
 	"github.com/magefile/mage/sh"
-
-	// mage:import
-	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
-	// mage:import
-	"github.com/elastic/elastic-agent-libs/dev-tools/mage"
-	"github.com/elastic/elastic-agent-libs/dev-tools/mage/gotool"
-	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 )
 
 func init() {
-	devtools.BeatLicense = "Elastic License"
-	devtools.BeatDescription = "Shipper processes, queues, and ships data."
+	//devtools.BeatLicense = "Elastic License"
+	//devtools.BeatDescription = "Shipper processes, queues, and ships data."
 }
 
 // Aliases are shortcuts to long target names.
@@ -74,17 +69,20 @@ func GenProto() error {
 	}
 
 	log.Println("Formatting generated code...")
-	common.Fmt()
+	//common.Fmt()
 	return nil
 }
 
-func Build() {
-	sh.Run("go", "build")
+func Build() error {
+	return sh.RunV("goreleaser", "build", "--snapshot", "--rm-dist")
 }
 
 // Notice generates a NOTICE.txt file for the module.
 func Notice() error {
+	gotool.Mod.Tidy()
+
 	// Runs "go mod download all" which may update go.sum unnecessarily.
+	fmt.Println(">> Generating notice")
 	err := mage.GenerateNotice(
 		filepath.Join("dev-tools", "templates", "notice", "overrides.json"),
 		filepath.Join("dev-tools", "templates", "notice", "rules.json"),
