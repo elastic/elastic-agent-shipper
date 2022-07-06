@@ -23,7 +23,7 @@ import (
 	"github.com/elastic/elastic-agent-shipper/output"
 	"github.com/elastic/elastic-agent-shipper/queue"
 
-	pb "github.com/elastic/elastic-agent-shipper/api"
+	pb "github.com/elastic/elastic-agent-shipper-client/pkg/proto"
 )
 
 // LoadAndRun loads the config object and runs the gRPC server

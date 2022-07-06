@@ -40,8 +40,8 @@ pipeline {
         withGithubNotify(context: "Check") {
           withMageEnv(version: "${env.GO_VERSION}"){
             dir("${BASE_DIR}"){
-              cmd(label: 'mage notice', script: 'mage notice')
-              cmd(label: 'mage check', script: 'mage check')
+              cmd(label: 'mage notice', script: 'mage -v notice')
+              cmd(label: 'mage check', script: 'mage -v check')
             }
           }
         }
@@ -68,7 +68,7 @@ pipeline {
                 unstash 'source'
                 dir("${BASE_DIR}"){
                   withMageEnv(version: "${env.GO_VERSION}"){
-                    cmd(label: 'Go build', script: 'mage build')
+                    cmd(label: 'Go build', script: 'mage -v build')
                   }
                 }
               }

@@ -12,7 +12,7 @@ import (
 	memqueue "github.com/elastic/beats/v7/libbeat/publisher/queue/memqueue"
 	"github.com/elastic/elastic-agent-libs/logp"
 
-	"github.com/elastic/elastic-agent-shipper/api/messages"
+	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 )
 
 // Queue is a shipper-specific wrapper around the bare libbeat queue.

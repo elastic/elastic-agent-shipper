@@ -11,8 +11,8 @@ import (
 	pbts "google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/elastic/elastic-agent-libs/logp"
-	pb "github.com/elastic/elastic-agent-shipper/api"
-	"github.com/elastic/elastic-agent-shipper/api/messages"
+	pb "github.com/elastic/elastic-agent-shipper-client/pkg/proto"
+	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 	"github.com/elastic/elastic-agent-shipper/queue"
 )
 
