@@ -7,7 +7,7 @@ require (
 	github.com/spf13/cobra v1.3.0
 	google.golang.org/genproto v0.0.0-20220602131408-e326c6e8e9c8 // indirect
 	google.golang.org/grpc v1.47.0
-	google.golang.org/protobuf v1.28.0
+	google.golang.org/protobuf v1.28.0 // indirect
 )
 
 require (
@@ -15,6 +15,7 @@ require (
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20220607160924-1a71765a8bbe
 	github.com/elastic/elastic-agent-shipper-client v0.2.0
 	github.com/elastic/go-ucfg v0.8.5
+	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/magefile/mage v1.13.0
 	github.com/stretchr/testify v1.7.0
 	go.elastic.co/go-licence-detector v0.5.0
@@ -31,7 +32,6 @@ require (
 	github.com/elastic/go-windows v1.0.1 // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/gobuffalo/here v0.6.0 // indirect
-	github.com/gofrs/uuid v4.2.0+incompatible // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/licenseclassifier v0.0.0-20200402202327-879cb1424de0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
