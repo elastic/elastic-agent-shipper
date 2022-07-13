@@ -131,7 +131,7 @@ func (serv *shipperServer) PublishEvents(_ context.Context, req *messages.Publis
 			)
 
 		if errors.Is(err, queue.ErrQueueIsFull) {
-			log.Warnf("queue is full, not all events accepted")
+			log.Debugf("queue is full, not all events accepted")
 		} else {
 			err = fmt.Errorf("failed to enqueue an event: %w", err)
 			serv.logger.Error(err)
@@ -184,8 +184,8 @@ func (serv *shipperServer) PersistedIndex(req *messages.PersistedIndexRequest, p
 	for {
 		select {
 
-		case change := <-ch:
-			if change.persistedIndex == nil {
+		case change, closed := <-ch:
+			if closed || change.persistedIndex == nil {
 				continue
 			}
 
