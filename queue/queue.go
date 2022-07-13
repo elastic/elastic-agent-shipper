@@ -30,10 +30,10 @@ type Queue struct {
 
 type Metrics beatsqueue.Metrics
 
-// EntryId is a unique ascending id assigned to each entry that goes in the
+// EntryID is a unique ascending id assigned to each entry that goes in the
 // queue, to handle acknowledgments within the shipper and report progress
 // to the client.
-type EntryId uint64
+type EntryID uint64
 
 // metricsSource is a wrapper around the libbeat queue interface, exposing only
 // the callback to query the current metrics. It is used to pass queue metrics
@@ -58,11 +58,11 @@ func New() (*Queue, error) {
 	return &Queue{eventQueue: eventQueue, producer: producer}, nil
 }
 
-func (queue *Queue) Publish(event *messages.Event) (EntryId, error) {
+func (queue *Queue) Publish(event *messages.Event) (EntryID, error) {
 	if !queue.producer.Publish(event) {
-		return EntryId(0), ErrQueueIsFull
+		return EntryID(0), ErrQueueIsFull
 	}
-	return EntryId(0), nil
+	return EntryID(0), nil
 }
 
 func (queue *Queue) Metrics() (Metrics, error) {
@@ -79,15 +79,15 @@ func (queue *Queue) Close() {
 	queue.eventQueue.Close()
 }
 
-func (queue *Queue) AcceptedEntryId() EntryId {
-	return EntryId(0)
+func (queue *Queue) AcceptedEntryID() EntryID {
+	return EntryID(0)
 }
 
-func (queue *Queue) PersistedEntryId() EntryId {
+func (queue *Queue) PersistedEntryID() EntryID {
 	// This function needs to be implemented differently depending on the queue
 	// type. For the memory queue, it should return the most recent sequential
 	// entry id that has been published and acknowledged by the outputs.
 	// For the disk queue, it should return the most recent sequential entry id
 	// that has been written to disk.
-	return EntryId(0)
+	return EntryID(0)
 }
