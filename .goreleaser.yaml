@@ -9,7 +9,7 @@ builds:
       - -s -w -X main.CommitHash={{.ShortCommit}}
       - -s -w -X main.BuildTime={{.Timestamp}}
   - id: darwin
-    binary: '{{ .ProjectName }}-{{ .Env.VERSION }}-{{ if .IsSnapshot}}SNAPSHOT{{ end }}-{{ .Os }}-{{ if eq .Arch "amd64" }}x86_64{{ end }}{{ if eq .Arch "arm64" }}aarch64{{ end }}/{{ .ProjectName }}'
+    binary: '{{ .ProjectName }}-{{ .Env.VERSION }}{{ if .IsSnapshot}}-SNAPSHOT{{ end }}-{{ .Os }}-{{ if eq .Arch "amd64" }}x86_64{{ end }}{{ if eq .Arch "arm64" }}aarch64{{ end }}/{{ .ProjectName }}'
     env:
       - CGO_ENABLED=0
     goos:
@@ -19,7 +19,7 @@ builds:
       - arm64
     no_unique_dist_dir: true
   - id: linux
-    binary: '{{ .ProjectName }}-{{ .Env.VERSION }}-{{ if .IsSnapshot}}SNAPSHOT{{ end }}-{{ .Os }}-{{ if eq .Arch "amd64" }}x86_64{{ end }}{{ if eq .Arch "386" }}x86{{ end }}{{ if eq .Arch "arm64" }}{{ .Arch }}{{ end }}/{{ .ProjectName }}'
+    binary: '{{ .ProjectName }}-{{ .Env.VERSION }}{{ if .IsSnapshot}}-SNAPSHOT{{ end }}-{{ .Os }}-{{ if eq .Arch "amd64" }}x86_64{{ end }}{{ if eq .Arch "386" }}x86{{ end }}{{ if eq .Arch "arm64" }}{{ .Arch }}{{ end }}/{{ .ProjectName }}'
     env:
       - CGO_ENABLED=0
     goos:
@@ -30,7 +30,7 @@ builds:
       - 386
     no_unique_dist_dir: true
   - id: windows
-    binary: '{{ .ProjectName }}-{{ .Env.VERSION }}-{{ if .IsSnapshot}}SNAPSHOT{{ end }}-{{ .Os }}-{{ if eq .Arch "amd64" }}x86_64{{ end }}{{ if eq .Arch "386" }}x86{{ end }}/{{ .ProjectName }}'
+    binary: '{{ .ProjectName }}-{{ .Env.VERSION }}{{ if .IsSnapshot}}-SNAPSHOT{{ end }}-{{ .Os }}-{{ if eq .Arch "amd64" }}x86_64{{ end }}{{ if eq .Arch "386" }}x86{{ end }}/{{ .ProjectName }}'
     env:
       - CGO_ENABLED=0
     goos:
