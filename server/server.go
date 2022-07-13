@@ -29,7 +29,7 @@ func (serv shipperServer) PublishEvents(_ context.Context, req *messages.Publish
 	results := []*messages.EventResult{}
 	for _, evt := range req.Events {
 		serv.logger.Infof("Got event %s: %#v", evt.EventId, evt.Fields.Data)
-		err := serv.queue.Publish(evt)
+		_, err := serv.queue.Publish(evt)
 		if err != nil {
 			// If we couldn't accept any events, return the error directly. Otherwise,
 			// just return success on however many events we were able to handle.

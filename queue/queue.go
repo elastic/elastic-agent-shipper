@@ -58,11 +58,11 @@ func New() (*Queue, error) {
 	return &Queue{eventQueue: eventQueue, producer: producer}, nil
 }
 
-func (queue *Queue) Publish(event *messages.Event) (EventId, error) {
+func (queue *Queue) Publish(event *messages.Event) (EntryId, error) {
 	if !queue.producer.Publish(event) {
-		return EventId(0), ErrQueueIsFull
+		return EntryId(0), ErrQueueIsFull
 	}
-	return EventId(0), nil
+	return EntryId(0), nil
 }
 
 func (queue *Queue) Metrics() (Metrics, error) {
