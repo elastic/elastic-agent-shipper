@@ -7,11 +7,13 @@ package common
 import (
 	"context"
 	"fmt"
-	"github.com/magefile/mage/mg"
-	"github.com/pkg/errors"
+
 	"io"
 	"os"
 	"os/exec"
+
+	"github.com/magefile/mage/mg"
+	"github.com/pkg/errors"
 )
 
 func GoUnitTest(ctx context.Context) error {

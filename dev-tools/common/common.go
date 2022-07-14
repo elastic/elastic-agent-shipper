@@ -7,15 +7,16 @@ package common
 import (
 	"context"
 	"fmt"
-	"github.com/elastic/elastic-agent-libs/dev-tools/mage/gotool"
-	"github.com/magefile/mage/mg"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/elastic/elastic-agent-libs/dev-tools/mage/gotool"
+	"github.com/magefile/mage/mg"
+	"github.com/pkg/errors"
 )
 
 // CreateDir creates the parent directory for the given file.
