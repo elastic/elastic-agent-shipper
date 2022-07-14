@@ -14,9 +14,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/elastic/elastic-agent-libs/dev-tools/mage/gotool"
 	"github.com/magefile/mage/mg"
 	"github.com/pkg/errors"
+
+	"github.com/elastic/elastic-agent-libs/dev-tools/mage/gotool"
 )
 
 // CreateDir creates the parent directory for the given file.
@@ -31,9 +32,7 @@ func CreateDir(file string) string {
 }
 
 func InstallGoTestTools() {
-	gotool.Install(
-		gotool.Install.Package("gotest.tools/gotestsum"),
-	)
+	gotool.Install(gotool.Install.Package("gotest.tools/gotestsum")) //nolint:errcheck //not required
 }
 
 func MakeCommand(ctx context.Context, env map[string]string, cmd string, args ...string) *exec.Cmd {
