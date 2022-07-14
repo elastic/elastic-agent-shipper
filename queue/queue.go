@@ -79,11 +79,11 @@ func (queue *Queue) Close() {
 	queue.eventQueue.Close()
 }
 
-func (queue *Queue) AcceptedEntryID() EntryID {
+func (queue *Queue) AcceptedIndex() EntryID {
 	return EntryID(0)
 }
 
-func (queue *Queue) PersistedEntryID() EntryID {
+func (queue *Queue) PersistedIndex() EntryID {
 	// This function needs to be implemented differently depending on the queue
 	// type. For the memory queue, it should return the most recent sequential
 	// entry id that has been published and acknowledged by the outputs.
