@@ -94,7 +94,7 @@ func (Build) Binary() error {
 	default:
 	}
 
-	fmt.Println(">> build: Building binary for", platforms)
+	fmt.Println(">> build: Building binary for", platforms) //nolint:forbidigo // it's ok to use fmt.println in mage
 	sh.Run("goreleaser", args...)
 	return nil
 }

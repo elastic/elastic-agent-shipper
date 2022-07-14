@@ -17,7 +17,7 @@ import (
 func GoUnitTest(ctx context.Context) error {
 	mg.Deps(InstallGoTestTools)
 
-	fmt.Println(">> go test:", "Unit Testing")
+	fmt.Println(">> go test:", "Unit Testing") //nolint:forbidigo
 
 	gotestsumArgs := []string{"--no-color"}
 	if mg.Verbose() {
@@ -66,10 +66,10 @@ func GoUnitTest(ctx context.Context) error {
 
 	// Return an error indicating that testing failed.
 	if goTestErr != nil {
-		fmt.Println(">> go test:", "Unit Tests : Test Failed")
+		fmt.Println(">> go test:", "Unit Tests : Test Failed") //nolint:forbidigo
 		return errors.Wrap(goTestErr, "go test returned a non-zero value")
 	}
 
-	fmt.Println(">> go test:", "Unit Tests : Test Passed")
+	fmt.Println(">> go test:", "Unit Tests : Test Passed") //nolint:forbidigo
 	return nil
 }
