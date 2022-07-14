@@ -88,7 +88,7 @@ func NewShipperServer(q *queue.Queue, cfg ShipperServerConfig) (ShipperServer, e
 
 // GetAcceptedIndex atomically reads the accepted index
 func (serv *shipperServer) GetAcceptedIndex() uint64 {
-	return serv.queue.AcceptedIndex()
+	return uint64(serv.queue.AcceptedIndex())
 }
 
 // GetPersistedIndex atomically reads the persisted index
@@ -117,9 +117,9 @@ func (serv *shipperServer) PublishEvents(_ context.Context, req *messages.Publis
 	}
 
 	for _, e := range req.Events {
-		err := serv.queue.Publish(e)
+		_, err := serv.queue.Publish(e)
 		if err == nil {
-			resp.AcceptedIndex++
+			resp.AcceptedCount++
 			continue
 		}
 
@@ -253,7 +253,7 @@ func (serv *shipperServer) updateIndices(ctx context.Context) error {
 	c := change{}
 
 	oldPersistedIndex := serv.GetPersistedIndex()
-	persistedIndex := serv.queue.PersistedIndex()
+	persistedIndex := uint64(serv.queue.PersistedIndex())
 
 	if persistedIndex != oldPersistedIndex {
 		atomic.StoreUint64(&serv.persistedIndex, persistedIndex)
