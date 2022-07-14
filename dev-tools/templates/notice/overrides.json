@@ -21,7 +21,3 @@
 {"name": "github.com/elastic/elastic-agent-client/v7", "licenceType": "Elastic"}
 {"name": "github.com/elastic/e2e-testing", "licenceType": "Elastic"}
 {"name": "github.com/elastic/elastic-agent-shipper-client", "licenceType": "Elastic"}
-{"name": "github.com/acomagu/bufpipe", "licenceType": "MIT"}
-{"name": "github.com/gobwas/pool", "licenceType": "MIT"}
-{"name": "github.com/tj/go-spin", "licenceType": "MIT"}
-{"name": "github.com/xi2/xz", "licenceType": "Apache-2.0", "url": "https://github.com/xi2/xz/blob/master/LICENSE"}

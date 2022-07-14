@@ -11,7 +11,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/elastic/elastic-agent-libs/dev-tools/mage"
-	devtools "github.com/elastic/elastic-agent-shipper/dev-tools"
+	devtools "github.com/elastic/elastic-agent-shipper/dev-tools/common"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -65,7 +65,7 @@ func (Build) TestBinaries() error {
 }
 
 // Binary will create the project binaries found in /build/binaries
-// ENV PLATFORMS = all local darwin linux windows darwin/amd64 darwin/arm64 linux/386 linux/amd64 linux/arm64 windows/386 windows/amd64
+// ENV PLATFORMS = all, local, darwin, linux, windows, darwin/amd64, darwin/arm64, linux/386, linux/amd64, linux/arm64, windows/386, windows/amd64
 // ENV SNAPSHOT = true/false
 func (Build) Binary() error {
 	args := []string{"build", "--rm-dist", "--skip-validate"}
@@ -87,7 +87,6 @@ func (Build) Binary() error {
 	case "darwin/amd64", "darwin/arm64", "linux/386", "linux/amd64", "linux/arm64", "windows/386", "windows/amd64":
 		goos := strings.Split(platforms, "/")[0]
 		arch := strings.Split(platforms, "/")[1]
-		fmt.Println(goos, arch)
 		os.Setenv("GOOS", goos)
 		os.Setenv("GOARCH", arch)
 		args = append(args, "--single-target")

@@ -12,7 +12,6 @@ import (
 	_ "go.elastic.co/go-licence-detector"
 
 	_ "github.com/elastic/elastic-agent-libs/dev-tools/mage"
-
-	_ "github.com/goreleaser/goreleaser"
+	
 	_ "gotest.tools/gotestsum/cmd"
 )
