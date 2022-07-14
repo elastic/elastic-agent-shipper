@@ -20,7 +20,7 @@ func TestSimpleBatch(t *testing.T) {
 	eventCount := 100
 	events := make([]messages.Event, eventCount)
 	for i := 0; i < eventCount; i++ {
-		err = queue.Publish(&events[i])
+		_, err = queue.Publish(&events[i])
 		assert.NoError(t, err, "couldn't publish to queue")
 	}
 
