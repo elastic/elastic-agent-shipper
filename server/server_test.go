@@ -15,8 +15,10 @@ import (
 	pb "github.com/elastic/elastic-agent-shipper-client/pkg/proto"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 	"github.com/elastic/elastic-agent-shipper/queue"
+
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -52,7 +54,7 @@ func TestPublish(t *testing.T) {
 	shipper, err := NewShipperServer(publisher, ShipperServerConfig{
 		PollingInterval: time.Second, // we don't use the polled values in this test
 	})
-	defer shipper.Close()
+	defer func() { _ = shipper.Close() }()
 	require.NoError(t, err)
 	client, stop := startServer(t, ctx, shipper)
 	defer stop()
@@ -143,7 +145,7 @@ func TestPersistedIndex(t *testing.T) {
 		shipper, err := NewShipperServer(publisher, ShipperServerConfig{
 			PollingInterval: 5 * time.Millisecond,
 		})
-		defer shipper.Close()
+		defer func() { _ = shipper.Close() }()
 		require.NoError(t, err)
 		client, stop := startServer(t, ctx, shipper)
 		defer stop()
@@ -197,7 +199,12 @@ func startServer(t *testing.T, ctx context.Context, shipperServer ShipperServer)
 		return lis.Dial()
 	}
 
-	conn, err := grpc.DialContext(ctx, "bufnet", grpc.WithContextDialer(bufDialer), grpc.WithInsecure())
+	conn, err := grpc.DialContext(
+		ctx,
+		"bufnet",
+		grpc.WithContextDialer(bufDialer),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
 	if err != nil {
 		require.NoError(t, err)
 	}
