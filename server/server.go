@@ -21,6 +21,17 @@ import (
 	"github.com/gofrs/uuid"
 )
 
+type Publisher interface {
+	io.Closer
+
+	// AcceptedIndex returns the current sequential index of the accepted events
+	AcceptedIndex() queue.EntryID
+	// AcceptedIndex returns the current sequential index of the persisted events
+	PersistedIndex() queue.EntryID
+	// Publish publishes the given event and returns the current accepted index (after this event)
+	Publish(*messages.Event) (queue.EntryID, error)
+}
+
 // ShipperServer contains all the gRPC operations for the shipper endpoints.
 type ShipperServer interface {
 	pb.ProducerServer
@@ -28,9 +39,9 @@ type ShipperServer interface {
 }
 
 type shipperServer struct {
-	logger *logp.Logger
-	queue  *queue.Queue
-	cfg    ShipperServerConfig
+	logger    *logp.Logger
+	publisher Publisher
+	cfg       ShipperServerConfig
 
 	uuid           string
 	persistedIndex uint64
@@ -50,9 +61,9 @@ type polling struct {
 }
 
 // NewShipperServer creates a new server instance for handling gRPC endpoints.
-func NewShipperServer(q *queue.Queue, cfg ShipperServerConfig) (ShipperServer, error) {
-	if q == nil {
-		return nil, errors.New("queue cannot be nil")
+func NewShipperServer(publisher Publisher, cfg ShipperServerConfig) (ShipperServer, error) {
+	if publisher == nil {
+		return nil, errors.New("publisher cannot be nil")
 	}
 
 	err := cfg.Validate()
@@ -66,10 +77,10 @@ func NewShipperServer(q *queue.Queue, cfg ShipperServerConfig) (ShipperServer, e
 	}
 
 	s := shipperServer{
-		uuid:   id.String(),
-		logger: logp.NewLogger("shipper-server"),
-		queue:  q,
-		cfg:    cfg,
+		uuid:      id.String(),
+		logger:    logp.NewLogger("shipper-server"),
+		publisher: publisher,
+		cfg:       cfg,
 		polling: polling{
 			stopped: make(chan struct{}),
 		},
@@ -88,7 +99,7 @@ func NewShipperServer(q *queue.Queue, cfg ShipperServerConfig) (ShipperServer, e
 
 // GetAcceptedIndex atomically reads the accepted index
 func (serv *shipperServer) GetAcceptedIndex() uint64 {
-	return uint64(serv.queue.AcceptedIndex())
+	return uint64(serv.publisher.AcceptedIndex())
 }
 
 // GetPersistedIndex atomically reads the persisted index
@@ -117,7 +128,7 @@ func (serv *shipperServer) PublishEvents(_ context.Context, req *messages.Publis
 	}
 
 	for _, e := range req.Events {
-		_, err := serv.queue.Publish(e)
+		_, err := serv.publisher.Publish(e)
 		if err == nil {
 			resp.AcceptedCount++
 			continue
@@ -156,15 +167,6 @@ func (serv *shipperServer) PublishEvents(_ context.Context, req *messages.Publis
 
 // PublishEvents is the server implementation of the gRPC PersistedIndex call.
 func (serv *shipperServer) PersistedIndex(req *messages.PersistedIndexRequest, producer pb.Producer_PersistedIndexServer) error {
-	// first we reply with current values and then subscribe to notifications and start streaming
-	err := producer.Send(&messages.PersistedIndexReply{
-		Uuid:           serv.uuid,
-		PersistedIndex: serv.GetPersistedIndex(),
-	})
-	if err != nil {
-		return err
-	}
-
 	serv.logger.Debug("subscribing client for persisted index change notification...")
 	ch, stop, err := serv.notifications.subscribe()
 	if err != nil {
@@ -176,11 +178,21 @@ func (serv *shipperServer) PersistedIndex(req *messages.PersistedIndexRequest, p
 	defer serv.logger.Debug("client unsubscribed from persisted index change notifications")
 	defer stop()
 
+	// before reading notification we send the current values
+	// in case the notification would not come in a long time
+	err = producer.Send(&messages.PersistedIndexReply{
+		Uuid:           serv.uuid,
+		PersistedIndex: serv.GetPersistedIndex(),
+	})
+	if err != nil {
+		return err
+	}
+
 	for {
 		select {
 
-		case change, closed := <-ch:
-			if closed || change.persistedIndex == nil {
+		case change, open := <-ch:
+			if !open || change.persistedIndex == nil {
 				continue
 			}
 
@@ -196,7 +208,7 @@ func (serv *shipperServer) PersistedIndex(req *messages.PersistedIndexRequest, p
 			return fmt.Errorf("producer context: %w", producer.Context().Err())
 
 		case <-serv.polling.ctx.Done():
-			return fmt.Errorf("server context: %w", serv.polling.ctx.Err())
+			return fmt.Errorf("server is stopped: %w", serv.polling.ctx.Err())
 		}
 	}
 }
@@ -253,20 +265,19 @@ func (serv *shipperServer) updateIndices(ctx context.Context) error {
 	c := change{}
 
 	oldPersistedIndex := serv.GetPersistedIndex()
-	persistedIndex := uint64(serv.queue.PersistedIndex())
+	persistedIndex := uint64(serv.publisher.PersistedIndex())
 
 	if persistedIndex != oldPersistedIndex {
 		atomic.StoreUint64(&serv.persistedIndex, persistedIndex)
 		// register the change
 		c.persistedIndex = &persistedIndex
+		log = log.With("persisted_index", persistedIndex)
 	}
-	log = log.With("persisted_index", persistedIndex)
-
-	log.Debug("indices have been updated")
 
 	if c.Any() {
-		log := serv.logger.With(
-			"persisted_index", puint64String(c.persistedIndex),
+		log.Debug("indices have been updated")
+
+		log := log.With(
 			"subscribers_count", len(serv.notifications.subscribers),
 		)
 
@@ -279,11 +290,4 @@ func (serv *shipperServer) updateIndices(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func puint64String(i *uint64) string {
-	if i == nil {
-		return "nil"
-	}
-	return fmt.Sprintf("%d", *i)
 }
