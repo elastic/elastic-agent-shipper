@@ -15,6 +15,9 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
+	"strings"
+
 	//mage:import
 
 	"github.com/elastic/elastic-agent-libs/dev-tools/mage/gotool"
@@ -62,12 +65,39 @@ func (Build) TestBinaries() error {
 }
 
 // Binary will create the project binaries found in /build/binaries
-func (Build) Binary() {
-	isSnapshot := os.Getenv("SNAPSHOT")
+// ENV PLATFORMS = all local darwin linux windows darwin/amd64 darwin/arm64 linux/386 linux/amd64 linux/arm64 windows/386 windows/amd64
+// ENV SNAPSHOT = true/false
+func (Build) Binary() error {
+	args := []string{"build", "--rm-dist", "--skip-validate"}
+	if snapshotEnv, _ := os.LookupEnv("SNAPSHOT"); snapshotEnv != "" {
+		isSnapshot, err := strconv.ParseBool(snapshotEnv)
+		if err != nil {
+			return err
+		}
+		if isSnapshot {
+			args = append(args, "--snapshot")
+		}
+	}
 	platforms := os.Getenv("PLATFORM")
+	switch platforms {
+	case "local":
+		args = append(args, "--single-target")
+	case "windows", "linux", "darwin":
+		args = append(args, "--id", platforms)
+	case "darwin/amd64", "darwin/arm64", "linux/386", "linux/amd64", "linux/arm64", "windows/386", "windows/amd64":
+		goos := strings.Split(platforms, "/")[0]
+		arch := strings.Split(platforms, "/")[1]
+		fmt.Println(goos, arch)
+		os.Setenv("GOOS", goos)
+		os.Setenv("GOARCH", arch)
+		args = append(args, "--single-target")
+	case "all":
+	default:
+	}
 
-	fmt.Println(">> build: Building binary for", platforms, isSnapshot)
-	sh.Run("goreleaser", "build", "--rm-dist", "--skip-validate", "--id custom")
+	fmt.Println(">> build: Building binary for", platforms)
+	sh.Run("goreleaser", args...)
+	return nil
 }
 
 // TEST

@@ -4,7 +4,6 @@ go 1.17
 
 require (
 	github.com/elastic/elastic-agent-libs v0.2.7
-	github.com/goreleaser/goreleaser v1.6.3
 	github.com/spf13/cobra v1.3.0
 	google.golang.org/genproto v0.0.0-20220602131408-e326c6e8e9c8 // indirect
 	google.golang.org/grpc v1.47.0
@@ -17,6 +16,7 @@ require (
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20220607160924-1a71765a8bbe
 	github.com/elastic/elastic-agent-shipper-client v0.1.0
 	github.com/elastic/go-ucfg v0.8.5
+	github.com/goreleaser/goreleaser v1.6.3
 	github.com/magefile/mage v1.13.0
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.7.0
