@@ -77,11 +77,9 @@ pipeline {
           stage('Test') {
             steps {
               withGithubNotify(context: "Test-${PLATFORM}") {
-                withMageEnv(){
-                  dir("${BASE_DIR}"){
-                    withEnv() {
-                      cmd(label: 'Go unitTest', script: 'mage unittest')
-                    }
+                dir("${BASE_DIR}"){
+                  withMageEnv(){
+                    cmd(label: 'Go unitTest', script: 'mage unittest')
                   }
                 }
               }
