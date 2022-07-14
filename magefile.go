@@ -63,8 +63,11 @@ func (Build) TestBinaries() error {
 
 // Binary will create the project binaries found in /build/binaries
 func (Build) Binary() {
-	fmt.Println(">> build: Building binary")
-	sh.Run("goreleaser", "build", "--rm-dist", "--skip-validate")
+	isSnapshot := os.Getenv("SNAPSHOT")
+	platforms := os.Getenv("PLATFORM")
+
+	fmt.Println(">> build: Building binary for", platforms, isSnapshot)
+	sh.Run("goreleaser", "build", "--rm-dist", "--skip-validate", "--id custom")
 }
 
 // TEST
