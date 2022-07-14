@@ -259,7 +259,6 @@ func (serv *shipperServer) startPolling() {
 }
 
 // updateIndices updates in-memory indices and notifies subscribers if necessary.
-// TODO: this is a temporary implementation until the queue supports the `persisted_index`.
 func (serv *shipperServer) updateIndices(ctx context.Context) error {
 	log := serv.logger
 	c := change{}
