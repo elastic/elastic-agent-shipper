@@ -10,13 +10,14 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/elastic/elastic-agent-libs/dev-tools/mage"
-	devtools "github.com/elastic/elastic-agent-shipper/dev-tools/common"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/elastic/elastic-agent-libs/dev-tools/mage"
+	devtools "github.com/elastic/elastic-agent-shipper/dev-tools/common"
 
 	//mage:import
 
@@ -32,8 +33,6 @@ var (
 // Aliases are shortcuts to long target names.
 // nolint: deadcode // it's used by `mage`.
 var Aliases = map[string]interface{}{
-	"llc":      mage.Linter.LastChange,
-	"lint":     mage.Linter.All,
 	"build":    Build.Binary,
 	"unittest": Test.Unit,
 }
@@ -50,7 +49,7 @@ func (Build) All() {
 
 // Clean removes the build directory.
 func (Build) Clean(test string) {
-	os.RemoveAll("build")
+	os.RemoveAll("build") // nolint:errcheck //not required
 }
 
 // TestBinaries checks if the binaries are generated (for now).
@@ -87,8 +86,8 @@ func (Build) Binary() error {
 	case "darwin/amd64", "darwin/arm64", "linux/386", "linux/amd64", "linux/arm64", "windows/386", "windows/amd64":
 		goos := strings.Split(platforms, "/")[0]
 		arch := strings.Split(platforms, "/")[1]
-		os.Setenv("GOOS", goos)
-		os.Setenv("GOARCH", arch)
+		os.Setenv("GOOS", goos)   // nolint:errcheck //not required
+		os.Setenv("GOARCH", arch) // nolint:errcheck //not required
 		args = append(args, "--single-target")
 	case "all":
 	default:
