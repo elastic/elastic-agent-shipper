@@ -69,7 +69,7 @@ func (Build) TestBinaries() error {
 // ENV SNAPSHOT = true/false
 func (Build) Binary() error {
 	args := []string{"build", "--rm-dist", "--skip-validate"}
-	if snapshotEnv, _ := os.LookupEnv("SNAPSHOT"); snapshotEnv != "" {
+	if snapshotEnv := os.Getenv("SNAPSHOT"); snapshotEnv != "" {
 		isSnapshot, err := strconv.ParseBool(snapshotEnv)
 		if err != nil {
 			return err
