@@ -33,8 +33,7 @@ type shipperServer struct {
 	cfg    ShipperServerConfig
 
 	uuid           string
-	acceptedIndex  int64
-	persistedIndex int64
+	persistedIndex uint64
 
 	polling       polling
 	notifications notifications
@@ -88,13 +87,13 @@ func NewShipperServer(q *queue.Queue, cfg ShipperServerConfig) (ShipperServer, e
 }
 
 // GetAcceptedIndex atomically reads the accepted index
-func (serv *shipperServer) GetAcceptedIndex() int64 {
-	return atomic.LoadInt64(&serv.acceptedIndex)
+func (serv *shipperServer) GetAcceptedIndex() uint64 {
+	return serv.queue.AcceptedIndex()
 }
 
 // GetPersistedIndex atomically reads the persisted index
-func (serv *shipperServer) GetPersistedIndex() int64 {
-	return atomic.LoadInt64(&serv.persistedIndex)
+func (serv *shipperServer) GetPersistedIndex() uint64 {
+	return atomic.LoadUint64(&serv.persistedIndex)
 }
 
 // PublishEvents is the server implementation of the gRPC PublishEvents call.
@@ -140,10 +139,6 @@ func (serv *shipperServer) PublishEvents(_ context.Context, req *messages.Publis
 		break
 	}
 
-	// it is cheaper to check than always using atomic
-	if resp.AcceptedCount > 0 {
-		atomic.AddInt64(&serv.acceptedIndex, int64(resp.AcceptedCount))
-	}
 	resp.AcceptedIndex = serv.GetAcceptedIndex()
 	resp.PersistedIndex = serv.GetPersistedIndex()
 
@@ -254,34 +249,24 @@ func (serv *shipperServer) startPolling() {
 // updateIndices updates in-memory indices and notifies subscribers if necessary.
 // TODO: this is a temporary implementation until the queue supports the `persisted_index`.
 func (serv *shipperServer) updateIndices(ctx context.Context) error {
-
-	// TODO: for now we calculate an approximate value
-	// we cannot rely on this value and needs to be changed when the queue is ready.
-	metrics, err := serv.queue.Metrics()
-	if err != nil {
-		return fmt.Errorf("failed to fetch queue metrics: %w", err)
-	}
-
 	log := serv.logger
 	c := change{}
 
-	if metrics.UnackedConsumedEvents.Exists() {
-		oldPersistedIndex := serv.GetPersistedIndex()
-		persistedIndex := serv.GetAcceptedIndex() - int64(metrics.UnackedConsumedEvents.ValueOr(0))
+	oldPersistedIndex := serv.GetPersistedIndex()
+	persistedIndex := serv.queue.PersistedIndex()
 
-		if persistedIndex != oldPersistedIndex {
-			atomic.SwapInt64(&serv.persistedIndex, persistedIndex)
-			// register the change
-			c.persistedIndex = &persistedIndex
-		}
-		log = log.With("persisted_index", persistedIndex)
+	if persistedIndex != oldPersistedIndex {
+		atomic.StoreUint64(&serv.persistedIndex, persistedIndex)
+		// register the change
+		c.persistedIndex = &persistedIndex
 	}
+	log = log.With("persisted_index", persistedIndex)
 
 	log.Debug("indices have been updated")
 
 	if c.Any() {
 		log := serv.logger.With(
-			"persisted_index", pint64String(c.persistedIndex),
+			"persisted_index", puint64String(c.persistedIndex),
 			"subscribers_count", len(serv.notifications.subscribers),
 		)
 
@@ -296,7 +281,7 @@ func (serv *shipperServer) updateIndices(ctx context.Context) error {
 	return nil
 }
 
-func pint64String(i *int64) string {
+func puint64String(i *uint64) string {
 	if i == nil {
 		return "nil"
 	}

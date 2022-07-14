@@ -18,7 +18,7 @@ const (
 
 type change struct {
 	// persistedIndex is a changed persisted index or `nil` if the value has not changed.
-	persistedIndex *int64
+	persistedIndex *uint64
 }
 
 // Any returns true if there is a change.

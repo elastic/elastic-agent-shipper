@@ -70,6 +70,14 @@ func (queue *Queue) Get(eventCount int) (beatsqueue.Batch, error) {
 	return queue.eventQueue.Get(eventCount)
 }
 
+func (queue *Queue) AcceptedIndex() uint64 {
+	return 0
+}
+
+func (queue *Queue) PersistedIndex() uint64 {
+	return 0
+}
+
 func (queue *Queue) Close() {
 	queue.eventQueue.Close()
 }
