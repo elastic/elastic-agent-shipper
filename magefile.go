@@ -35,7 +35,7 @@ const (
 // nolint: deadcode // it's used by `mage`.
 var Aliases = map[string]interface{}{
 	"build":    Build.Binary,
-	"unittest": Test.Unit,
+	"unitTest": Test.Unit,
 }
 
 // BUILD
@@ -140,7 +140,7 @@ func (Test) Integration(ctx context.Context) error {
 	return nil
 }
 
-// Unit runs all the unit tests (use alias `mage unittest`).
+// Unit runs all the unit tests (use alias `mage unitTest`).
 func (Test) Unit(ctx context.Context) error {
 	//mg.Deps(Build.Binary, Build.TestBinaries)
 	return devtools.GoUnitTest(ctx)
