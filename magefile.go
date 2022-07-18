@@ -26,7 +26,10 @@ import (
 	"github.com/magefile/mage/sh"
 )
 
-const GoreleaserPath = "github.com/goreleaser/goreleaser@v1.6.3"
+const (
+	GoreleaserRepo = "github.com/goreleaser/goreleaser@v1.6.3"
+	GoLicenserRepo = "github.com/elastic/go-licenser@v0.4.1"
+)
 
 // Aliases are shortcuts to long target names.
 // nolint: deadcode // it's used by `mage`.
@@ -61,10 +64,17 @@ func (Build) TestBinaries() error {
 	return nil
 }
 
-// InstallGoLicenser target installs go-licenser
+// InstallGoreleaser target installs goreleaser
 func InstallGoreleaser() error {
 	return gotool.Install(
-		gotool.Install.Package(GoreleaserPath),
+		gotool.Install.Package(GoreleaserRepo),
+	)
+}
+
+// InstallGoLicenser target installs go-licenser
+func InstallGoLicenser() error {
+	return gotool.Install(
+		gotool.Install.Package(GoLicenserRepo),
 	)
 }
 
@@ -140,7 +150,7 @@ func Check() {
 
 // CheckLicense checks the license headers
 func CheckLicense() error {
-	mg.Deps(mage.InstallGoLicenser())
+	mg.Deps(InstallGoLicenser())
 
 	return gotool.Licenser(
 		gotool.Licenser.License("Elastic"),
@@ -150,7 +160,7 @@ func CheckLicense() error {
 
 // License should generate the license headers
 func License() error {
-	mg.Deps(mage.InstallGoLicenser())
+	mg.Deps(InstallGoLicenser)
 	return gotool.Licenser(
 		gotool.Licenser.License("Elastic"),
 	)
