@@ -11,8 +11,6 @@ import (
 	"github.com/elastic/elastic-agent-shipper/cmd"
 )
 
-const Version = "8.3.0"
-
 var (
 	// BuildTime is the build time of the binary (set externally with ldflags).
 	BuildTime = "unknown"

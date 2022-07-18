@@ -5,9 +5,7 @@ before:
     - go generate ./...
 builds:
   - id: darwin
-    binary: '{{ .ProjectName }}-{{ .Env.VERSION }}{{ if .IsSnapshot}}-SNAPSHOT{{ end }}-{{ .Os }}-{{ if eq .Arch "amd64" }}x86_64{{ end }}{{ if eq .Arch "arm64" }}aarch64{{ end }}/{{ .ProjectName }}'
-    env:
-      - CGO_ENABLED=0
+    binary: '{{ .ProjectName }}-{{ .Env.DEFAULT_VERSION }}-{{ .Os }}-{{ if eq .Arch "amd64" }}x86_64{{ end }}{{ if eq .Arch "arm64" }}aarch64{{ end }}/{{ .ProjectName }}'
     goos:
       - darwin
     goarch:
@@ -15,9 +13,7 @@ builds:
       - arm64
     no_unique_dist_dir: true
   - id: linux
-    binary: '{{ .ProjectName }}-{{ .Env.VERSION }}{{ if .IsSnapshot}}-SNAPSHOT{{ end }}-{{ .Os }}-{{ if eq .Arch "amd64" }}x86_64{{ end }}{{ if eq .Arch "386" }}x86{{ end }}{{ if eq .Arch "arm64" }}{{ .Arch }}{{ end }}/{{ .ProjectName }}'
-    env:
-      - CGO_ENABLED=0
+    binary: '{{ .ProjectName }}-{{ .Env.DEFAULT_VERSION }}-{{ .Os }}-{{ if eq .Arch "amd64" }}x86_64{{ end }}{{ if eq .Arch "386" }}x86{{ end }}{{ if eq .Arch "arm64" }}{{ .Arch }}{{ end }}/{{ .ProjectName }}'
     goos:
       - linux
     goarch:
@@ -26,9 +22,7 @@ builds:
       - 386
     no_unique_dist_dir: true
   - id: windows
-    binary: '{{ .ProjectName }}-{{ .Env.VERSION }}{{ if .IsSnapshot}}-SNAPSHOT{{ end }}-{{ .Os }}-{{ if eq .Arch "amd64" }}x86_64{{ end }}{{ if eq .Arch "386" }}x86{{ end }}/{{ .ProjectName }}'
-    env:
-      - CGO_ENABLED=0
+    binary: '{{ .ProjectName }}-{{ .Env.DEFAULT_VERSION }}-{{ .Os }}-{{ if eq .Arch "amd64" }}x86_64{{ end }}{{ if eq .Arch "386" }}x86{{ end }}/{{ .ProjectName }}'
     goos:
       - windows
     goarch:
@@ -42,5 +36,3 @@ changelog:
       - '^docs:'
       - '^test:'
 dist: build/binaries
-env:
-  - VERSION=8.3.0

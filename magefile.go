@@ -18,6 +18,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent-shipper/dev-tools/common"
+	"github.com/elastic/elastic-agent-shipper/tools"
 
 	//mage:import
 
@@ -28,7 +29,6 @@ import (
 
 const (
 	GoreleaserRepo = "github.com/goreleaser/goreleaser@v1.6.3"
-	GoLicenserRepo = "github.com/elastic/go-licenser@v0.4.1"
 )
 
 // Aliases are shortcuts to long target names.
@@ -71,18 +71,26 @@ func InstallGoreleaser() error {
 	)
 }
 
-// InstallGoLicenser target installs go-licenser
-func InstallGoLicenser() error {
-	return gotool.Install(
-		gotool.Install.Package(GoLicenserRepo),
-	)
-}
-
 // Binary will create the project binaries found in /build/binaries (use `mage build`)
 // ENV PLATFORMS = all, local, darwin, linux, windows, darwin/amd64, darwin/arm64, linux/386, linux/amd64, linux/arm64, windows/386, windows/amd64
 // ENV SNAPSHOT = true/false
 func (Build) Binary() error {
 	InstallGoreleaser()
+
+	// Environment variable
+	version := tools.DefaultBeatVersion
+	env := map[string]string{
+		"CGO_ENABLED": "0",
+	}
+	if cgoEnv := os.Getenv("CGO_ENABLED"); cgoEnv != "" {
+		isCGOEnabled, err := strconv.ParseBool(cgoEnv)
+		if err != nil {
+			return err
+		}
+		if isCGOEnabled {
+			env["CGO_ENABLED"] = "1"
+		}
+	}
 	args := []string{"build", "--rm-dist", "--skip-validate"}
 	if snapshotEnv := os.Getenv("SNAPSHOT"); snapshotEnv != "" {
 		isSnapshot, err := strconv.ParseBool(snapshotEnv)
@@ -91,8 +99,11 @@ func (Build) Binary() error {
 		}
 		if isSnapshot {
 			args = append(args, "--snapshot")
+			version += "-SNAPSHOT"
 		}
 	}
+	env["DEFAULT_VERSION"] = version
+
 	platforms := os.Getenv("PLATFORM")
 	switch platforms {
 	case "local":
@@ -103,14 +114,14 @@ func (Build) Binary() error {
 	case "darwin/amd64", "darwin/arm64", "linux/386", "linux/amd64", "linux/arm64", "windows/386", "windows/amd64":
 		goos := strings.Split(platforms, "/")[0]
 		arch := strings.Split(platforms, "/")[1]
-		os.Setenv("GOOS", goos)   // nolint:errcheck //not required
-		os.Setenv("GOARCH", arch) // nolint:errcheck //not required
+		env["GOOS"] = goos
+		env["GOARCH"] = arch
 		args = append(args, "--id", goos, "--single-target")
 	case "all":
 	default:
 	}
 	fmt.Println(">> build: Building binary for", platforms) //nolint:forbidigo // it's ok to use fmt.println in mage
-	sh.Run("goreleaser", args...)
+	sh.RunWithV(env, "goreleaser", args...)
 	return nil
 }
 
@@ -150,7 +161,7 @@ func Check() {
 
 // CheckLicense checks the license headers
 func CheckLicense() error {
-	mg.Deps(InstallGoLicenser())
+	mg.Deps(mage.InstallGoLicenser)
 
 	return gotool.Licenser(
 		gotool.Licenser.License("Elastic"),
@@ -160,7 +171,7 @@ func CheckLicense() error {
 
 // License should generate the license headers
 func License() error {
-	mg.Deps(InstallGoLicenser)
+	mg.Deps(mage.InstallGoLicenser)
 	return gotool.Licenser(
 		gotool.Licenser.License("Elastic"),
 	)
