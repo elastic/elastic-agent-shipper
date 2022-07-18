@@ -117,12 +117,7 @@ func (serv *shipperServer) PublishEvents(_ context.Context, req *messages.Publis
 	if req.Uuid != "" && req.Uuid != serv.uuid {
 		resp.AcceptedIndex = serv.GetAcceptedIndex()
 		resp.PersistedIndex = serv.GetPersistedIndex()
-		serv.logger.
-			With(
-				"expected", serv.uuid,
-				"actual", req.Uuid,
-			).
-			Debugf("shipper UUID does not match, all events rejected")
+		serv.logger.Debugf("shipper UUID does not match, all events rejected. Expected = %s, actual = %s", serv.uuid, req.Uuid)
 
 		return resp, nil
 	}
@@ -134,16 +129,10 @@ func (serv *shipperServer) PublishEvents(_ context.Context, req *messages.Publis
 			continue
 		}
 
-		log := serv.logger.
-			With(
-				"event_count", len(req.Events),
-				"accepted_count", resp.AcceptedCount,
-			)
-
 		if errors.Is(err, queue.ErrQueueIsFull) {
-			log.Debugf("queue is full, not all events accepted")
+			serv.logger.Debugf("queue is full, not all events accepted. Events = %d, accepted = %d", len(req.Events), resp.AcceptedCount)
 		} else {
-			err = fmt.Errorf("failed to enqueue an event: %w", err)
+			err = fmt.Errorf("failed to enqueue an event. Events = %d, accepted = %d: %w", len(req.Events), resp.AcceptedCount, err)
 			serv.logger.Error(err)
 		}
 
@@ -154,13 +143,12 @@ func (serv *shipperServer) PublishEvents(_ context.Context, req *messages.Publis
 	resp.PersistedIndex = serv.GetPersistedIndex()
 
 	serv.logger.
-		With(
-			"event_count", len(req.Events),
-			"accepted_count", resp.AcceptedCount,
-			"accepted_index", resp.AcceptedIndex,
-			"persisted_index", resp.PersistedIndex,
-		).
-		Debugf("finished publishing a batch")
+		Debugf("finished publishing a batch. Events = %d, accepted = %d, accepted index = %d, persisted index = %d",
+			len(req.Events),
+			resp.AcceptedCount,
+			resp.AcceptedIndex,
+			resp.PersistedIndex,
+		)
 
 	return resp, nil
 }
@@ -260,7 +248,6 @@ func (serv *shipperServer) startPolling() {
 
 // updateIndices updates in-memory indices and notifies subscribers if necessary.
 func (serv *shipperServer) updateIndices(ctx context.Context) error {
-	log := serv.logger
 	c := change{}
 
 	oldPersistedIndex := serv.GetPersistedIndex()
@@ -270,21 +257,17 @@ func (serv *shipperServer) updateIndices(ctx context.Context) error {
 		atomic.StoreUint64(&serv.persistedIndex, persistedIndex)
 		// register the change
 		c.persistedIndex = &persistedIndex
-		log = log.With("persisted_index", persistedIndex)
+		serv.logger.Debugf("new persisted index %d received", persistedIndex)
 	}
 
 	if c.Any() {
-		log.Debug("indices have been updated")
-
-		log := log.With(
-			"subscribers_count", len(serv.notifications.subscribers),
-		)
+		serv.logger.Debug("indices have been updated")
 
 		// this must be async because the loop in `notifyChange` can block on a receiver channel
 		go func() {
-			log.Debug("notifying about change...")
+			serv.logger.Debugf("notifying %d subscribers about change...", len(serv.notifications.subscribers))
 			serv.notifications.notify(ctx, c)
-			log.Debug("finished notifying about change")
+			serv.logger.Debug("finished notifying about change")
 		}()
 	}
 
