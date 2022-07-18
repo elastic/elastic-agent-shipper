@@ -26,9 +26,7 @@ import (
 	"github.com/magefile/mage/sh"
 )
 
-var (
-	goLicenserRepo = "github.com/elastic/go-licenser@v0.4.1"
-)
+const GoreleaserPath = "github.com/goreleaser/goreleaser@v1.6.3"
 
 // Aliases are shortcuts to long target names.
 // nolint: deadcode // it's used by `mage`.
@@ -63,10 +61,18 @@ func (Build) TestBinaries() error {
 	return nil
 }
 
-// Binary will create the project binaries found in /build/binaries
+// InstallGoLicenser target installs go-licenser
+func InstallGoreleaser() error {
+	return gotool.Install(
+		gotool.Install.Package(GoreleaserPath),
+	)
+}
+
+// Binary will create the project binaries found in /build/binaries (use `mage build`)
 // ENV PLATFORMS = all, local, darwin, linux, windows, darwin/amd64, darwin/arm64, linux/386, linux/amd64, linux/arm64, windows/386, windows/amd64
 // ENV SNAPSHOT = true/false
 func (Build) Binary() error {
+	InstallGoreleaser()
 	args := []string{"build", "--rm-dist", "--skip-validate"}
 	if snapshotEnv := os.Getenv("SNAPSHOT"); snapshotEnv != "" {
 		isSnapshot, err := strconv.ParseBool(snapshotEnv)
@@ -80,7 +86,8 @@ func (Build) Binary() error {
 	platforms := os.Getenv("PLATFORM")
 	switch platforms {
 	case "local":
-		args = append(args, "--single-target")
+		goos := runtime.GOOS
+		args = append(args, "--id", goos, "--single-target")
 	case "windows", "linux", "darwin":
 		args = append(args, "--id", platforms)
 	case "darwin/amd64", "darwin/arm64", "linux/386", "linux/amd64", "linux/arm64", "windows/386", "windows/amd64":
@@ -88,11 +95,10 @@ func (Build) Binary() error {
 		arch := strings.Split(platforms, "/")[1]
 		os.Setenv("GOOS", goos)   // nolint:errcheck //not required
 		os.Setenv("GOARCH", arch) // nolint:errcheck //not required
-		args = append(args, "--single-target")
+		args = append(args, "--id", goos, "--single-target")
 	case "all":
 	default:
 	}
-
 	fmt.Println(">> build: Building binary for", platforms) //nolint:forbidigo // it's ok to use fmt.println in mage
 	sh.Run("goreleaser", args...)
 	return nil
@@ -134,7 +140,7 @@ func Check() {
 
 // CheckLicense checks the license headers
 func CheckLicense() error {
-	mg.Deps(InstallLicenser)
+	mg.Deps(mage.InstallGoLicenser())
 
 	return gotool.Licenser(
 		gotool.Licenser.License("Elastic"),
@@ -142,14 +148,9 @@ func CheckLicense() error {
 	)
 }
 
-// InstallLicenser installs the licenser in the current environment
-func InstallLicenser() error {
-	return gotool.Install(gotool.Install.Package(goLicenserRepo))
-}
-
 // License should generate the license headers
 func License() error {
-	mg.Deps(InstallLicenser)
+	mg.Deps(mage.InstallGoLicenser())
 	return gotool.Licenser(
 		gotool.Licenser.License("Elastic"),
 	)

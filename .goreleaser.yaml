@@ -35,13 +35,6 @@ builds:
       - amd64
       - 386
     no_unique_dist_dir: true
-archives:
-  - replacements:
-      darwin: Darwin
-      linux: Linux
-      windows: Windows
-      amd64: x86_64
-    format: gz
 changelog:
   sort: asc
   filters:
