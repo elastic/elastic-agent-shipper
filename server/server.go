@@ -18,9 +18,12 @@ import (
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 	"github.com/elastic/elastic-agent-shipper/queue"
 
+	"google.golang.org/grpc/peer"
+
 	"github.com/gofrs/uuid"
 )
 
+// Publisher contains all operations required for the shipper server to publish incoming events.
 type Publisher interface {
 	io.Closer
 
@@ -43,11 +46,11 @@ type shipperServer struct {
 	publisher Publisher
 	cfg       ShipperServerConfig
 
-	uuid           string
-	persistedIndex uint64
+	uuid string
 
-	polling       polling
-	notifications notifications
+	polling          polling
+	notifications    notifications
+	indexSubscribers int64
 
 	close *sync.Once
 
@@ -76,6 +79,8 @@ func NewShipperServer(publisher Publisher, cfg ShipperServerConfig) (ShipperServ
 		return nil, err
 	}
 
+	notificationMutex := &sync.RWMutex{}
+
 	s := shipperServer{
 		uuid:      id.String(),
 		logger:    logp.NewLogger("shipper-server"),
@@ -85,8 +90,8 @@ func NewShipperServer(publisher Publisher, cfg ShipperServerConfig) (ShipperServ
 			stopped: make(chan struct{}),
 		},
 		notifications: notifications{
-			subscribers: make(map[uuid.UUID]chan change),
-			mutex:       &sync.Mutex{},
+			mutex: notificationMutex,
+			cond:  sync.NewCond(notificationMutex),
 		},
 		close: &sync.Once{},
 	}
@@ -97,14 +102,18 @@ func NewShipperServer(publisher Publisher, cfg ShipperServerConfig) (ShipperServ
 	return &s, nil
 }
 
-// GetAcceptedIndex atomically reads the accepted index
+// GetAcceptedIndex returns the accepted index
 func (serv *shipperServer) GetAcceptedIndex() uint64 {
 	return uint64(serv.publisher.AcceptedIndex())
 }
 
-// GetPersistedIndex atomically reads the persisted index
+// GetPersistedIndex returns the persisted index
 func (serv *shipperServer) GetPersistedIndex() uint64 {
-	return atomic.LoadUint64(&serv.persistedIndex)
+	s := serv.notifications.getState()
+	if s == nil {
+		return 0
+	}
+	return s.persistedIndex
 }
 
 // PublishEvents is the server implementation of the gRPC PublishEvents call.
@@ -155,48 +164,49 @@ func (serv *shipperServer) PublishEvents(_ context.Context, req *messages.Publis
 
 // PublishEvents is the server implementation of the gRPC PersistedIndex call.
 func (serv *shipperServer) PersistedIndex(req *messages.PersistedIndexRequest, producer pb.Producer_PersistedIndexServer) error {
-	serv.logger.Debug("subscribing client for persisted index change notification...")
-	ch, stop, err := serv.notifications.subscribe()
-	if err != nil {
-		return err
-	}
+	atomic.AddInt64(&serv.indexSubscribers, 1)
+	defer atomic.AddInt64(&serv.indexSubscribers, -1)
 
-	serv.logger.Debug("client subscribed for persisted index change notifications")
-	// defer works in a LIFO order
-	defer serv.logger.Debug("client unsubscribed from persisted index change notifications")
-	defer stop()
+	p, _ := peer.FromContext(producer.Context())
+	addr := addressString(p)
+	serv.logger.Debugf("%s subscribed for persisted index change", addr)
+	defer serv.logger.Debugf("%s unsubscribed from persisted index change", addr)
 
-	// before reading notification we send the current values
-	// in case the notification would not come in a long time
-	err = producer.Send(&messages.PersistedIndexReply{
-		Uuid:           serv.uuid,
-		PersistedIndex: serv.GetPersistedIndex(),
-	})
-	if err != nil {
-		return err
+	// before reading notification we send the current value
+	// in case the first notification does not come in a long time
+	persistedIndex := serv.GetPersistedIndex()
+	if persistedIndex != 0 {
+		err := producer.Send(&messages.PersistedIndexReply{
+			Uuid:           serv.uuid,
+			PersistedIndex: persistedIndex,
+		})
+		if err != nil {
+			return err
+		}
 	}
 
 	for {
 		select {
-
-		case change, open := <-ch:
-			if !open || change.persistedIndex == nil {
-				continue
-			}
-
-			err := producer.Send(&messages.PersistedIndexReply{
-				Uuid:           serv.uuid,
-				PersistedIndex: *change.persistedIndex,
-			})
-			if err != nil {
-				return fmt.Errorf("failed to send the update: %w", err)
-			}
-
 		case <-producer.Context().Done():
 			return fmt.Errorf("producer context: %w", producer.Context().Err())
 
 		case <-serv.polling.ctx.Done():
 			return fmt.Errorf("server is stopped: %w", serv.polling.ctx.Err())
+		default:
+			state := serv.notifications.wait()
+			// state can be nil if the notifications are shutting down
+			// we don't send notifications about the same index twice
+			if state == nil || state.persistedIndex == persistedIndex {
+				continue
+			}
+			persistedIndex = state.persistedIndex // store for future comparison
+			err := producer.Send(&messages.PersistedIndexReply{
+				Uuid:           serv.uuid,
+				PersistedIndex: persistedIndex,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to send the update: %w", err)
+			}
 		}
 	}
 }
@@ -204,8 +214,7 @@ func (serv *shipperServer) PersistedIndex(req *messages.PersistedIndexRequest, p
 // Close implements the Closer interface
 func (serv *shipperServer) Close() error {
 	serv.close.Do(func() {
-		// polling must be stopped first, otherwise it would try to write
-		// a notification to a closed channel and this would cause a panic
+		// we should stop polling first to cut off the source of notifications
 		serv.polling.stop()
 		<-serv.polling.stopped
 
@@ -234,42 +243,29 @@ func (serv *shipperServer) startPolling() {
 				return
 
 			case <-ticker.C:
-				serv.logger.Debug("updating indices...")
-				err := serv.updateIndices(serv.polling.ctx)
-				if err != nil {
-					serv.logger.Errorf("failed to update indices: %s", err)
-				} else {
-					serv.logger.Debug("successfully updated indices.")
-				}
+				serv.trySendNewIndex()
 			}
 		}
 	}()
 }
 
-// updateIndices updates in-memory indices and notifies subscribers if necessary.
-func (serv *shipperServer) updateIndices(ctx context.Context) error {
-	c := change{}
-
-	oldPersistedIndex := serv.GetPersistedIndex()
+// trySendNewIndex gets the latest indices and notifies subscribers about the new value.
+func (serv *shipperServer) trySendNewIndex() {
 	persistedIndex := uint64(serv.publisher.PersistedIndex())
 
-	if persistedIndex != oldPersistedIndex {
-		atomic.StoreUint64(&serv.persistedIndex, persistedIndex)
-		// register the change
-		c.persistedIndex = &persistedIndex
-		serv.logger.Debugf("new persisted index %d received", persistedIndex)
+	s := state{
+		persistedIndex: persistedIndex,
 	}
-
-	if c.Any() {
-		serv.logger.Debug("indices have been updated")
-
-		// this must be async because the loop in `notifyChange` can block on a receiver channel
-		go func() {
-			serv.logger.Debugf("notifying %d subscribers about change...", len(serv.notifications.subscribers))
-			serv.notifications.notify(ctx, c)
-			serv.logger.Debug("finished notifying about change")
-		}()
+	notified := serv.notifications.notify(s)
+	if !notified {
+		return
 	}
+	serv.logger.Debugf("notified %d subscribers about new persisted index %d.", atomic.LoadInt64(&serv.indexSubscribers), persistedIndex)
+}
 
-	return nil
+func addressString(p *peer.Peer) string {
+	if p == nil {
+		return "client"
+	}
+	return p.Addr.String()
 }

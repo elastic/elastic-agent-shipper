@@ -5,91 +5,87 @@
 package server
 
 import (
-	"context"
 	"sync"
-
-	"github.com/gofrs/uuid"
+	"sync/atomic"
 )
 
-const (
-	// how many notifications can be in a notification buffer.
-	notificationBufferSize = 16
-)
-
-type change struct {
-	// persistedIndex is a changed persisted index or `nil` if the value has not changed.
-	persistedIndex *uint64
+// state is an extendable struct that stores
+// the information subscribers need to be notified about
+type state struct {
+	persistedIndex uint64
 }
 
-// Any returns true if there is a change.
-func (c change) Any() bool {
-	return c.persistedIndex != nil
+// Equals returns true if 2 instances of the state are equal
+func (s *state) Equals(v *state) bool {
+	return (s == nil && v == nil) || (s != nil && v != nil && s.persistedIndex == v.persistedIndex)
 }
 
 type notifications struct {
-	subscribers map[uuid.UUID]chan change
-	mutex       *sync.Mutex
+	mutex *sync.RWMutex
+	cond  *sync.Cond
+
+	// the whole state must be always replaced with `notify`
+	// the struct fields are not thread safe on their own
+	state *state
+
+	// the notifications are stopped when this flag > 0
+	stopped uint32
 }
 
-func (n *notifications) subscribe() (out <-chan change, stop func(), err error) {
-	ch := make(chan change, notificationBufferSize)
-	id, err := uuid.NewV4()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	n.mutex.Lock()
-	n.subscribers[id] = ch
-	n.mutex.Unlock()
-
-	stop = func() {
-		n.mutex.Lock()
-		// we must block till the end of the function so `shutdown`
-		// does not try to close closed channels and panics
-		defer n.mutex.Unlock()
-
-		// `shutdown` could shut down the notifications before this is executed
-		_, ok := n.subscribers[id]
-		if ok {
-			delete(n.subscribers, id)
-			close(ch)
-			// drain the channel's buffer
-			for range ch {
-			}
-		}
-	}
-
-	return ch, stop, nil
+// getState return the current state or `nil` if the initial state
+// is not set or if the notifications are stopped.
+// This is thread-safe.
+func (n *notifications) getState() *state {
+	n.mutex.RLock()
+	defer n.mutex.RUnlock()
+	return n.state
 }
 
-// notify notifies all the subscribers.
-// This function should be used asynchronously.
-// If one of subscriber channel's buffer is exhausted it might block
-// until the subscriber reads the previous notification or unsubscribes.
-func (n *notifications) notify(ctx context.Context, value change) {
-	n.mutex.Lock()
-	defer n.mutex.Unlock()
-
-	for _, ch := range n.subscribers {
-		select {
-		case <-ctx.Done():
-			return
-		case ch <- value:
-			continue
-		}
+// wait returns a pointer to the current state or blocks until the
+// first state change or when notifications are stopped.
+func (n *notifications) wait() *state {
+	// before trying to lock we check the flag
+	// it should be less expensive
+	if atomic.LoadUint32(&n.stopped) != 0 {
+		return nil
 	}
+
+	n.cond.L.Lock()
+	defer n.cond.L.Unlock()
+
+	// waiting until there is an initial state or everything is stopped
+	for n.state == nil && atomic.LoadUint32(&n.stopped) == 0 {
+		n.cond.Wait()
+	}
+
+	return n.state
 }
 
-// shutdown closes all the subscriber channels and drains them.
+// notify notifies all the subscribers and returns `true`
+// or does not notify and returns `false` in case there is no update in the state
+func (n *notifications) notify(value state) bool {
+	if atomic.LoadUint32(&n.stopped) != 0 {
+		return false
+	}
+	n.cond.L.Lock()
+	defer n.cond.L.Unlock()
+	if value.Equals(n.state) {
+		return false
+	}
+	n.state = &value
+	n.cond.Broadcast()
+
+	return true
+}
+
+// shutdown stops waiting for all the subscribers and sets the current state to `nil`.
 func (n *notifications) shutdown() {
-	n.mutex.Lock()
-	defer n.mutex.Unlock()
-
-	for _, ch := range n.subscribers {
-		close(ch)
-		// drain the channel buffer
-		for range ch {
-		}
+	if !atomic.CompareAndSwapUint32(&n.stopped, 0, 1) {
+		return
 	}
-	n.subscribers = make(map[uuid.UUID]chan change)
+	n.cond.L.Lock()
+	defer n.cond.L.Unlock()
+	n.state = nil
+	// trigger unblock on each `Wait` so the subscribers could check the `stopped` flag and stop waiting
+	n.cond.Broadcast()
 }
