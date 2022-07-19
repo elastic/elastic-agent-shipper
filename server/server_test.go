@@ -50,7 +50,9 @@ func TestPublish(t *testing.T) {
 		Fields:   sampleValues,
 	}
 
-	publisher := &publisherMock{}
+	publisher := &publisherMock{
+		persistedIndex: 42,
+	}
 	shipper, err := NewShipperServer(publisher, ShipperServerConfig{
 		PollingInterval: time.Second, // we don't use the polled values in this test
 	})
