@@ -20,6 +20,8 @@ import (
 	"github.com/elastic/elastic-agent-libs/dev-tools/mage/gotool"
 )
 
+var PlatformFiles = []string{"darwin-aarch64", "darwin-x86_64", "linux-arm64", "linux-x86_64", "linux-x86", "windows-x86_64", "windows-x86"}
+
 // CreateDir creates the parent directory for the given file.
 func CreateDir(file string) string {
 	// Create the output directory.

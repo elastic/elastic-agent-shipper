@@ -55,17 +55,23 @@ func (Build) Clean(test string) {
 
 // TestBinaries checks if the binaries are generated (for now).
 func (Build) TestBinaries() error {
-	p := filepath.Join("build", "binaries")
-	execName := "exec"
-	if runtime.GOOS == "windows" {
-		execName += ".exe"
+	path := filepath.Join("build", "binaries")
+	for _, platform := range devtools.PlatformFiles {
+		var execName = "elastic-agent-shipper"
+		if strings.Contains(platform, "windows") {
+			execName += ".exe"
+		}
+		binary := filepath.Join(path, fmt.Sprintf("%s-%s-%s", "elastic-agent-shipper", tools.DefaultBeatVersion, platform), execName)
+		if _, err := os.Stat(binary); os.IsNotExist(err) {
+			return err
+		}
 	}
-	_ = p
+
 	return nil
 }
 
-// InstallGoreleaser target installs goreleaser
-func InstallGoreleaser() error {
+// InstallGoReleaser target installs goreleaser
+func InstallGoReleaser() error {
 	return gotool.Install(
 		gotool.Install.Package(GoreleaserRepo),
 	)
@@ -75,7 +81,7 @@ func InstallGoreleaser() error {
 // ENV PLATFORMS = all, local, darwin, linux, windows, darwin/amd64, darwin/arm64, linux/386, linux/amd64, linux/arm64, windows/386, windows/amd64
 // ENV SNAPSHOT = true/false
 func (Build) Binary() error {
-	InstallGoreleaser()
+	InstallGoReleaser()
 
 	// Environment variable
 	version := tools.DefaultBeatVersion
