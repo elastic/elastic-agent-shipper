@@ -29,7 +29,7 @@ type Publisher interface {
 
 	// AcceptedIndex returns the current sequential index of the accepted events
 	AcceptedIndex() queue.EntryID
-	// AcceptedIndex returns the current sequential index of the persisted events
+	// PersistedIndex returns the current sequential index of the persisted events
 	PersistedIndex() queue.EntryID
 	// Publish publishes the given event and returns the current accepted index (after this event)
 	Publish(*messages.Event) (queue.EntryID, error)
