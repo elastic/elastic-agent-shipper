@@ -45,6 +45,7 @@ type Build mg.Namespace
 
 // All builds binaries for the all  os/arch.
 func (Build) All() {
+	os.Setenv("PLATFORM", "all")
 	mg.Deps(Build.Binary)
 }
 
@@ -78,7 +79,7 @@ func InstallGoReleaser() error {
 }
 
 // Binary will create the project binaries found in /build/binaries (use `mage build`)
-// ENV PLATFORMS = all, local, darwin, linux, windows, darwin/amd64, darwin/arm64, linux/386, linux/amd64, linux/arm64, windows/386, windows/amd64
+// ENV PLATFORM = all, darwin, linux, windows, darwin/amd64, darwin/arm64, linux/386, linux/amd64, linux/arm64, windows/386, windows/amd64
 // ENV SNAPSHOT = true/false
 func (Build) Binary() error {
 	InstallGoReleaser()
@@ -112,9 +113,6 @@ func (Build) Binary() error {
 
 	platforms := os.Getenv("PLATFORM")
 	switch platforms {
-	case "local":
-		goos := runtime.GOOS
-		args = append(args, "--id", goos, "--single-target")
 	case "windows", "linux", "darwin":
 		args = append(args, "--id", platforms)
 	case "darwin/amd64", "darwin/arm64", "linux/386", "linux/amd64", "linux/arm64", "windows/386", "windows/amd64":
@@ -125,6 +123,8 @@ func (Build) Binary() error {
 		args = append(args, "--id", goos, "--single-target")
 	case "all":
 	default:
+		goos := runtime.GOOS
+		args = append(args, "--id", goos, "--single-target")
 	}
 	fmt.Println(">> build: Building binary for", platforms) //nolint:forbidigo // it's ok to use fmt.println in mage
 	sh.RunWithV(env, "goreleaser", args...)
