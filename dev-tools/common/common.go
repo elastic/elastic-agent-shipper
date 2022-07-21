@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -49,7 +48,6 @@ func MakeCommand(ctx context.Context, env map[string]string, cmd string, args ..
 	}
 	c.Stderr = os.Stderr
 	c.Stdin = os.Stdin
-	log.Println("exec:", cmd, strings.Join(args, " "))
 	fmt.Println("exec:", cmd, strings.Join(args, " ")) //nolint:forbidigo // just for mage
 	return c
 }
