@@ -75,8 +75,8 @@ func (queue *Queue) Get(eventCount int) (beatsqueue.Batch, error) {
 	return queue.eventQueue.Get(eventCount)
 }
 
-func (queue *Queue) Close() {
-	queue.eventQueue.Close()
+func (queue *Queue) Close() error {
+	return queue.eventQueue.Close()
 }
 
 func (queue *Queue) AcceptedIndex() EntryID {

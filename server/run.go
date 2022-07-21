@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -104,11 +105,13 @@ func (c *clientHandler) Run(cfg config.ShipperConfig, unit *client.Unit) error {
 		opts = []grpc.ServerOption{grpc.Creds(creds)}
 	}
 	grpcServer := grpc.NewServer(opts...)
-	r := shipperServer{
-		logger: log,
-		queue:  queue,
+	shipperServer, err := NewShipperServer(queue, ShipperServerConfig{
+		PollingInterval: 100 * time.Millisecond, // TODO make proper configuration
+	})
+	if err != nil {
+		return fmt.Errorf("failed to initialise the server: %w", err)
 	}
-	pb.RegisterProducerServer(grpcServer, r)
+	pb.RegisterProducerServer(grpcServer, shipperServer)
 
 	shutdownFunc := func() {
 		grpcServer.GracefulStop()
@@ -118,6 +121,7 @@ func (c *clientHandler) Run(cfg config.ShipperConfig, unit *client.Unit) error {
 		// We call Wait to give it a chance to finish with events
 		// it has already read.
 		out.Wait()
+		shipperServer.Close()
 	}
 	handleShutdown(shutdownFunc, c.shutdownInit)
 	log.Debugf("gRPC server is listening on port %d", cfg.Port)
