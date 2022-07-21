@@ -13,6 +13,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper/monitoring"
+	"github.com/elastic/elastic-agent-shipper/queue"
 	"github.com/elastic/go-ucfg/json"
 )
 
@@ -41,6 +42,7 @@ type ShipperConfig struct {
 	Key     string            `config:"key"`        //TLS Keyfile, if specified
 	Port    int               `config:"port"`       //Port to listen on
 	Monitor monitoring.Config `config:"monitoring"` //Queue monitoring settings
+	Queue   queue.Config      `config:"queue"`      //Queue settings
 }
 
 // ReadConfig returns the populated config from the specified path
@@ -61,6 +63,7 @@ func ReadConfig() (ShipperConfig, error) {
 		Port:    defaultPort,
 		Log:     logp.DefaultConfig(logp.SystemdEnvironment),
 		Monitor: monitoring.DefaultConfig(),
+		Queue:   queue.DefaultConfig(),
 	}
 	err = raw.Unpack(&config)
 	if err != nil {
@@ -80,6 +83,7 @@ func ReadConfigFromJSON(raw string) (ShipperConfig, error) {
 		Port:    defaultPort,
 		Log:     logp.DefaultConfig(logp.SystemdEnvironment),
 		Monitor: monitoring.DefaultConfig(),
+		Queue:   queue.DefaultConfig(),
 	}
 	err = rawCfg.Unpack(&shipperConfig)
 	if err != nil {
