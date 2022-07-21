@@ -11,6 +11,17 @@ import (
 	"github.com/elastic/elastic-agent-shipper/cmd"
 )
 
+var (
+	// BuildTime is the build time of the binary (set externally with ldflags).
+	BuildTime = "unknown"
+
+	// CommitHash is the Git hash of the branch, used for version purposes (set externally with ldflags).
+	CommitHash = "undefined"
+
+	// Tag describes the semver version of the application (set externally with ldflags).
+	Tag string
+)
+
 func main() {
 	command := cmd.NewCommand()
 	if err := command.Execute(); err != nil {

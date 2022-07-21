@@ -1,0 +1,34 @@
+# Make sure to check the documentation at https://goreleaser.com
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+builds:
+  - id: darwin
+    binary: '{{ .ProjectName }}-{{ .Env.DEFAULT_VERSION }}-{{ .Os }}-{{ if eq .Arch "amd64" }}x86_64{{ end }}{{ if eq .Arch "arm64" }}aarch64{{ end }}/{{ .ProjectName }}'
+    goos:
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    no_unique_dist_dir: true
+  - id: linux
+    binary: '{{ .ProjectName }}-{{ .Env.DEFAULT_VERSION }}-{{ .Os }}-{{ if eq .Arch "amd64" }}x86_64{{ end }}{{ if eq .Arch "386" }}x86{{ end }}{{ if eq .Arch "arm64" }}{{ .Arch }}{{ end }}/{{ .ProjectName }}'
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+      - 386
+    no_unique_dist_dir: true
+  - id: windows
+    binary: '{{ .ProjectName }}-{{ .Env.DEFAULT_VERSION }}-{{ .Os }}-{{ if eq .Arch "amd64" }}x86_64{{ end }}{{ if eq .Arch "386" }}x86{{ end }}/{{ .ProjectName }}'
+    goos:
+      - windows
+    goarch:
+      - amd64
+      - 386
+    no_unique_dist_dir: true
+changelog:
+  skip: true
+dist: build/binaries
