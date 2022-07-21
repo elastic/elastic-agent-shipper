@@ -54,8 +54,8 @@ func (Build) Clean(test string) {
 	os.RemoveAll("build") // nolint:errcheck //not required
 }
 
-// TestBinaries checks if the binaries are generated (for now).
-func (Build) TestBinaries() error {
+// CheckBinaries checks if the binaries are generated (for now).
+func (Build) CheckBinaries() error {
 	path := filepath.Join("build", "binaries")
 	for _, platform := range devtools.PlatformFiles {
 		var execName = "elastic-agent-shipper"

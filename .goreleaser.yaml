@@ -30,9 +30,5 @@ builds:
       - 386
     no_unique_dist_dir: true
 changelog:
-  sort: asc
-  filters:
-    exclude:
-      - '^docs:'
-      - '^test:'
+  skip: true
 dist: build/binaries
