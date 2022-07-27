@@ -34,8 +34,9 @@ const (
 // Aliases are shortcuts to long target names.
 // nolint: deadcode // it's used by `mage`.
 var Aliases = map[string]interface{}{
-	"build":    Build.Binary,
-	"unitTest": Test.Unit,
+	"build":           Build.Binary,
+	"unitTest":        Test.Unit,
+	"integrationTest": Test.Integration,
 }
 
 // BUILD
@@ -141,7 +142,7 @@ func (Test) All() {
 	mg.SerialDeps(Test.Unit, Test.Integration)
 }
 
-// Integration runs all the integration tests (use alias `mage integrationtest`).
+// Integration runs all the integration tests (use alias `mage integrationTest`).
 func (Test) Integration(ctx context.Context) error {
 	return nil
 }

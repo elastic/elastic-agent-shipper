@@ -67,7 +67,7 @@ pipeline {
                 }
                 unstash 'source'
                 dir("${BASE_DIR}"){
-                  withMageEnv(version: "${env.GO_VERSION}", pkgs: ['github.com/goreleaser/goreleaser@v1.6.3']){
+                  withMageEnv(version: "${env.GO_VERSION}"){
                     cmd(label: 'Go build', script: 'mage -v build')
                   }
                 }
@@ -79,7 +79,7 @@ pipeline {
               withGithubNotify(context: "Test-${PLATFORM}") {
                 dir("${BASE_DIR}"){
                   withMageEnv(){
-                    cmd(label: 'Go unitTest', script: 'mage unittest')
+                    cmd(label: 'Go unitTest', script: 'mage unitTest')
                   }
                 }
               }
