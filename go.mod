@@ -13,7 +13,7 @@ require (
 require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220603155004-ac7e079a9403
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20220607160924-1a71765a8bbe
-	github.com/elastic/elastic-agent-shipper-client v0.3.0
+	github.com/elastic/elastic-agent-shipper-client v0.4.0
 	github.com/elastic/go-ucfg v0.8.5
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/magefile/mage v1.13.0

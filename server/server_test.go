@@ -20,6 +20,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -53,9 +54,7 @@ func TestPublish(t *testing.T) {
 	publisher := &publisherMock{
 		persistedIndex: 42,
 	}
-	shipper, err := NewShipperServer(publisher, ShipperServerConfig{
-		PollingInterval: time.Second, // we don't use the polled values in this test
-	})
+	shipper, err := NewShipperServer(publisher)
 	defer func() { _ = shipper.Close() }()
 	require.NoError(t, err)
 	client, stop := startServer(t, ctx, shipper)
@@ -144,9 +143,7 @@ func TestPersistedIndex(t *testing.T) {
 	publisher := &publisherMock{persistedIndex: 42}
 
 	t.Run("server should send updates to the clients", func(t *testing.T) {
-		shipper, err := NewShipperServer(publisher, ShipperServerConfig{
-			PollingInterval: 5 * time.Millisecond,
-		})
+		shipper, err := NewShipperServer(publisher)
 		defer func() { _ = shipper.Close() }()
 		require.NoError(t, err)
 		client, stop := startServer(t, ctx, shipper)
@@ -154,12 +151,12 @@ func TestPersistedIndex(t *testing.T) {
 
 		// first delivery can happen before the first index update
 		require.Eventually(t, func() bool {
-			cl := createConsumers(t, ctx, client, 5)
+			cl := createConsumers(t, ctx, client, 5, 5*time.Millisecond)
 			defer cl.stop()
 			return cl.assertConsumed(t, 42) // initial value in the publisher
 		}, 100*time.Millisecond, time.Millisecond, "clients are supposed to get the update")
 
-		cl := createConsumers(t, ctx, client, 50)
+		cl := createConsumers(t, ctx, client, 50, 5*time.Millisecond)
 		publisher.persistedIndex = 64
 
 		cl.assertConsumed(t, 64)
@@ -172,14 +169,12 @@ func TestPersistedIndex(t *testing.T) {
 	})
 
 	t.Run("server should properly shutdown", func(t *testing.T) {
-		shipper, err := NewShipperServer(publisher, ShipperServerConfig{
-			PollingInterval: 5 * time.Millisecond, // we don't use the polled values in this test
-		})
+		shipper, err := NewShipperServer(publisher)
 		require.NoError(t, err)
 		client, stop := startServer(t, ctx, shipper)
 		defer stop()
 
-		cl := createConsumers(t, ctx, client, 50)
+		cl := createConsumers(t, ctx, client, 50, 5*time.Millisecond)
 		publisher.persistedIndex = 64
 		shipper.Close() // stopping the server
 		require.Eventually(t, func() bool {
@@ -220,7 +215,7 @@ func startServer(t *testing.T, ctx context.Context, shipperServer ShipperServer)
 	return pb.NewProducerClient(conn), stop
 }
 
-func createConsumers(t *testing.T, ctx context.Context, client pb.ProducerClient, count int) consumerList {
+func createConsumers(t *testing.T, ctx context.Context, client pb.ProducerClient, count int, pollingInterval time.Duration) consumerList {
 	ctx, cancel := context.WithCancel(ctx)
 
 	cl := consumerList{
@@ -228,7 +223,9 @@ func createConsumers(t *testing.T, ctx context.Context, client pb.ProducerClient
 		consumers: make([]pb.Producer_PersistedIndexClient, 0, count),
 	}
 	for i := 0; i < 50; i++ {
-		consumer, err := client.PersistedIndex(ctx, &messages.PersistedIndexRequest{})
+		consumer, err := client.PersistedIndex(ctx, &messages.PersistedIndexRequest{
+			PollingInterval: durationpb.New(pollingInterval),
+		})
 		require.NoError(t, err)
 		cl.consumers = append(cl.consumers, consumer)
 	}

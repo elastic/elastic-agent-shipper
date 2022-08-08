@@ -12,7 +12,6 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -105,9 +104,7 @@ func (c *clientHandler) Run(cfg config.ShipperConfig, unit *client.Unit) error {
 		opts = []grpc.ServerOption{grpc.Creds(creds)}
 	}
 	grpcServer := grpc.NewServer(opts...)
-	shipperServer, err := NewShipperServer(queue, ShipperServerConfig{
-		PollingInterval: 100 * time.Millisecond, // TODO make proper configuration
-	})
+	shipperServer, err := NewShipperServer(queue)
 	if err != nil {
 		return fmt.Errorf("failed to initialise the server: %w", err)
 	}

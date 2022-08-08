@@ -10,15 +10,12 @@ import (
 	"fmt"
 	"io"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	pb "github.com/elastic/elastic-agent-shipper-client/pkg/proto"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 	"github.com/elastic/elastic-agent-shipper/queue"
-
-	"google.golang.org/grpc/peer"
 
 	"github.com/gofrs/uuid"
 )
@@ -44,34 +41,20 @@ type ShipperServer interface {
 type shipperServer struct {
 	logger    *logp.Logger
 	publisher Publisher
-	cfg       ShipperServerConfig
 
 	uuid string
 
-	polling          polling
-	notifications    notifications
-	indexSubscribers int64
-
 	close *sync.Once
+	ctx   context.Context
+	stop  func()
 
 	pb.UnimplementedProducerServer
 }
 
-type polling struct {
-	ctx     context.Context
-	stop    func()
-	stopped chan struct{}
-}
-
 // NewShipperServer creates a new server instance for handling gRPC endpoints.
-func NewShipperServer(publisher Publisher, cfg ShipperServerConfig) (ShipperServer, error) {
+func NewShipperServer(publisher Publisher) (ShipperServer, error) {
 	if publisher == nil {
 		return nil, errors.New("publisher cannot be nil")
-	}
-
-	err := cfg.Validate()
-	if err != nil {
-		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
 	id, err := uuid.NewV4()
@@ -79,25 +62,14 @@ func NewShipperServer(publisher Publisher, cfg ShipperServerConfig) (ShipperServ
 		return nil, err
 	}
 
-	notificationMutex := &sync.RWMutex{}
-
 	s := shipperServer{
 		uuid:      id.String(),
 		logger:    logp.NewLogger("shipper-server"),
 		publisher: publisher,
-		cfg:       cfg,
-		polling: polling{
-			stopped: make(chan struct{}),
-		},
-		notifications: notifications{
-			mutex: notificationMutex,
-			cond:  sync.NewCond(notificationMutex),
-		},
-		close: &sync.Once{},
+		close:     &sync.Once{},
 	}
 
-	s.polling.ctx, s.polling.stop = context.WithCancel(context.Background())
-	s.startPolling()
+	s.ctx, s.stop = context.WithCancel(context.Background())
 
 	return &s, nil
 }
@@ -109,11 +81,7 @@ func (serv *shipperServer) GetAcceptedIndex() uint64 {
 
 // GetPersistedIndex returns the persisted index
 func (serv *shipperServer) GetPersistedIndex() uint64 {
-	s := serv.notifications.getState()
-	if s == nil {
-		return 0
-	}
-	return s.persistedIndex
+	return uint64(serv.publisher.PersistedIndex())
 }
 
 // PublishEvents is the server implementation of the gRPC PublishEvents call.
@@ -164,16 +132,9 @@ func (serv *shipperServer) PublishEvents(_ context.Context, req *messages.Publis
 
 // PublishEvents is the server implementation of the gRPC PersistedIndex call.
 func (serv *shipperServer) PersistedIndex(req *messages.PersistedIndexRequest, producer pb.Producer_PersistedIndexServer) error {
-	atomic.AddInt64(&serv.indexSubscribers, 1)
-	defer atomic.AddInt64(&serv.indexSubscribers, -1)
+	serv.logger.Debug("new subscriber for persisted index change")
+	defer serv.logger.Debug("unsubscribed from persisted index change")
 
-	p, _ := peer.FromContext(producer.Context())
-	addr := addressString(p)
-	serv.logger.Debugf("%s subscribed for persisted index change", addr)
-	defer serv.logger.Debugf("%s unsubscribed from persisted index change", addr)
-
-	// before reading notification we send the current value
-	// in case the first notification does not come in a long time
 	persistedIndex := serv.GetPersistedIndex()
 	if persistedIndex != 0 {
 		err := producer.Send(&messages.PersistedIndexReply{
@@ -185,21 +146,29 @@ func (serv *shipperServer) PersistedIndex(req *messages.PersistedIndexRequest, p
 		}
 	}
 
+	pollingIntervalDur := req.PollingInterval.AsDuration()
+
+	if pollingIntervalDur == 0 {
+		return nil
+	}
+
+	ticker := time.NewTicker(pollingIntervalDur)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-producer.Context().Done():
 			return fmt.Errorf("producer context: %w", producer.Context().Err())
 
-		case <-serv.polling.ctx.Done():
-			return fmt.Errorf("server is stopped: %w", serv.polling.ctx.Err())
-		default:
-			state := serv.notifications.wait()
-			// state can be nil if the notifications are shutting down
-			// we don't send notifications about the same index twice
-			if state == nil || state.persistedIndex == persistedIndex {
+		case <-serv.ctx.Done():
+			return fmt.Errorf("server is stopped: %w", serv.ctx.Err())
+
+		case <-ticker.C:
+			newPersistedIndex := serv.GetPersistedIndex()
+			if newPersistedIndex == persistedIndex {
 				continue
 			}
-			persistedIndex = state.persistedIndex // store for future comparison
+			persistedIndex = newPersistedIndex
 			err := producer.Send(&messages.PersistedIndexReply{
 				Uuid:           serv.uuid,
 				PersistedIndex: persistedIndex,
@@ -214,58 +183,8 @@ func (serv *shipperServer) PersistedIndex(req *messages.PersistedIndexRequest, p
 // Close implements the Closer interface
 func (serv *shipperServer) Close() error {
 	serv.close.Do(func() {
-		// we should stop polling first to cut off the source of notifications
-		serv.polling.stop()
-		<-serv.polling.stopped
-
-		serv.logger.Debug("shutting down all notifications...")
-		serv.notifications.shutdown()
-		serv.logger.Debug("all notifications have been shut down")
+		serv.stop()
 	})
 
 	return nil
-}
-
-func (serv *shipperServer) startPolling() {
-	go func() {
-		ticker := time.NewTicker(serv.cfg.PollingInterval)
-		defer ticker.Stop()
-
-		for {
-			select {
-
-			case <-serv.polling.ctx.Done():
-				err := serv.polling.ctx.Err()
-				if err != nil && errors.Is(err, context.Canceled) {
-					serv.logger.Error(err)
-				}
-				close(serv.polling.stopped) // signaling back to `Close`
-				return
-
-			case <-ticker.C:
-				serv.trySendNewIndex()
-			}
-		}
-	}()
-}
-
-// trySendNewIndex gets the latest indices and notifies subscribers about the new value.
-func (serv *shipperServer) trySendNewIndex() {
-	persistedIndex := uint64(serv.publisher.PersistedIndex())
-
-	s := state{
-		persistedIndex: persistedIndex,
-	}
-	notified := serv.notifications.notify(s)
-	if !notified {
-		return
-	}
-	serv.logger.Debugf("notified %d subscribers about new persisted index %d.", atomic.LoadInt64(&serv.indexSubscribers), persistedIndex)
-}
-
-func addressString(p *peer.Peer) string {
-	if p == nil {
-		return "client"
-	}
-	return p.Addr.String()
 }
