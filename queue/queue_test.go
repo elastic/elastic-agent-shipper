@@ -7,11 +7,14 @@ package queue
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/elastic/beats/v7/libbeat/publisher/queue/diskqueue"
+	"github.com/elastic/beats/v7/libbeat/publisher/queue/memqueue"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 )
 
@@ -46,30 +49,91 @@ func TestMemoryQueueSimpleBatch(t *testing.T) {
 
 func TestQueueTypes(t *testing.T) {
 	tests := map[string]struct {
-		queueType   string
-		encryption  bool
-		compression bool
+		memSettings  *memqueue.Settings
+		diskSettings *diskqueue.Settings
 	}{
-		"memory":                      {queueType: "memory"},
-		"disk":                        {queueType: "disk"},
-		"disk_encryption":             {queueType: "disk", encryption: true},
-		"disk_compression":            {queueType: "disk", compression: true},
-		"disk_encryption_compression": {queueType: "disk", encryption: true, compression: true},
+		"memory": {
+			memSettings: &memqueue.Settings{
+				Events:         1024,
+				FlushMinEvents: 256,
+				FlushTimeout:   5 * time.Millisecond,
+			},
+		},
+		"disk no mem": {
+			diskSettings: &diskqueue.Settings{
+				MaxSegmentSize:   100 * (1 << 20), // 100MiB
+				MaxBufferSize:    (1 << 30),       // 1GiB
+				ReadAheadLimit:   512,
+				WriteAheadLimit:  2048,
+				RetryInterval:    1 * time.Second,
+				MaxRetryInterval: 30 * time.Second,
+				UseProtobuf:      true,
+			},
+		},
+		"disk with mem": {
+			memSettings: &memqueue.Settings{
+				Events:         1024,
+				FlushMinEvents: 256,
+				FlushTimeout:   5 * time.Millisecond,
+			},
+			diskSettings: &diskqueue.Settings{
+				MaxSegmentSize:   100 * (1 << 20), // 100MiB
+				MaxBufferSize:    (1 << 30),       // 1GiB
+				ReadAheadLimit:   512,
+				WriteAheadLimit:  2048,
+				RetryInterval:    1 * time.Second,
+				MaxRetryInterval: 30 * time.Second,
+				UseProtobuf:      true,
+			},
+		},
+		"disk_encryption": {
+			diskSettings: &diskqueue.Settings{
+				MaxSegmentSize:   100 * (1 << 20), // 100MiB
+				MaxBufferSize:    (1 << 30),       // 1GiB
+				ReadAheadLimit:   512,
+				WriteAheadLimit:  2048,
+				RetryInterval:    1 * time.Second,
+				MaxRetryInterval: 30 * time.Second,
+				UseProtobuf:      true,
+				EncryptionKey:    []byte("testtesttesttest"),
+			},
+		},
+		"disk_compression": {
+			diskSettings: &diskqueue.Settings{
+				MaxSegmentSize:   100 * (1 << 20), // 100MiB
+				MaxBufferSize:    (1 << 30),       // 1GiB
+				ReadAheadLimit:   512,
+				WriteAheadLimit:  2048,
+				RetryInterval:    1 * time.Second,
+				MaxRetryInterval: 30 * time.Second,
+				UseProtobuf:      true,
+				UseCompression:   true,
+			},
+		},
+		"disk_encryption_compression": {
+			diskSettings: &diskqueue.Settings{
+				MaxSegmentSize:   100 * (1 << 20), // 100MiB
+				MaxBufferSize:    (1 << 30),       // 1GiB
+				ReadAheadLimit:   512,
+				WriteAheadLimit:  2048,
+				RetryInterval:    1 * time.Second,
+				MaxRetryInterval: 30 * time.Second,
+				UseProtobuf:      true,
+				UseCompression:   true,
+				EncryptionKey:    []byte("testtesttesttest"),
+			},
+		},
 	}
 	for name, tc := range tests {
 		cfg := DefaultConfig()
-		cfg.Type = tc.queueType
-		if tc.queueType == "disk" {
+		cfg.MemSettings = tc.memSettings
+		cfg.DiskSettings = tc.diskSettings
+		if cfg.DiskSettings != nil {
 			dir, err := os.MkdirTemp("", t.Name()+"_"+name)
 			assert.NoError(t, err, "couldn't make tempdir")
 			defer os.RemoveAll(dir)
 			cfg.DiskSettings.Path = dir
-			cfg.DiskSettings.UseProtobuf = true
 		}
-		if tc.encryption {
-			cfg.DiskSettings.EncryptionKey = []byte("testtesttesttest")
-		}
-		cfg.DiskSettings.UseCompression = tc.compression
 
 		queue, err := New(cfg)
 		assert.NoError(t, err)

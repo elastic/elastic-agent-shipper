@@ -46,15 +46,15 @@ var ErrQueueIsFull = fmt.Errorf("couldn't publish: queue is full")
 
 func New(c Config) (*Queue, error) {
 	var eventQueue beatsqueue.Queue
-	switch c.Type {
-	case "memory":
-		eventQueue = memqueue.NewQueue(logp.L(), c.MemSettings)
-	case "disk":
+	// If both Disk & Mem settings exist, go with Disk
+	if c.DiskSettings != nil {
 		var err error
-		eventQueue, err = diskqueue.NewQueue(logp.L(), c.DiskSettings)
+		eventQueue, err = diskqueue.NewQueue(logp.L(), *c.DiskSettings)
 		if err != nil {
 			return nil, fmt.Errorf("error creating diskqueue: %w", err)
 		}
+	} else {
+		eventQueue = memqueue.NewQueue(logp.L(), *c.MemSettings)
 	}
 	producer := eventQueue.Producer(beatsqueue.ProducerConfig{})
 	return &Queue{eventQueue: eventQueue, producer: producer}, nil

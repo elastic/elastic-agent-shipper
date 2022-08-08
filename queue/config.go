@@ -13,26 +13,24 @@ import (
 )
 
 type Config struct {
-	Type         string             `config:"type"`
-	MemSettings  memqueue.Settings  `config:"memqueue"`
-	DiskSettings diskqueue.Settings `config:"diskqueue"`
+	MemSettings  *memqueue.Settings  `config:"memqueue"`
+	DiskSettings *diskqueue.Settings `config:"diskqueue"`
 }
 
 func DefaultConfig() Config {
 	return Config{
-		Type: "memory",
-		MemSettings: memqueue.Settings{
+		MemSettings: &memqueue.Settings{
 			Events:         1024,
 			FlushMinEvents: 256,
 			FlushTimeout:   5 * time.Millisecond,
 		}, //memqueue should have a DefaultSettings()
-		DiskSettings: diskqueue.DefaultSettings(),
+		DiskSettings: nil,
 	}
 }
 
 func (c *Config) Validate() error {
-	if c.Type != "memory" && c.Type != "disk" {
-		return fmt.Errorf("unknown queue type: %s, must be 'memory' or 'disk'", c.Type)
+	if c.MemSettings == nil && c.DiskSettings == nil {
+		return fmt.Errorf("memory or disk queue settings must be supplied")
 	}
 	return nil
 }
