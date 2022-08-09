@@ -16,6 +16,8 @@ import (
 	pb "github.com/elastic/elastic-agent-shipper-client/pkg/proto"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 	"github.com/elastic/elastic-agent-shipper/queue"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/gofrs/uuid"
 )
@@ -96,7 +98,7 @@ func (serv *shipperServer) PublishEvents(_ context.Context, req *messages.Publis
 		resp.PersistedIndex = serv.GetPersistedIndex()
 		serv.logger.Debugf("shipper UUID does not match, all events rejected. Expected = %s, actual = %s", serv.uuid, req.Uuid)
 
-		return resp, nil
+		return resp, status.Error(codes.FailedPrecondition, fmt.Sprintf("UUID does not match. Expected = %s, actual = %s", serv.uuid, req.Uuid))
 	}
 
 	for _, e := range req.Events {
@@ -136,14 +138,12 @@ func (serv *shipperServer) PersistedIndex(req *messages.PersistedIndexRequest, p
 	defer serv.logger.Debug("unsubscribed from persisted index change")
 
 	persistedIndex := serv.GetPersistedIndex()
-	if persistedIndex != 0 {
-		err := producer.Send(&messages.PersistedIndexReply{
-			Uuid:           serv.uuid,
-			PersistedIndex: persistedIndex,
-		})
-		if err != nil {
-			return err
-		}
+	err := producer.Send(&messages.PersistedIndexReply{
+		Uuid:           serv.uuid,
+		PersistedIndex: persistedIndex,
+	})
+	if err != nil {
+		return err
 	}
 
 	pollingIntervalDur := req.PollingInterval.AsDuration()

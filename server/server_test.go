@@ -123,17 +123,16 @@ func TestPublish(t *testing.T) {
 		require.Equal(t, uint64(publisher.persistedIndex), pir.PersistedIndex)
 	})
 
-	t.Run("should return count = 0 when uuid does not match", func(t *testing.T) {
+	t.Run("should return an error when uuid does not match", func(t *testing.T) {
 		publisher.q = make([]*messages.Event, 0, 3)
 		events := []*messages.Event{e, e, e}
 		reply, err := client.PublishEvents(ctx, &messages.PublishRequest{
 			Uuid:   "wrong",
 			Events: events,
 		})
-		require.NoError(t, err)
-		require.Equal(t, uint32(0), reply.AcceptedCount)
-		require.Equal(t, uint64(0), reply.AcceptedIndex)
-		require.Equal(t, uint64(publisher.persistedIndex), pir.PersistedIndex)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "UUID does not match")
+		require.Nil(t, reply)
 	})
 }
 
