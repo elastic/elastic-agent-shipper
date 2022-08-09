@@ -13,9 +13,11 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/logp"
+
 	pb "github.com/elastic/elastic-agent-shipper-client/pkg/proto"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 	"github.com/elastic/elastic-agent-shipper/queue"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
