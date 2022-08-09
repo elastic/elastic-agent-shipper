@@ -6,9 +6,9 @@ package queue
 
 import (
 	"fmt"
-	"time"
 
 	beatsqueue "github.com/elastic/beats/v7/libbeat/publisher/queue"
+	diskqueue "github.com/elastic/beats/v7/libbeat/publisher/queue/diskqueue"
 	memqueue "github.com/elastic/beats/v7/libbeat/publisher/queue/memqueue"
 	"github.com/elastic/elastic-agent-libs/logp"
 
@@ -30,6 +30,11 @@ type Queue struct {
 
 type Metrics beatsqueue.Metrics
 
+// EntryID is a unique ascending id assigned to each entry that goes in the
+// queue, to handle acknowledgments within the shipper and report progress
+// to the client.
+type EntryID uint64
+
 // metricsSource is a wrapper around the libbeat queue interface, exposing only
 // the callback to query the current metrics. It is used to pass queue metrics
 // to the monitoring package.
@@ -39,25 +44,27 @@ type MetricsSource interface {
 
 var ErrQueueIsFull = fmt.Errorf("couldn't publish: queue is full")
 
-func New() (*Queue, error) {
-	eventQueue := memqueue.NewQueue(logp.L(), memqueue.Settings{
-		Events: 1024,
-		// The event count and timeout for queue flushes is hard-coded to a placeholder
-		// for now, since that's what the existing Beats API understands. The plan is
-		// for these parameters to instead be controlled by the output as it reads
-		// the queue. See https://github.com/elastic/elastic-agent-shipper/issues/58.
-		FlushMinEvents: 256,
-		FlushTimeout:   5 * time.Millisecond,
-	})
+func New(c Config) (*Queue, error) {
+	var eventQueue beatsqueue.Queue
+	// If both Disk & Mem settings exist, go with Disk
+	if c.DiskSettings != nil {
+		var err error
+		eventQueue, err = diskqueue.NewQueue(logp.L(), *c.DiskSettings)
+		if err != nil {
+			return nil, fmt.Errorf("error creating diskqueue: %w", err)
+		}
+	} else {
+		eventQueue = memqueue.NewQueue(logp.L(), *c.MemSettings)
+	}
 	producer := eventQueue.Producer(beatsqueue.ProducerConfig{})
 	return &Queue{eventQueue: eventQueue, producer: producer}, nil
 }
 
-func (queue *Queue) Publish(event *messages.Event) error {
+func (queue *Queue) Publish(event *messages.Event) (EntryID, error) {
 	if !queue.producer.Publish(event) {
-		return ErrQueueIsFull
+		return EntryID(0), ErrQueueIsFull
 	}
-	return nil
+	return EntryID(0), nil
 }
 
 func (queue *Queue) Metrics() (Metrics, error) {
@@ -70,6 +77,19 @@ func (queue *Queue) Get(eventCount int) (beatsqueue.Batch, error) {
 	return queue.eventQueue.Get(eventCount)
 }
 
-func (queue *Queue) Close() {
-	queue.eventQueue.Close()
+func (queue *Queue) Close() error {
+	return queue.eventQueue.Close()
+}
+
+func (queue *Queue) AcceptedIndex() EntryID {
+	return EntryID(0)
+}
+
+func (queue *Queue) PersistedIndex() EntryID {
+	// This function needs to be implemented differently depending on the queue
+	// type. For the memory queue, it should return the most recent sequential
+	// entry id that has been published and acknowledged by the outputs.
+	// For the disk queue, it should return the most recent sequential entry id
+	// that has been written to disk.
+	return EntryID(0)
 }
