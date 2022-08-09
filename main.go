@@ -9,17 +9,13 @@ import (
 	"os"
 
 	"github.com/elastic/elastic-agent-shipper/cmd"
+	"github.com/elastic/elastic-agent-shipper/tools"
 )
 
 var (
-	// BuildTime is the build time of the binary (set externally with ldflags).
-	BuildTime = "unknown"
-
-	// CommitHash is the Git hash of the branch, used for version purposes (set externally with ldflags).
-	CommitHash = "undefined"
-
-	// Tag describes the semver version of the application (set externally with ldflags).
-	Tag string
+	Version   string = tools.DefaultBeatVersion
+	Commit    string
+	BuildTime string
 )
 
 func main() {

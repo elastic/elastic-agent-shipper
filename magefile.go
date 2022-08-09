@@ -82,24 +82,19 @@ func InstallGoReleaser() error {
 // Binary will create the project binaries found in /build/binaries (use `mage build`)
 // ENV PLATFORM = all, darwin, linux, windows, darwin/amd64, darwin/arm64, linux/386, linux/amd64, linux/arm64, windows/386, windows/amd64
 // ENV SNAPSHOT = true/false
+// ENV DEV = true/false
 func (Build) Binary() error {
 	InstallGoReleaser()
+
+	args := []string{"build", "--rm-dist", "--skip-validate"}
 
 	// Environment variable
 	version := tools.DefaultBeatVersion
 	env := map[string]string{
-		"CGO_ENABLED": "0",
+		"CGO_ENABLED": devtools.EnvOrDefault("CGO_ENABLED", "0"),
+		"DEV":         devtools.EnvOrDefault("DEV", "false"),
 	}
-	if cgoEnv := os.Getenv("CGO_ENABLED"); cgoEnv != "" {
-		isCGOEnabled, err := strconv.ParseBool(cgoEnv)
-		if err != nil {
-			return err
-		}
-		if isCGOEnabled {
-			env["CGO_ENABLED"] = "1"
-		}
-	}
-	args := []string{"build", "--rm-dist", "--skip-validate"}
+
 	if snapshotEnv := os.Getenv("SNAPSHOT"); snapshotEnv != "" {
 		isSnapshot, err := strconv.ParseBool(snapshotEnv)
 		if err != nil {

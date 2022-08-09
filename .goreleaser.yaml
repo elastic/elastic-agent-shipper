@@ -11,6 +11,13 @@ builds:
     goarch:
       - amd64
       - arm64
+    flags:
+      - -buildmode=pie
+    ldflags:
+      - '{{ if eq .Env.DEV "false" }}-s{{ end }}'
+      - -X main.Version={{ .Env.DEFAULT_VERSION }} -X main.Commit={{.Commit}} -X main.BuildTime={{.Date}}
+    gcflags:
+      - '{{ if eq .Env.DEV "true" }}all=-N -l{{ end }}'
     no_unique_dist_dir: true
   - id: linux
     binary: '{{ .ProjectName }}-{{ .Env.DEFAULT_VERSION }}-{{ .Os }}-{{ if eq .Arch "amd64" }}x86_64{{ end }}{{ if eq .Arch "386" }}x86{{ end }}{{ if eq .Arch "arm64" }}{{ .Arch }}{{ end }}/{{ .ProjectName }}'
@@ -21,6 +28,13 @@ builds:
       - arm64
       - 386
     no_unique_dist_dir: true
+    flags:
+      - -buildmode=pie
+    ldflags:
+      - '{{ if eq .Env.DEV "false" }}-s{{ end }}'
+      - -X main.Version={{ .Env.DEFAULT_VERSION }} -X main.Commit={{.Commit}} -X main.BuildTime={{.Date}}
+    gcflags:
+      - '{{ if eq .Env.DEV "true" }}all=-N -l{{ end }}'
   - id: windows
     binary: '{{ .ProjectName }}-{{ .Env.DEFAULT_VERSION }}-{{ .Os }}-{{ if eq .Arch "amd64" }}x86_64{{ end }}{{ if eq .Arch "386" }}x86{{ end }}/{{ .ProjectName }}'
     goos:
@@ -29,6 +43,13 @@ builds:
       - amd64
       - 386
     no_unique_dist_dir: true
+    flags:
+      - -buildmode=pie
+    ldflags:
+      - '{{ if eq .Env.DEV "false" }}-s{{ end }}'
+      - -X main.Version={{ .Env.DEFAULT_VERSION }} -X main.Commit={{.Commit}} -X main.BuildTime={{.Date}}
+    gcflags:
+      - '{{ if eq .Env.DEV "true" }}all=-N -l{{ end }}'
 changelog:
   skip: true
 dist: build/binaries

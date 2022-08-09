@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/magefile/mage/mg"
@@ -50,4 +51,15 @@ func MakeCommand(ctx context.Context, env map[string]string, cmd string, args ..
 	c.Stdin = os.Stdin
 	fmt.Println("exec:", cmd, strings.Join(args, " ")) //nolint:forbidigo // just for mage
 	return c
+}
+
+func EnvOrDefault(buildEnv string, defaultValue string) string {
+	if val := os.Getenv(buildEnv); val != "" {
+		boolVal, err := strconv.ParseBool(val)
+		if err != nil {
+			return defaultValue
+		}
+		return strconv.FormatBool(boolVal)
+	}
+	return defaultValue
 }
