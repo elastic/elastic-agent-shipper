@@ -44,7 +44,7 @@ var Aliases = map[string]interface{}{
 // Build contains targets related to linting the Go code
 type Build mg.Namespace
 
-// All builds binaries for the all  os/arch.
+// All builds binaries for the all os/arch.
 func (Build) All() {
 	os.Setenv("PLATFORM", "all")
 	mg.Deps(Build.Binary)
