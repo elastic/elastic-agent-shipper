@@ -13,8 +13,9 @@ require (
 require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220722175030-7cb39607b349
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20220607160924-1a71765a8bbe
-	github.com/elastic/elastic-agent-shipper-client v0.3.0
+	github.com/elastic/elastic-agent-shipper-client v0.4.0
 	github.com/elastic/go-ucfg v0.8.6
+	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/magefile/mage v1.13.0
 	github.com/stretchr/testify v1.7.1
 	go.elastic.co/go-licence-detector v0.5.0
@@ -32,7 +33,6 @@ require (
 	github.com/elastic/go-windows v1.0.1 // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/gobuffalo/here v0.6.0 // indirect
-	github.com/gofrs/uuid v4.2.0+incompatible // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/licenseclassifier v0.0.0-20200402202327-879cb1424de0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
