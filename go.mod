@@ -3,7 +3,7 @@ module github.com/elastic/elastic-agent-shipper
 go 1.17
 
 require (
-	github.com/elastic/elastic-agent-libs v0.2.9
+	github.com/elastic/elastic-agent-libs v0.2.11
 	github.com/spf13/cobra v1.3.0
 	google.golang.org/genproto v0.0.0-20220725144611-272f38e5d71b // indirect
 	google.golang.org/grpc v1.48.0
