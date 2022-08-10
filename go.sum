@@ -463,8 +463,9 @@ github.com/elastic/elastic-agent-client/v7 v7.0.0-20220607160924-1a71765a8bbe/go
 github.com/elastic/elastic-agent-libs v0.0.0-20220303160015-5b4e674da3dd/go.mod h1://82M1l73IHx0wDbS2Tzkq6Fx9fkmytS1KgkIyzvNTM=
 github.com/elastic/elastic-agent-libs v0.2.2/go.mod h1:1xDLBhIqBIjhJ7lr2s+xRFFkQHpitSp8q2zzv1Dqg+s=
 github.com/elastic/elastic-agent-libs v0.2.5/go.mod h1:chO3rtcLyGlKi9S0iGVZhYCzDfdDsAQYBc+ui588AFE=
-github.com/elastic/elastic-agent-libs v0.2.7 h1:JvjEJVyN7ERr2uDVs2jV+tXJaJUgFAjiqUN15EBWMJI=
 github.com/elastic/elastic-agent-libs v0.2.7/go.mod h1:chO3rtcLyGlKi9S0iGVZhYCzDfdDsAQYBc+ui588AFE=
+github.com/elastic/elastic-agent-libs v0.2.11 h1:ZeYn35Kxt+IdtMPmE01TaDeaahCg/z7MkGPVWUo6Lp4=
+github.com/elastic/elastic-agent-libs v0.2.11/go.mod h1:chO3rtcLyGlKi9S0iGVZhYCzDfdDsAQYBc+ui588AFE=
 github.com/elastic/elastic-agent-shipper-client v0.1.0 h1:tyDQyK2XY9Ss8a7QcHXrGRWnXBjtbwVafb98na4HVdA=
 github.com/elastic/elastic-agent-shipper-client v0.1.0/go.mod h1:OyI2W+Mv3JxlkEF3OeT7K0dbuxvwew8ke2Cf4HpLa9Q=
 github.com/elastic/elastic-agent-system-metrics v0.3.1/go.mod h1:RIYhJOS7mUeyIthfOSqmmbEILYSzaDWLi5zQ70bQo+o=
