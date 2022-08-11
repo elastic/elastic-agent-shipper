@@ -18,6 +18,9 @@ queue:
   test: #There is no actual "test" queue type, remove this later.
     events: 512
 
+server:
+ strict_mode: false
+
 monitoring:
   enabled: true
   interval: 5s
