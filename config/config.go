@@ -13,6 +13,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper/monitoring"
+	"github.com/elastic/elastic-agent-shipper/output"
 	"github.com/elastic/elastic-agent-shipper/queue"
 	"github.com/elastic/go-ucfg/json"
 )
@@ -43,6 +44,7 @@ type ShipperConfig struct {
 	Port    int               `config:"port"`       //Port to listen on
 	Monitor monitoring.Config `config:"monitoring"` //Queue monitoring settings
 	Queue   queue.Config      `config:"queue"`      //Queue settings
+	Output  output.Config     `config:"output"`     //Output settings
 }
 
 // ReadConfig returns the populated config from the specified path
