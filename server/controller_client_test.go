@@ -50,7 +50,7 @@ func TestAgentControl(t *testing.T) {
 								Type:           proto.UnitType_OUTPUT,
 								ConfigStateIdx: 1,
 								Config: &proto.UnitExpectedConfig{
-									Source: MustNewStruct(map[string]interface{}{
+									Source: MustNewStruct(t, map[string]interface{}{
 										"logging": map[string]interface{}{"level": "debug"},
 									}),
 								},
@@ -114,10 +114,10 @@ func TestAgentControl(t *testing.T) {
 	assert.True(t, gotStopped, "stopped state")
 }
 
-func MustNewStruct(contents map[string]interface{}) *structpb.Struct {
+func MustNewStruct(t *testing.T, contents map[string]interface{}) *structpb.Struct {
 	result, err := structpb.NewStruct(contents)
 	if err != nil {
-		panic(fmt.Errorf("failed to create test struct for contents: %w", err))
+		t.Fatalf("failed to create test struct for contents [%v]: %v", contents, err)
 	}
 	return result
 }

@@ -80,7 +80,8 @@ func ReadConfig() (ShipperConfig, error) {
 // Currently this just converts the given struct to json and tries to deserialize it into the
 // ShipperConfig struct. This is not the right way to do this, but this gets the build and
 // tests passing again with the new version of elastic-agent-client. Migrating fully to this
-// new config structure is part of the overall agent V2 transition.
+// new config structure is part of the overall agent V2 transition, for more details see
+// https://github.com/elastic/elastic-agent/issues/617.
 func ShipperConfigFromUnitConfig(logLevel client.UnitLogLevel, config *proto.UnitExpectedConfig) (ShipperConfig, error) {
 	jsonConfig, err := config.GetSource().MarshalJSON()
 	if err != nil {
