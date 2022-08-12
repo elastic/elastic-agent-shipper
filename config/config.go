@@ -18,6 +18,7 @@ import (
 
 	"github.com/elastic/elastic-agent-shipper/monitoring"
 	"github.com/elastic/elastic-agent-shipper/queue"
+	"github.com/elastic/elastic-agent-shipper/server"
 )
 
 const (
@@ -46,6 +47,7 @@ type ShipperConfig struct {
 	Port    int               `config:"port"`       //Port to listen on
 	Monitor monitoring.Config `config:"monitoring"` //Queue monitoring settings
 	Queue   queue.Config      `config:"queue"`      //Queue settings
+	Server  server.Config     `config:"server"`     //gRPC Server settings
 }
 
 // ReadConfig returns the populated config from the specified path
@@ -67,6 +69,7 @@ func ReadConfig() (ShipperConfig, error) {
 		Log:     logp.DefaultConfig(logp.SystemdEnvironment),
 		Monitor: monitoring.DefaultConfig(),
 		Queue:   queue.DefaultConfig(),
+		Server:  server.DefaultConfig(),
 	}
 	err = raw.Unpack(&config)
 	if err != nil {
@@ -102,6 +105,7 @@ func ReadConfigFromJSON(raw string) (ShipperConfig, error) {
 		Log:     logp.DefaultConfig(logp.SystemdEnvironment),
 		Monitor: monitoring.DefaultConfig(),
 		Queue:   queue.DefaultConfig(),
+		Server:  server.DefaultConfig(),
 	}
 	err = rawCfg.Unpack(&shipperConfig)
 	if err != nil {

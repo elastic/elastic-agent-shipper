@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"time"
 
@@ -52,11 +53,13 @@ type shipperServer struct {
 	ctx   context.Context
 	stop  func()
 
+	cfg Config
+
 	pb.UnimplementedProducerServer
 }
 
 // NewShipperServer creates a new server instance for handling gRPC endpoints.
-func NewShipperServer(publisher Publisher) (ShipperServer, error) {
+func NewShipperServer(cfg Config, publisher Publisher) (ShipperServer, error) {
 	if publisher == nil {
 		return nil, errors.New("publisher cannot be nil")
 	}
@@ -71,6 +74,7 @@ func NewShipperServer(publisher Publisher) (ShipperServer, error) {
 		logger:    logp.NewLogger("shipper-server"),
 		publisher: publisher,
 		close:     &sync.Once{},
+		cfg:       cfg,
 	}
 
 	s.ctx, s.stop = context.WithCancel(context.Background())
@@ -101,6 +105,15 @@ func (serv *shipperServer) PublishEvents(_ context.Context, req *messages.Publis
 		serv.logger.Debugf("shipper UUID does not match, all events rejected. Expected = %s, actual = %s", serv.uuid, req.Uuid)
 
 		return resp, status.Error(codes.FailedPrecondition, fmt.Sprintf("UUID does not match. Expected = %s, actual = %s", serv.uuid, req.Uuid))
+	}
+
+	if serv.cfg.StrictMode {
+		for _, e := range req.Events {
+			err := serv.validateEvent(e)
+			if err != nil {
+				return nil, status.Error(codes.InvalidArgument, err.Error())
+			}
+		}
 	}
 
 	for _, e := range req.Events {
@@ -189,4 +202,66 @@ func (serv *shipperServer) Close() error {
 	})
 
 	return nil
+}
+
+func (serv *shipperServer) validateEvent(m *messages.Event) error {
+	var msgs []string
+
+	if err := m.Timestamp.CheckValid(); err != nil {
+		msgs = append(msgs, fmt.Sprintf("timestamp: %s", err))
+	}
+
+	if err := serv.validateDataStream(m.DataStream); err != nil {
+		msgs = append(msgs, fmt.Sprintf("datastream: %s", err))
+	}
+
+	if err := serv.validateSource(m.Source); err != nil {
+		msgs = append(msgs, fmt.Sprintf("source: %s", err))
+	}
+
+	if len(msgs) == 0 {
+		return nil
+	}
+
+	return errors.New(strings.Join(msgs, "; "))
+}
+
+func (serv *shipperServer) validateSource(s *messages.Source) error {
+	if s == nil {
+		return fmt.Errorf("cannot be nil")
+	}
+
+	var msgs []string
+	if s.InputId == "" {
+		msgs = append(msgs, "input_id is a required field")
+	}
+
+	if len(msgs) == 0 {
+		return nil
+	}
+
+	return errors.New(strings.Join(msgs, "; "))
+}
+
+func (serv *shipperServer) validateDataStream(ds *messages.DataStream) error {
+	if ds == nil {
+		return fmt.Errorf("cannot be nil")
+	}
+
+	var msgs []string
+	if ds.Dataset == "" {
+		msgs = append(msgs, "dataset is a required field")
+	}
+	if ds.Namespace == "" {
+		msgs = append(msgs, "namespace is a required field")
+	}
+	if ds.Type == "" {
+		msgs = append(msgs, "type is a required field")
+	}
+
+	if len(msgs) == 0 {
+		return nil
+	}
+
+	return errors.New(strings.Join(msgs, "; "))
 }
