@@ -75,22 +75,18 @@ func ReadConfig() (ShipperConfig, error) {
 	return config, nil
 }
 
+// ShipperConfigFromUnitConfig converts the configuration provided by Agent to the internal
+// configuration object used by the shipper.
+// Currently this just converts the given struct to json and tries to deserialize it into the
+// ShipperConfig struct. This is not the right way to do this, but this gets the build and
+// tests passing again with the new version of elastic-agent-client. Migrating fully to this
+// new config structure is part of the overall agent V2 transition.
 func ShipperConfigFromUnitConfig(logLevel client.UnitLogLevel, config *proto.UnitExpectedConfig) (ShipperConfig, error) {
-	/*shipperConfig := ShipperConfig{
-		Port:    defaultPort,
-		Log:     logp.DefaultConfig(logp.SystemdEnvironment),
-		Monitor: monitoring.DefaultConfig(),
-		Queue:   queue.DefaultConfig(),
-	}*/
 	jsonConfig, err := config.GetSource().MarshalJSON()
 	if err != nil {
 		return ShipperConfig{}, err
 	}
 	return ReadConfigFromJSON(string(jsonConfig))
-	//return shipperConfig, nil
-	/*return ShipperConfig{
-		Log: logp.Config{Level: logp.DebugLevel},
-	}, nil*/
 }
 
 // ReadConfigFromJSON reads the event in from a JSON config. I believe @blakerouse told me
