@@ -46,6 +46,7 @@ func TestAgentControl(t *testing.T) {
 			if observed.Token == token {
 				if len(observed.Units) > 0 {
 					t.Logf("Current unit state is: %v", observed.Units[0].State)
+					assert.NotEqual(t, observed.Units[0].State, 5)
 				}
 
 				// initial checkin
@@ -87,6 +88,8 @@ func TestAgentControl(t *testing.T) {
 					return &proto.CheckinExpected{
 						Units: nil,
 					}
+				} else if observed.Units[0].State == proto.State_FAILED {
+					fmt.Printf("idk\n")
 				}
 
 			}

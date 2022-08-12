@@ -10,11 +10,14 @@ import (
 	"io/ioutil"
 	"path/filepath"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/go-ucfg/json"
+
 	"github.com/elastic/elastic-agent-shipper/monitoring"
 	"github.com/elastic/elastic-agent-shipper/queue"
-	"github.com/elastic/go-ucfg/json"
 )
 
 const (
@@ -72,8 +75,22 @@ func ReadConfig() (ShipperConfig, error) {
 	return config, nil
 }
 
-func ShipperConfigFromSomething() (ShipperConfig, error) {
-	return ShipperConfig{}, nil
+func ShipperConfigFromUnitConfig(logLevel client.UnitLogLevel, config *proto.UnitExpectedConfig) (ShipperConfig, error) {
+	/*shipperConfig := ShipperConfig{
+		Port:    defaultPort,
+		Log:     logp.DefaultConfig(logp.SystemdEnvironment),
+		Monitor: monitoring.DefaultConfig(),
+		Queue:   queue.DefaultConfig(),
+	}*/
+	jsonConfig, err := config.GetSource().MarshalJSON()
+	if err != nil {
+		return ShipperConfig{}, err
+	}
+	return ReadConfigFromJSON(string(jsonConfig))
+	//return shipperConfig, nil
+	/*return ShipperConfig{
+		Log: logp.Config{Level: logp.DebugLevel},
+	}, nil*/
 }
 
 // ReadConfigFromJSON reads the event in from a JSON config. I believe @blakerouse told me
