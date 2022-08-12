@@ -15,11 +15,20 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	structpb "google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client/mock"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
+
+func MustNewStruct(contents map[string]interface{}) *structpb.Struct {
+	result, err := structpb.NewStruct(contents)
+	if err != nil {
+		panic(fmt.Errorf("failed to create test struct for contents: %w", err))
+	}
+	return result
+}
 
 func TestAgentControl(t *testing.T) {
 	unitOneID := mock.NewID()
@@ -48,8 +57,13 @@ func TestAgentControl(t *testing.T) {
 								Id:             unitOneID,
 								Type:           proto.UnitType_OUTPUT,
 								ConfigStateIdx: 1,
-								Config:         `{"logging": {"level": "debug"}}`, // hack to make my life easier
-								State:          proto.State_HEALTHY,
+								Config: &proto.UnitExpectedConfig{
+									Id: "config_unit_one",
+									Source: MustNewStruct(map[string]interface{}{
+										"logging": map[string]interface{}{"level": "debug"},
+									}),
+								},
+								State: proto.State_HEALTHY,
 							},
 						},
 					}
@@ -62,8 +76,8 @@ func TestAgentControl(t *testing.T) {
 								Id:             unitOneID,
 								Type:           proto.UnitType_OUTPUT,
 								ConfigStateIdx: 1,
-								Config:         "{}",
-								State:          proto.State_STOPPED,
+								//Config:         "{}",
+								State: proto.State_STOPPED,
 							},
 						},
 					}

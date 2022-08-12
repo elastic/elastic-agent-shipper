@@ -72,6 +72,10 @@ func ReadConfig() (ShipperConfig, error) {
 	return config, nil
 }
 
+func ShipperConfigFromSomething() (ShipperConfig, error) {
+	return ShipperConfig{}, nil
+}
+
 // ReadConfigFromJSON reads the event in from a JSON config. I believe @blakerouse told me
 // that the V2 controller will send events via JSON, but I could be wrong.
 func ReadConfigFromJSON(raw string) (ShipperConfig, error) {
