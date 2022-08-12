@@ -9,6 +9,7 @@ type Config struct {
 	// list of required fields. This introduces some additional overhead but can
 	// be really handy for client developers on the debugging stage.
 	// Normally, it should be disabled during production use and enabled for testing.
+	// In production it is preferable to send events to the output if at all possible.
 	StrictMode bool `config:"strict_mode"`
 }
 
