@@ -22,14 +22,6 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
 
-func MustNewStruct(contents map[string]interface{}) *structpb.Struct {
-	result, err := structpb.NewStruct(contents)
-	if err != nil {
-		panic(fmt.Errorf("failed to create test struct for contents: %w", err))
-	}
-	return result
-}
-
 func TestAgentControl(t *testing.T) {
 	unitOneID := mock.NewID()
 
@@ -46,7 +38,6 @@ func TestAgentControl(t *testing.T) {
 			if observed.Token == token {
 				if len(observed.Units) > 0 {
 					t.Logf("Current unit state is: %v", observed.Units[0].State)
-					assert.NotEqual(t, observed.Units[0].State, 5)
 				}
 
 				// initial checkin
@@ -59,7 +50,6 @@ func TestAgentControl(t *testing.T) {
 								Type:           proto.UnitType_OUTPUT,
 								ConfigStateIdx: 1,
 								Config: &proto.UnitExpectedConfig{
-									Id: "config_unit_one",
 									Source: MustNewStruct(map[string]interface{}{
 										"logging": map[string]interface{}{"level": "debug"},
 									}),
@@ -77,8 +67,7 @@ func TestAgentControl(t *testing.T) {
 								Id:             unitOneID,
 								Type:           proto.UnitType_OUTPUT,
 								ConfigStateIdx: 1,
-								//Config:         "{}",
-								State: proto.State_STOPPED,
+								State:          proto.State_STOPPED,
 							},
 						},
 					}
@@ -88,10 +77,7 @@ func TestAgentControl(t *testing.T) {
 					return &proto.CheckinExpected{
 						Units: nil,
 					}
-				} else if observed.Units[0].State == proto.State_FAILED {
-					fmt.Printf("idk\n")
 				}
-
 			}
 
 			//gotInvalid = true
@@ -126,4 +112,12 @@ func TestAgentControl(t *testing.T) {
 	assert.True(t, gotConfig, "config state")
 	assert.True(t, gotHealthy, "healthy state")
 	assert.True(t, gotStopped, "stopped state")
+}
+
+func MustNewStruct(contents map[string]interface{}) *structpb.Struct {
+	result, err := structpb.NewStruct(contents)
+	if err != nil {
+		panic(fmt.Errorf("failed to create test struct for contents: %w", err))
+	}
+	return result
 }

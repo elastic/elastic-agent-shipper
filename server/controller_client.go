@@ -10,7 +10,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	client "github.com/elastic/elastic-agent-client/v7/pkg/client"
+	//client "github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper/config"
 )
@@ -85,8 +86,6 @@ func (c *clientHandler) startShipper(unit *client.Unit) {
 
 	// Assuming that if we got here from UnitChangedAdded, we don't need to care about the expected state?
 	_, level, unitConfig := unit.Expected()
-	//fmt.Printf("%v %v\n", a, b)
-	//cfg, err := config.ReadConfigFromJSON(configString)
 	cfg, err := config.ShipperConfigFromUnitConfig(level, unitConfig)
 	if err != nil {
 		c.log.Errorf("error unpacking config from agent: %s", err)
