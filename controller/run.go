@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package server
+package controller
 
 import (
 	"context"
@@ -22,6 +22,7 @@ import (
 	"github.com/elastic/elastic-agent-shipper/monitoring"
 	"github.com/elastic/elastic-agent-shipper/output"
 	"github.com/elastic/elastic-agent-shipper/queue"
+	"github.com/elastic/elastic-agent-shipper/server"
 
 	pb "github.com/elastic/elastic-agent-shipper-client/pkg/proto"
 )
@@ -104,7 +105,7 @@ func (c *clientHandler) Run(cfg config.ShipperConfig, unit *client.Unit) error {
 		opts = []grpc.ServerOption{grpc.Creds(creds)}
 	}
 	grpcServer := grpc.NewServer(opts...)
-	shipperServer, err := NewShipperServer(queue)
+	shipperServer, err := server.NewShipperServer(cfg.Server, queue)
 	if err != nil {
 		return fmt.Errorf("failed to initialise the server: %w", err)
 	}
