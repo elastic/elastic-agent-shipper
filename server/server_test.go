@@ -153,7 +153,7 @@ func TestPublish(t *testing.T) {
 					Metadata: sampleValues,
 					Fields:   sampleValues,
 				},
-				expectedMsg: "timestamp: proto:\u00a0invalid nil Timestamp",
+				expectedMsg: "timestamp: proto: invalid nil Timestamp",
 			},
 			{
 				name: "no source",
