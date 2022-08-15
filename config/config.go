@@ -10,12 +10,15 @@ import (
 	"io/ioutil"
 	"path/filepath"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/go-ucfg/json"
+
 	"github.com/elastic/elastic-agent-shipper/monitoring"
 	"github.com/elastic/elastic-agent-shipper/queue"
 	"github.com/elastic/elastic-agent-shipper/server"
-	"github.com/elastic/go-ucfg/json"
 )
 
 const (
@@ -73,6 +76,21 @@ func ReadConfig() (ShipperConfig, error) {
 		return config, fmt.Errorf("error unpacking shipper config: %w", err)
 	}
 	return config, nil
+}
+
+// ShipperConfigFromUnitConfig converts the configuration provided by Agent to the internal
+// configuration object used by the shipper.
+// Currently this just converts the given struct to json and tries to deserialize it into the
+// ShipperConfig struct. This is not the right way to do this, but this gets the build and
+// tests passing again with the new version of elastic-agent-client. Migrating fully to this
+// new config structure is part of the overall agent V2 transition, for more details see
+// https://github.com/elastic/elastic-agent/issues/617.
+func ShipperConfigFromUnitConfig(logLevel client.UnitLogLevel, config *proto.UnitExpectedConfig) (ShipperConfig, error) {
+	jsonConfig, err := config.GetSource().MarshalJSON()
+	if err != nil {
+		return ShipperConfig{}, err
+	}
+	return ReadConfigFromJSON(string(jsonConfig))
 }
 
 // ReadConfigFromJSON reads the event in from a JSON config. I believe @blakerouse told me

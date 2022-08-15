@@ -84,8 +84,8 @@ func (c *clientHandler) startShipper(unit *client.Unit) {
 	_ = unit.UpdateState(client.UnitStateConfiguring, "reading shipper config", nil)
 
 	// Assuming that if we got here from UnitChangedAdded, we don't need to care about the expected state?
-	_, configString := unit.Expected()
-	cfg, err := config.ReadConfigFromJSON(configString)
+	_, level, unitConfig := unit.Expected()
+	cfg, err := config.ShipperConfigFromUnitConfig(level, unitConfig)
 	if err != nil {
 		c.log.Errorf("error unpacking config from agent: %s", err)
 		_ = unit.UpdateState(client.UnitStateFailed, err.Error(), nil)
@@ -147,7 +147,7 @@ func (c *clientHandler) handleUnitUpdated(unit *client.Unit) {
 	unitType := unit.Type()
 
 	if unitType == client.UnitTypeOutput {
-		state, _ := unit.Expected()
+		state, _, _ := unit.Expected()
 		if state == client.UnitStateStopped {
 			c.shutdown(unit)
 		}
