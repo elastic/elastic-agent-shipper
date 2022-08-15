@@ -84,7 +84,7 @@ func (c *clientHandler) Run(cfg config.ShipperConfig, unit *client.Unit) error {
 	out := output.NewConsole(queue)
 	out.Start()
 
-	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", cfg.Port))
+	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", cfg.Server.Port))
 	if err != nil {
 		return fmt.Errorf("failed to listen: %w", err)
 	}
@@ -97,8 +97,8 @@ func (c *clientHandler) Run(cfg config.ShipperConfig, unit *client.Unit) error {
 	_ = unit.UpdateState(client.UnitStateConfiguring, "starting shipper server", nil)
 
 	var opts []grpc.ServerOption
-	if cfg.TLS {
-		creds, err := credentials.NewServerTLSFromFile(cfg.Cert, cfg.Key)
+	if cfg.Server.TLS {
+		creds, err := credentials.NewServerTLSFromFile(cfg.Server.Cert, cfg.Server.Key)
 		if err != nil {
 			return fmt.Errorf("failed to generate credentials %w", err)
 		}
@@ -122,7 +122,7 @@ func (c *clientHandler) Run(cfg config.ShipperConfig, unit *client.Unit) error {
 		shipperServer.Close()
 	}
 	handleShutdown(shutdownFunc, c.shutdownInit)
-	log.Debugf("gRPC server is listening on port %d", cfg.Port)
+	log.Debugf("gRPC server is listening on port %d", cfg.Server.Port)
 	_ = unit.UpdateState(client.UnitStateHealthy, "Shipper Running", nil)
 
 	// This will get sent after the server has shutdown, signaling to the runloop that it can stop.

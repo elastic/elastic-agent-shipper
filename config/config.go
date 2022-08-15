@@ -23,7 +23,6 @@ import (
 
 const (
 	defaultConfigName = "elastic-agent-shipper.yml"
-	defaultPort       = 50051
 )
 
 var (
@@ -41,10 +40,6 @@ func init() {
 //ShipperConfig defines the options present in the config file
 type ShipperConfig struct {
 	Log     logp.Config       `config:"logging"`
-	TLS     bool              `config:"tls"`
-	Cert    string            `config:"cert"`       //TLS cert file, if TLS is enabled
-	Key     string            `config:"key"`        //TLS Keyfile, if specified
-	Port    int               `config:"port"`       //Port to listen on
 	Monitor monitoring.Config `config:"monitoring"` //Queue monitoring settings
 	Queue   queue.Config      `config:"queue"`      //Queue settings
 	Server  server.Config     `config:"server"`     //gRPC Server settings
@@ -65,7 +60,6 @@ func ReadConfig() (ShipperConfig, error) {
 	}
 	// systemd environment will send us to stdout environment, which we want
 	config := ShipperConfig{
-		Port:    defaultPort,
 		Log:     logp.DefaultConfig(logp.SystemdEnvironment),
 		Monitor: monitoring.DefaultConfig(),
 		Queue:   queue.DefaultConfig(),
@@ -101,7 +95,6 @@ func ReadConfigFromJSON(raw string) (ShipperConfig, error) {
 		return ShipperConfig{}, fmt.Errorf("error parsing string config: %w", err)
 	}
 	shipperConfig := ShipperConfig{
-		Port:    defaultPort,
 		Log:     logp.DefaultConfig(logp.SystemdEnvironment),
 		Monitor: monitoring.DefaultConfig(),
 		Queue:   queue.DefaultConfig(),

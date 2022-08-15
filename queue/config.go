@@ -13,14 +13,14 @@ import (
 )
 
 type Config struct {
-	MemSettings  *memqueue.Settings  `config:"memqueue"`
-	DiskSettings *diskqueue.Settings `config:"diskqueue"`
+	MemSettings  *memqueue.Settings  `config:"mem"`
+	DiskSettings *diskqueue.Settings `config:"disk"`
 }
 
 func DefaultConfig() Config {
 	return Config{
 		MemSettings: &memqueue.Settings{
-			Events:         1024,
+			Events:         4096,
 			FlushMinEvents: 256,
 			FlushTimeout:   5 * time.Millisecond,
 		}, //memqueue should have a DefaultSettings()
