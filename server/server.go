@@ -26,8 +26,6 @@ import (
 
 // Publisher contains all operations required for the shipper server to publish incoming events.
 type Publisher interface {
-	Close() error
-
 	// PersistedIndex returns the current sequential index of the persisted events
 	PersistedIndex() (queue.EntryID, error)
 
@@ -87,8 +85,11 @@ func NewShipperServer(cfg Config, publisher Publisher) (ShipperServer, error) {
 	return &s, nil
 }
 
-// GetPersistedIndex returns the persisted index
-func (serv *shipperServer) GetPersistedIndex() uint64 {
+// getPersistedIndex returns the persisted index, or 0 if there is an error.
+// (An error can only happen if the queue is closed, in which case a placeholder
+// of 0 is often sufficient. Callers that need to explicitly recognize an error
+// state should use publisher.PersistedIndex directly.)
+func (serv *shipperServer) getPersistedIndex() uint64 {
 	index, err := serv.publisher.PersistedIndex()
 	if err != nil {
 		// An error means the queue has been closed, so just return a placeholder.
@@ -101,7 +102,7 @@ func (serv *shipperServer) GetPersistedIndex() uint64 {
 func (serv *shipperServer) PublishEvents(ctx context.Context, req *messages.PublishRequest) (*messages.PublishReply, error) {
 	resp := &messages.PublishReply{
 		Uuid:           serv.uuid,
-		PersistedIndex: serv.GetPersistedIndex(),
+		PersistedIndex: serv.getPersistedIndex(),
 	}
 
 	// the value in the request is optional
@@ -150,7 +151,7 @@ func (serv *shipperServer) PublishEvents(ctx context.Context, req *messages.Publ
 	}
 
 	resp.AcceptedIndex = uint64(acceptedIndex)
-	resp.PersistedIndex = serv.GetPersistedIndex()
+	resp.PersistedIndex = serv.getPersistedIndex()
 
 	serv.logger.
 		Debugf("finished publishing a batch. Events = %d, accepted = %d, accepted index = %d, persisted index = %d",
@@ -168,7 +169,7 @@ func (serv *shipperServer) PersistedIndex(req *messages.PersistedIndexRequest, p
 	serv.logger.Debug("new subscriber for persisted index change")
 	defer serv.logger.Debug("unsubscribed from persisted index change")
 
-	persistedIndex := serv.GetPersistedIndex()
+	persistedIndex := serv.getPersistedIndex()
 	err := producer.Send(&messages.PersistedIndexReply{
 		Uuid:           serv.uuid,
 		PersistedIndex: persistedIndex,
@@ -195,7 +196,7 @@ func (serv *shipperServer) PersistedIndex(req *messages.PersistedIndexRequest, p
 			return fmt.Errorf("server is stopped: %w", serv.ctx.Err())
 
 		case <-ticker.C:
-			newPersistedIndex := serv.GetPersistedIndex()
+			newPersistedIndex := serv.getPersistedIndex()
 			if newPersistedIndex == persistedIndex {
 				continue
 			}
