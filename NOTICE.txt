@@ -11,11 +11,11 @@ Third party libraries used by the Elastic Agent Shipper:
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/beats/v7
-Version: v7.0.0-alpha2.0.20220722175030-7cb39607b349
+Version: v7.0.0-alpha2.0.20220810153818-dd118efed5a5
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/beats/v7@v7.0.0-alpha2.0.20220722175030-7cb39607b349/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/beats/v7@v7.0.0-alpha2.0.20220810153818-dd118efed5a5/LICENSE.txt:
 
 Source code in this repository is variously licensed under the Apache License
 Version 2.0, an Apache compatible license, or the Elastic License. Outside of
@@ -19944,11 +19944,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-a
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-system-metrics
-Version: v0.4.3
+Version: v0.4.4
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-system-metrics@v0.4.3/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-system-metrics@v0.4.4/LICENSE.txt:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -20788,11 +20788,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/go-elasticsearc
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/go-libaudit/v2
-Version: v2.3.1
+Version: v2.3.2-0.20220729123722-f8f7d5c19e6b
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/go-libaudit/v2@v2.3.1/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/go-libaudit/v2@v2.3.2-0.20220729123722-f8f7d5c19e6b/LICENSE.txt:
 
 
                                  Apache License
@@ -21695,11 +21695,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/go-seccomp-bpf@
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/go-structform
-Version: v0.0.9
+Version: v0.0.10
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/go-structform@v0.0.9/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/go-structform@v0.0.10/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -50850,6 +50850,36 @@ Contents of probable licence file $GOMODCACHE/gopkg.in/jcmturner/rpc.v1@v1.1.0/L
    See the License for the specific language governing permissions and
    limitations under the License.
 
+
+--------------------------------------------------------------------------------
+Dependency : gopkg.in/natefinch/lumberjack.v2
+Version: v2.0.0
+Licence type (autodetected): MIT
+--------------------------------------------------------------------------------
+
+Contents of probable licence file $GOMODCACHE/gopkg.in/natefinch/lumberjack.v2@v2.0.0/LICENSE:
+
+The MIT License (MIT)
+
+Copyright (c) 2014 Nate Finch 
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : gopkg.in/yaml.v1
