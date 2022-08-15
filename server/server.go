@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 	"sync"
 	"time"
@@ -27,10 +26,8 @@ import (
 
 // Publisher contains all operations required for the shipper server to publish incoming events.
 type Publisher interface {
-	io.Closer
+	Close() error
 
-	// AcceptedIndex returns the current sequential index of the accepted events
-	AcceptedIndex() queue.EntryID
 	// PersistedIndex returns the current sequential index of the persisted events
 	PersistedIndex() queue.EntryID
 	// Publish publishes the given event and returns the current accepted index (after this event)
@@ -39,8 +36,9 @@ type Publisher interface {
 
 // ShipperServer contains all the gRPC operations for the shipper endpoints.
 type ShipperServer interface {
+	Close() error
+
 	pb.ProducerServer
-	io.Closer
 }
 
 type shipperServer struct {
@@ -82,11 +80,6 @@ func NewShipperServer(cfg Config, publisher Publisher) (ShipperServer, error) {
 	return &s, nil
 }
 
-// GetAcceptedIndex returns the accepted index
-func (serv *shipperServer) GetAcceptedIndex() uint64 {
-	return uint64(serv.publisher.AcceptedIndex())
-}
-
 // GetPersistedIndex returns the persisted index
 func (serv *shipperServer) GetPersistedIndex() uint64 {
 	return uint64(serv.publisher.PersistedIndex())
@@ -100,8 +93,7 @@ func (serv *shipperServer) PublishEvents(_ context.Context, req *messages.Publis
 
 	// the value in the request is optional
 	if req.Uuid != "" && req.Uuid != serv.uuid {
-		resp.AcceptedIndex = serv.GetAcceptedIndex()
-		resp.PersistedIndex = serv.GetPersistedIndex()
+		resp.PersistedIndex = int64(serv.GetPersistedIndex())
 		serv.logger.Debugf("shipper UUID does not match, all events rejected. Expected = %s, actual = %s", serv.uuid, req.Uuid)
 
 		return resp, status.Error(codes.FailedPrecondition, fmt.Sprintf("UUID does not match. Expected = %s, actual = %s", serv.uuid, req.Uuid))
@@ -116,10 +108,12 @@ func (serv *shipperServer) PublishEvents(_ context.Context, req *messages.Publis
 		}
 	}
 
+	acceptedIndex := queue.EntryID(0)
 	for _, e := range req.Events {
-		_, err := serv.publisher.Publish(e)
+		id, err := serv.publisher.Publish(e)
 		if err == nil {
 			resp.AcceptedCount++
+			acceptedIndex = id
 			continue
 		}
 
@@ -133,8 +127,8 @@ func (serv *shipperServer) PublishEvents(_ context.Context, req *messages.Publis
 		break
 	}
 
-	resp.AcceptedIndex = serv.GetAcceptedIndex()
-	resp.PersistedIndex = serv.GetPersistedIndex()
+	resp.AcceptedIndex = int64(acceptedIndex)
+	resp.PersistedIndex = int64(serv.GetPersistedIndex())
 
 	serv.logger.
 		Debugf("finished publishing a batch. Events = %d, accepted = %d, accepted index = %d, persisted index = %d",

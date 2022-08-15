@@ -34,3 +34,7 @@ func (c *Config) Validate() error {
 	}
 	return nil
 }
+
+func (c Config) useDiskQueue() bool {
+	return c.DiskSettings != nil
+}
