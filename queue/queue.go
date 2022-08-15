@@ -66,10 +66,10 @@ func New(c Config) (*Queue, error) {
 	return &Queue{config: c, eventQueue: eventQueue, producer: producer}, nil
 }
 
-func (queue *Queue) Publish(ctx context.Context, event *messages.Event, canBlock bool) (EntryID, error) {
+func (queue *Queue) Publish(ctx context.Context, event *messages.Event) (EntryID, error) {
 	var id beatsqueue.EntryID
 	var published bool
-	if canBlock {
+	if ctx != nil {
 		// TODO pass the real channel once libbeat supports it
 		id, published = queue.producer.Publish(event /*, ctx.Done()*/)
 	} else {

@@ -396,10 +396,6 @@ type publisherMock struct {
 }
 
 func (p *publisherMock) Publish(_ context.Context, event *messages.Event) (queue.EntryID, error) {
-	return p.TryPublish(event)
-}
-
-func (p *publisherMock) TryPublish(event *messages.Event) (queue.EntryID, error) {
 	if len(p.q) == cap(p.q) {
 		return queue.EntryID(0), queue.ErrQueueIsFull
 	}

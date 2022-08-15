@@ -32,10 +32,10 @@ type Publisher interface {
 	PersistedIndex() (queue.EntryID, error)
 
 	// Publish publishes the given event and returns its index.
-	// If canBlock is true, this call is blocking until the event is published or the
-	// target queue is closed.
-	// Otherwise, returns an error if it was not possible to publish the event without blocking.
-	Publish(context.Context, *messages.Event, canBlock bool) (queue.EntryID, error)
+	// If the given context is non-nil, Publish will block until the event is published or
+	// the given context is canceled (or the target queue is closed). Otherwise, Publish
+	// returns an error if it was not possible to publish the event without blocking.
+	Publish(ctx context.Context, event *messages.Event) (queue.EntryID, error)
 }
 
 // ShipperServer contains all the gRPC operations for the shipper endpoints.
@@ -98,7 +98,6 @@ func (serv *shipperServer) GetPersistedIndex() uint64 {
 func (serv *shipperServer) PublishEvents(ctx context.Context, req *messages.PublishRequest) (*messages.PublishReply, error) {
 	resp := &messages.PublishReply{
 		Uuid:           serv.uuid,
-		AcceptedIndex:  serv.GetAcceptedIndex(),
 		PersistedIndex: serv.GetPersistedIndex(),
 	}
 
@@ -130,7 +129,7 @@ func (serv *shipperServer) PublishEvents(ctx context.Context, req *messages.Publ
 
 	// then we try to publish the rest without blocking
 	for _, e := range req.Events[1:] {
-		id, err := serv.publisher.TryPublish(e)
+		id, err := serv.publisher.Publish(nil, e)
 		if err == nil {
 			resp.AcceptedCount++
 			acceptedIndex = id
