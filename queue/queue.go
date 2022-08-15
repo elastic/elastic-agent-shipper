@@ -85,7 +85,7 @@ func (queue *Queue) Close() error {
 	return queue.eventQueue.Close()
 }
 
-func (queue *Queue) PersistedIndex() (EntryID, err) {
+func (queue *Queue) PersistedIndex() (EntryID, error) {
 	if queue.config.useDiskQueue() {
 		// TODO (https://github.com/elastic/elastic-agent-shipper/issues/27):
 		// Once the disk queue supports entry IDs, this should return the

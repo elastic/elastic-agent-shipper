@@ -406,10 +406,6 @@ func (p *publisherMock) Publish(event *messages.Event) (queue.EntryID, error) {
 	return queue.EntryID(len(p.q)), nil
 }
 
-func (p *publisherMock) AcceptedIndex() queue.EntryID {
-	return queue.EntryID(len(p.q))
-}
-
-func (p *publisherMock) PersistedIndex() queue.EntryID {
-	return p.persistedIndex
+func (p *publisherMock) PersistedIndex() (queue.EntryID, error) {
+	return p.persistedIndex, nil
 }

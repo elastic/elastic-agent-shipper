@@ -39,7 +39,7 @@ func TestMemoryQueueSimpleBatch(t *testing.T) {
 
 	assert.Equal(t, batch.Count(), eventCount)
 	for i := 0; i < eventCount; i++ {
-		event, ok := batch.Event(i).(*messages.Event)
+		event, ok := batch.Entry(i).(*messages.Event)
 		assert.True(t, ok, "queue output should have the same concrete type as its input")
 		// Need to use assert.True since assert.Equal* uses value comparison
 		// for unequal pointers.
@@ -152,7 +152,7 @@ func TestQueueTypes(t *testing.T) {
 			assert.NoError(t, err, "couldn't get queue batch")
 			for i := 0; i < batch.Count(); i++ {
 				//get each event and mark the index as received
-				event, ok := batch.Event(i).(*messages.Event)
+				event, ok := batch.Entry(i).(*messages.Event)
 				require.True(t, ok)
 				data := event.GetFields().GetData()
 				testField, prs := data["message"]

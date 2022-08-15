@@ -29,8 +29,8 @@ type Publisher interface {
 	Close() error
 
 	// PersistedIndex returns the current sequential index of the persisted events
-	PersistedIndex() queue.EntryID
-	// Publish publishes the given event and returns the current accepted index (after this event)
+	PersistedIndex() (queue.EntryID, error)
+	// Publish publishes the given event and returns its index
 	Publish(*messages.Event) (queue.EntryID, error)
 }
 
@@ -82,7 +82,12 @@ func NewShipperServer(cfg Config, publisher Publisher) (ShipperServer, error) {
 
 // GetPersistedIndex returns the persisted index
 func (serv *shipperServer) GetPersistedIndex() uint64 {
-	return uint64(serv.publisher.PersistedIndex())
+	index, err := serv.publisher.PersistedIndex()
+	if err != nil {
+		// An error means the queue has been closed, so just return a placeholder.
+		return 0
+	}
+	return uint64(index)
 }
 
 // PublishEvents is the server implementation of the gRPC PublishEvents call.
@@ -93,7 +98,7 @@ func (serv *shipperServer) PublishEvents(_ context.Context, req *messages.Publis
 
 	// the value in the request is optional
 	if req.Uuid != "" && req.Uuid != serv.uuid {
-		resp.PersistedIndex = int64(serv.GetPersistedIndex())
+		resp.PersistedIndex = serv.GetPersistedIndex()
 		serv.logger.Debugf("shipper UUID does not match, all events rejected. Expected = %s, actual = %s", serv.uuid, req.Uuid)
 
 		return resp, status.Error(codes.FailedPrecondition, fmt.Sprintf("UUID does not match. Expected = %s, actual = %s", serv.uuid, req.Uuid))
@@ -127,8 +132,8 @@ func (serv *shipperServer) PublishEvents(_ context.Context, req *messages.Publis
 		break
 	}
 
-	resp.AcceptedIndex = int64(acceptedIndex)
-	resp.PersistedIndex = int64(serv.GetPersistedIndex())
+	resp.AcceptedIndex = uint64(acceptedIndex)
+	resp.PersistedIndex = serv.GetPersistedIndex()
 
 	serv.logger.
 		Debugf("finished publishing a batch. Events = %d, accepted = %d, accepted index = %d, persisted index = %d",
