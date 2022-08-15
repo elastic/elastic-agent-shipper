@@ -67,16 +67,18 @@ func New(c Config) (*Queue, error) {
 }
 
 func (queue *Queue) Publish(ctx context.Context, event *messages.Event) (EntryID, error) {
-	var id beatsqueue.EntryID
-	var published bool
-	if ctx != nil {
-		// TODO pass the real channel once libbeat supports it
-		id, published = queue.producer.Publish(event /*, ctx.Done()*/)
-	} else {
-		id, published = queue.producer.TryPublish(event)
-	}
+	// TODO pass the real channel once libbeat supports it
+	id, published := queue.producer.Publish(event /*, ctx.Done()*/)
 	if !published {
 		return EntryID(0), ErrQueueIsClosed
+	}
+	return EntryID(id), nil
+}
+
+func (queue *Queue) TryPublish(event *messages.Event) (EntryID, error) {
+	id, published := queue.producer.TryPublish(event)
+	if !published {
+		return EntryID(0), ErrQueueIsFull
 	}
 	return EntryID(id), nil
 }

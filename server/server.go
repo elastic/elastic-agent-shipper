@@ -32,10 +32,13 @@ type Publisher interface {
 	PersistedIndex() (queue.EntryID, error)
 
 	// Publish publishes the given event and returns its index.
-	// If the given context is non-nil, Publish will block until the event is published or
-	// the given context is canceled (or the target queue is closed). Otherwise, Publish
-	// returns an error if it was not possible to publish the event without blocking.
+	// It blocks until the event is published or the given context is canceled
+	// (or the target queue is closed).
 	Publish(ctx context.Context, event *messages.Event) (queue.EntryID, error)
+
+	// TryPublish publishes the given event and returns its index.
+	// If the event cannot be published without blocking, TryPublish returns an error.
+	TryPublish(event *messages.Event) (queue.EntryID, error)
 }
 
 // ShipperServer contains all the gRPC operations for the shipper endpoints.
