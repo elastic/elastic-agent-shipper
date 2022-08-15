@@ -33,8 +33,12 @@ type Publisher interface {
 	AcceptedIndex() queue.EntryID
 	// PersistedIndex returns the current sequential index of the persisted events
 	PersistedIndex() queue.EntryID
-	// Publish publishes the given event and returns the current accepted index (after this event)
-	Publish(*messages.Event) (queue.EntryID, error)
+	// Publish publishes the given event and returns the current accepted index (after this event).
+	// This operation is blocking until the event is published or the target queue is closed.
+	Publish(context.Context, *messages.Event) (queue.EntryID, error)
+	// TryPublish tries to immediately publish the given event and returns the current accepted index (after this event).
+	// Returns an error if it was not possible to publish the event without blocking.
+	TryPublish(*messages.Event) (queue.EntryID, error)
 }
 
 // ShipperServer contains all the gRPC operations for the shipper endpoints.
@@ -93,18 +97,21 @@ func (serv *shipperServer) GetPersistedIndex() uint64 {
 }
 
 // PublishEvents is the server implementation of the gRPC PublishEvents call.
-func (serv *shipperServer) PublishEvents(_ context.Context, req *messages.PublishRequest) (*messages.PublishReply, error) {
+func (serv *shipperServer) PublishEvents(ctx context.Context, req *messages.PublishRequest) (*messages.PublishReply, error) {
 	resp := &messages.PublishReply{
-		Uuid: serv.uuid,
+		Uuid:           serv.uuid,
+		AcceptedIndex:  serv.GetAcceptedIndex(),
+		PersistedIndex: serv.GetPersistedIndex(),
 	}
 
 	// the value in the request is optional
 	if req.Uuid != "" && req.Uuid != serv.uuid {
-		resp.AcceptedIndex = serv.GetAcceptedIndex()
-		resp.PersistedIndex = serv.GetPersistedIndex()
 		serv.logger.Debugf("shipper UUID does not match, all events rejected. Expected = %s, actual = %s", serv.uuid, req.Uuid)
-
 		return resp, status.Error(codes.FailedPrecondition, fmt.Sprintf("UUID does not match. Expected = %s, actual = %s", serv.uuid, req.Uuid))
+	}
+
+	if len(req.Events) == 0 {
+		return resp, nil
 	}
 
 	if serv.cfg.StrictMode {
@@ -116,8 +123,16 @@ func (serv *shipperServer) PublishEvents(_ context.Context, req *messages.Publis
 		}
 	}
 
-	for _, e := range req.Events {
-		_, err := serv.publisher.Publish(e)
+	// we block until at least one event from the batch is published
+	_, err := serv.publisher.Publish(ctx, req.Events[0])
+	if err != nil {
+		return nil, status.Error(codes.Unavailable, err.Error())
+	}
+	resp.AcceptedCount++
+
+	// then we try to publish the rest without blocking
+	for _, e := range req.Events[1:] {
+		_, err := serv.publisher.TryPublish(e)
 		if err == nil {
 			resp.AcceptedCount++
 			continue
