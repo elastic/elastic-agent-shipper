@@ -132,7 +132,7 @@ func (serv *shipperServer) PublishEvents(ctx context.Context, req *messages.Publ
 
 	// then we try to publish the rest without blocking
 	for _, e := range req.Events[1:] {
-		id, err := serv.publisher.Publish(nil, e)
+		id, err := serv.publisher.TryPublish(e)
 		if err == nil {
 			resp.AcceptedCount++
 			acceptedIndex = id
