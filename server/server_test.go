@@ -73,9 +73,7 @@ func TestPublish(t *testing.T) {
 			Events: events,
 		})
 		require.NoError(t, err)
-		require.Equal(t, uint32(len(events)), reply.AcceptedCount)
-		require.Equal(t, uint64(len(events)), reply.AcceptedIndex)
-		require.Equal(t, uint64(publisher.persistedIndex), pir.PersistedIndex)
+		assertIndices(t, reply, pir, len(events), len(events), int(publisher.persistedIndex))
 	})
 
 	t.Run("should grow accepted index", func(t *testing.T) {
@@ -86,25 +84,19 @@ func TestPublish(t *testing.T) {
 			Events: events,
 		})
 		require.NoError(t, err)
-		require.Equal(t, uint32(len(events)), reply.AcceptedCount)
-		require.Equal(t, uint64(1), reply.AcceptedIndex)
-		require.Equal(t, uint64(publisher.persistedIndex), pir.PersistedIndex)
+		assertIndices(t, reply, pir, len(events), 1, int(publisher.persistedIndex))
 		reply, err = client.PublishEvents(ctx, &messages.PublishRequest{
 			Uuid:   pir.Uuid,
 			Events: events,
 		})
 		require.NoError(t, err)
-		require.Equal(t, uint32(len(events)), reply.AcceptedCount)
-		require.Equal(t, uint64(2), reply.AcceptedIndex)
-		require.Equal(t, uint64(publisher.persistedIndex), pir.PersistedIndex)
+		assertIndices(t, reply, pir, len(events), 2, int(publisher.persistedIndex))
 		reply, err = client.PublishEvents(ctx, &messages.PublishRequest{
 			Uuid:   pir.Uuid,
 			Events: events,
 		})
 		require.NoError(t, err)
-		require.Equal(t, uint32(len(events)), reply.AcceptedCount)
-		require.Equal(t, uint64(3), reply.AcceptedIndex)
-		require.Equal(t, uint64(publisher.persistedIndex), pir.PersistedIndex)
+		assertIndices(t, reply, pir, len(events), 3, int(publisher.persistedIndex))
 	})
 
 	t.Run("should return different count when queue is full", func(t *testing.T) {
@@ -115,9 +107,7 @@ func TestPublish(t *testing.T) {
 			Events: events,
 		})
 		require.NoError(t, err)
-		require.Equal(t, uint32(1), reply.AcceptedCount)
-		require.Equal(t, uint64(1), reply.AcceptedIndex)
-		require.Equal(t, uint64(publisher.persistedIndex), pir.PersistedIndex)
+		assertIndices(t, reply, pir, 1, 1, int(publisher.persistedIndex))
 	})
 
 	t.Run("should return an error when uuid does not match", func(t *testing.T) {
@@ -153,7 +143,7 @@ func TestPublish(t *testing.T) {
 					Metadata: sampleValues,
 					Fields:   sampleValues,
 				},
-				expectedMsg: "timestamp: proto: invalid nil Timestamp",
+				expectedMsg: "invalid nil Timestamp",
 			},
 			{
 				name: "no source",
@@ -240,7 +230,7 @@ func TestPublish(t *testing.T) {
 				status, ok := status.FromError(err)
 				require.True(t, ok, "expected gRPC error")
 				require.Equal(t, codes.InvalidArgument, status.Code())
-				require.Equal(t, tc.expectedMsg, status.Message())
+				require.Contains(t, status.Message(), tc.expectedMsg)
 
 				// no validation in non-strict mode
 				reply, err = client.PublishEvents(ctx, &messages.PublishRequest{
@@ -248,7 +238,7 @@ func TestPublish(t *testing.T) {
 					Events: []*messages.Event{tc.event},
 				})
 				require.NoError(t, err)
-				require.Equal(t, uint32(1), reply.AcceptedCount)
+				require.Equal(t, uint32(1), reply.AcceptedCount, "should accept in non-strict mode")
 			})
 		}
 	})
@@ -350,6 +340,14 @@ func createConsumers(t *testing.T, ctx context.Context, client pb.ProducerClient
 	return cl
 }
 
+func assertIndices(t *testing.T, reply *messages.PublishReply, pir *messages.PersistedIndexReply, acceptedCount int, acceptedIndex int, persistedIndex int) {
+	require.NotNil(t, reply, "reply cannot be nil")
+	require.Equal(t, uint32(acceptedCount), reply.AcceptedCount, "accepted count does not match")
+	require.Equal(t, uint64(acceptedIndex), reply.AcceptedIndex, "accepted index does not match")
+	require.Equal(t, uint64(persistedIndex), reply.PersistedIndex, "persisted index does not match")
+	require.Equal(t, uint64(persistedIndex), pir.PersistedIndex, "persisted index reply does not match")
+}
+
 func getPersistedIndex(t *testing.T, ctx context.Context, client pb.ProducerClient) *messages.PersistedIndexReply {
 	pirCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -397,7 +395,11 @@ type publisherMock struct {
 	persistedIndex queue.EntryID
 }
 
-func (p *publisherMock) Publish(event *messages.Event) (queue.EntryID, error) {
+func (p *publisherMock) Publish(_ context.Context, event *messages.Event) (queue.EntryID, error) {
+	return p.TryPublish(event)
+}
+
+func (p *publisherMock) TryPublish(event *messages.Event) (queue.EntryID, error) {
 	if len(p.q) == cap(p.q) {
 		return queue.EntryID(0), queue.ErrQueueIsFull
 	}

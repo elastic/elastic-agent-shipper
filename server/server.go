@@ -30,8 +30,12 @@ type Publisher interface {
 
 	// PersistedIndex returns the current sequential index of the persisted events
 	PersistedIndex() (queue.EntryID, error)
-	// Publish publishes the given event and returns its index
-	Publish(*messages.Event) (queue.EntryID, error)
+
+	// Publish publishes the given event and returns its index.
+	// If canBlock is true, this call is blocking until the event is published or the
+	// target queue is closed.
+	// Otherwise, returns an error if it was not possible to publish the event without blocking.
+	Publish(context.Context, *messages.Event, canBlock bool) (queue.EntryID, error)
 }
 
 // ShipperServer contains all the gRPC operations for the shipper endpoints.
@@ -91,17 +95,21 @@ func (serv *shipperServer) GetPersistedIndex() uint64 {
 }
 
 // PublishEvents is the server implementation of the gRPC PublishEvents call.
-func (serv *shipperServer) PublishEvents(_ context.Context, req *messages.PublishRequest) (*messages.PublishReply, error) {
+func (serv *shipperServer) PublishEvents(ctx context.Context, req *messages.PublishRequest) (*messages.PublishReply, error) {
 	resp := &messages.PublishReply{
-		Uuid: serv.uuid,
+		Uuid:           serv.uuid,
+		AcceptedIndex:  serv.GetAcceptedIndex(),
+		PersistedIndex: serv.GetPersistedIndex(),
 	}
 
 	// the value in the request is optional
 	if req.Uuid != "" && req.Uuid != serv.uuid {
-		resp.PersistedIndex = serv.GetPersistedIndex()
 		serv.logger.Debugf("shipper UUID does not match, all events rejected. Expected = %s, actual = %s", serv.uuid, req.Uuid)
-
 		return resp, status.Error(codes.FailedPrecondition, fmt.Sprintf("UUID does not match. Expected = %s, actual = %s", serv.uuid, req.Uuid))
+	}
+
+	if len(req.Events) == 0 {
+		return resp, nil
 	}
 
 	if serv.cfg.StrictMode {
@@ -113,9 +121,16 @@ func (serv *shipperServer) PublishEvents(_ context.Context, req *messages.Publis
 		}
 	}
 
-	acceptedIndex := queue.EntryID(0)
-	for _, e := range req.Events {
-		id, err := serv.publisher.Publish(e)
+	// we block until at least one event from the batch is published
+	acceptedIndex, err := serv.publisher.Publish(ctx, req.Events[0])
+	if err != nil {
+		return nil, status.Error(codes.Unavailable, err.Error())
+	}
+	resp.AcceptedCount++
+
+	// then we try to publish the rest without blocking
+	for _, e := range req.Events[1:] {
+		id, err := serv.publisher.TryPublish(e)
 		if err == nil {
 			resp.AcceptedCount++
 			acceptedIndex = id

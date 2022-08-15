@@ -5,6 +5,7 @@
 package queue
 
 import (
+	"context"
 	"fmt"
 
 	beatsqueue "github.com/elastic/beats/v7/libbeat/publisher/queue"
@@ -44,8 +45,10 @@ type MetricsSource interface {
 	Metrics() (Metrics, error)
 }
 
-var ErrQueueIsFull = fmt.Errorf("couldn't publish: queue is full")
-var ErrQueueIsClosed = fmt.Errorf("couldn't publish: queue is closed")
+var (
+	ErrQueueIsFull   = fmt.Errorf("couldn't publish: queue is full")
+	ErrQueueIsClosed = fmt.Errorf("couldn't publish: queue is closed")
+)
 
 func New(c Config) (*Queue, error) {
 	var eventQueue beatsqueue.Queue
@@ -63,8 +66,15 @@ func New(c Config) (*Queue, error) {
 	return &Queue{config: c, eventQueue: eventQueue, producer: producer}, nil
 }
 
-func (queue *Queue) Publish(event *messages.Event) (EntryID, error) {
-	id, published := queue.producer.Publish(event)
+func (queue *Queue) Publish(ctx context.Context, event *messages.Event, canBlock bool) (EntryID, error) {
+	var id beatsqueue.EntryID
+	var published bool
+	if canBlock {
+		// TODO pass the real channel once libbeat supports it
+		id, published = queue.producer.Publish(event /*, ctx.Done()*/)
+	} else {
+		id, published = queue.producer.TryPublish(event)
+	}
 	if !published {
 		return EntryID(0), ErrQueueIsClosed
 	}
