@@ -168,10 +168,13 @@ func (serv *shipperServer) PersistedIndex(req *messages.PersistedIndexRequest, p
 	serv.logger.Debug("new subscriber for persisted index change")
 	defer serv.logger.Debug("unsubscribed from persisted index change")
 
-	persistedIndex := serv.getPersistedIndex()
-	err := producer.Send(&messages.PersistedIndexReply{
+	persistedIndex, err := serv.publisher.PersistedIndex()
+	if err != nil {
+		return status.Error(codes.Unavailable, err.Error())
+	}
+	err = producer.Send(&messages.PersistedIndexReply{
 		Uuid:           serv.uuid,
-		PersistedIndex: persistedIndex,
+		PersistedIndex: uint64(persistedIndex),
 	})
 	if err != nil {
 		return err
@@ -196,13 +199,13 @@ func (serv *shipperServer) PersistedIndex(req *messages.PersistedIndexRequest, p
 
 		case <-ticker.C:
 			newPersistedIndex, err := serv.publisher.PersistedIndex()
-			if err != nil || uint64(newPersistedIndex) == persistedIndex {
+			if err != nil || newPersistedIndex == persistedIndex {
 				continue
 			}
-			persistedIndex = uint64(newPersistedIndex)
+			persistedIndex = newPersistedIndex
 			err = producer.Send(&messages.PersistedIndexReply{
 				Uuid:           serv.uuid,
-				PersistedIndex: persistedIndex,
+				PersistedIndex: uint64(persistedIndex),
 			})
 			if err != nil {
 				return fmt.Errorf("failed to send the update: %w", err)
