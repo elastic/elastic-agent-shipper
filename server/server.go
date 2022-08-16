@@ -111,7 +111,7 @@ func (serv *shipperServer) PublishEvents(ctx context.Context, req *messages.Publ
 	}
 
 	if len(req.Events) == 0 {
-		return resp, nil
+		return nil, status.Error(codes.InvalidArgument, "publish request must contain at least one event")
 	}
 
 	if serv.cfg.StrictMode {
