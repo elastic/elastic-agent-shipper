@@ -101,8 +101,7 @@ func (serv *shipperServer) getPersistedIndex() uint64 {
 // PublishEvents is the server implementation of the gRPC PublishEvents call.
 func (serv *shipperServer) PublishEvents(ctx context.Context, req *messages.PublishRequest) (*messages.PublishReply, error) {
 	resp := &messages.PublishReply{
-		Uuid:           serv.uuid,
-		PersistedIndex: serv.getPersistedIndex(),
+		Uuid: serv.uuid,
 	}
 
 	// the value in the request is optional
@@ -196,12 +195,12 @@ func (serv *shipperServer) PersistedIndex(req *messages.PersistedIndexRequest, p
 			return fmt.Errorf("server is stopped: %w", serv.ctx.Err())
 
 		case <-ticker.C:
-			newPersistedIndex := serv.getPersistedIndex()
-			if newPersistedIndex == persistedIndex {
+			newPersistedIndex, err := serv.publisher.PersistedIndex()
+			if err != nil || uint64(newPersistedIndex) == persistedIndex {
 				continue
 			}
-			persistedIndex = newPersistedIndex
-			err := producer.Send(&messages.PersistedIndexReply{
+			persistedIndex = uint64(newPersistedIndex)
+			err = producer.Send(&messages.PersistedIndexReply{
 				Uuid:           serv.uuid,
 				PersistedIndex: persistedIndex,
 			})
