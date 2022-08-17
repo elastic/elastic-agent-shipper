@@ -344,7 +344,6 @@ func assertIndices(t *testing.T, reply *messages.PublishReply, pir *messages.Per
 	require.NotNil(t, reply, "reply cannot be nil")
 	require.Equal(t, uint32(acceptedCount), reply.AcceptedCount, "accepted count does not match")
 	require.Equal(t, uint64(acceptedIndex), reply.AcceptedIndex, "accepted index does not match")
-	require.Equal(t, uint64(persistedIndex), reply.PersistedIndex, "persisted index does not match")
 	require.Equal(t, uint64(persistedIndex), pir.PersistedIndex, "persisted index reply does not match")
 }
 
