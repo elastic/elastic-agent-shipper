@@ -8,7 +8,7 @@ other types of data to a host.
 The data shipper is a new process in the Elastic agent system designed to centralize local data
 processing, queueuing, and publishing to the target output (Elasticsearch, Logstash, etc.).
 
-The data shipper is part of a larger effort to rearchitect the Elastic agent. In the initial Elastic
+The data shipper is a part of a larger effort to rearchitect the Elastic agent. In the initial Elastic
 agent architecture each underlying data collector (e.g. Filebeat) was required to implement its own
 processing, queueing, and output connection(s) for each supported output type. The data shipper
 simplifies this architecture by allowing data collectors to implement a single gRPC client to
