@@ -18,11 +18,13 @@ type Config struct {
 }
 
 func DefaultConfig() Config {
+	// Use the same default memory queue configuration that Beats does:
+	// https://github.com/elastic/beats/blob/7449e5c4b944c661299de8099d5423bafd458ee2/libbeat/publisher/queue/memqueue/config.go#L32
 	return Config{
 		MemSettings: &memqueue.Settings{
 			Events:         4096,
-			FlushMinEvents: 256,
-			FlushTimeout:   5 * time.Millisecond,
+			FlushMinEvents: 2048,
+			FlushTimeout:   1 * time.Second,
 		}, //memqueue should have a DefaultSettings()
 		DiskSettings: nil,
 	}
