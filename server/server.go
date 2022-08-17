@@ -85,19 +85,6 @@ func NewShipperServer(cfg Config, publisher Publisher) (ShipperServer, error) {
 	return &s, nil
 }
 
-// getPersistedIndex returns the persisted index, or 0 if there is an error.
-// (An error can only happen if the queue is closed, in which case a placeholder
-// of 0 is often sufficient. Callers that need to explicitly recognize an error
-// state should use publisher.PersistedIndex directly.)
-func (serv *shipperServer) getPersistedIndex() uint64 {
-	index, err := serv.publisher.PersistedIndex()
-	if err != nil {
-		// An error means the queue has been closed, so just return a placeholder.
-		return 0
-	}
-	return uint64(index)
-}
-
 // PublishEvents is the server implementation of the gRPC PublishEvents call.
 func (serv *shipperServer) PublishEvents(ctx context.Context, req *messages.PublishRequest) (*messages.PublishReply, error) {
 	resp := &messages.PublishReply{
@@ -150,14 +137,12 @@ func (serv *shipperServer) PublishEvents(ctx context.Context, req *messages.Publ
 	}
 
 	resp.AcceptedIndex = uint64(acceptedIndex)
-	resp.PersistedIndex = serv.getPersistedIndex()
 
 	serv.logger.
-		Debugf("finished publishing a batch. Events = %d, accepted = %d, accepted index = %d, persisted index = %d",
+		Debugf("finished publishing a batch. Events = %d, accepted = %d, accepted index = %d",
 			len(req.Events),
 			resp.AcceptedCount,
 			resp.AcceptedIndex,
-			resp.PersistedIndex,
 		)
 
 	return resp, nil
