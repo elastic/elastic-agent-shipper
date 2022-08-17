@@ -7,12 +7,12 @@ about: Who, what, when, where, and how?
 Hey, stop right there!
 
 We use GitHub to track feature requests and bug reports. Please do not
-submit issues for questions about how to use features of Beat, how to
-set Beats up, best practices, or development related help.
+submit issues for questions about how to use features of the Elastic agent, how to
+set the Elastic agent up, best practices, or development related help.
 
-However, we do want to help! Head on over to our official Elastic-Agent-Inputs forums and ask
+However, we do want to help! Head on over to our official Elastic agent forums and ask
 your questions there. In additional to awesome, knowledgeable community
-contributors, core Elastic-Agent-Inputs developers are on the forums every single day to help
+contributors, core Elastic agent developers are on the forums every single day to help
 you out.
 
 The forums are here: https://discuss.elastic.co/c/elastic-stack/elastic-agent
