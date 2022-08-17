@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 	"sync"
 	"time"
@@ -27,24 +26,24 @@ import (
 
 // Publisher contains all operations required for the shipper server to publish incoming events.
 type Publisher interface {
-	io.Closer
-
-	// AcceptedIndex returns the current sequential index of the accepted events
-	AcceptedIndex() queue.EntryID
 	// PersistedIndex returns the current sequential index of the persisted events
-	PersistedIndex() queue.EntryID
-	// Publish publishes the given event and returns the current accepted index (after this event).
-	// This operation is blocking until the event is published or the target queue is closed.
-	Publish(context.Context, *messages.Event) (queue.EntryID, error)
-	// TryPublish tries to immediately publish the given event and returns the current accepted index (after this event).
-	// Returns an error if it was not possible to publish the event without blocking.
-	TryPublish(*messages.Event) (queue.EntryID, error)
+	PersistedIndex() (queue.EntryID, error)
+
+	// Publish publishes the given event and returns its index.
+	// It blocks until the event is published or the given context is canceled
+	// (or the target queue is closed).
+	Publish(ctx context.Context, event *messages.Event) (queue.EntryID, error)
+
+	// TryPublish publishes the given event and returns its index.
+	// If the event cannot be published without blocking, TryPublish returns an error.
+	TryPublish(event *messages.Event) (queue.EntryID, error)
 }
 
 // ShipperServer contains all the gRPC operations for the shipper endpoints.
 type ShipperServer interface {
+	Close() error
+
 	pb.ProducerServer
-	io.Closer
 }
 
 type shipperServer struct {
@@ -86,22 +85,10 @@ func NewShipperServer(cfg Config, publisher Publisher) (ShipperServer, error) {
 	return &s, nil
 }
 
-// GetAcceptedIndex returns the accepted index
-func (serv *shipperServer) GetAcceptedIndex() uint64 {
-	return uint64(serv.publisher.AcceptedIndex())
-}
-
-// GetPersistedIndex returns the persisted index
-func (serv *shipperServer) GetPersistedIndex() uint64 {
-	return uint64(serv.publisher.PersistedIndex())
-}
-
 // PublishEvents is the server implementation of the gRPC PublishEvents call.
 func (serv *shipperServer) PublishEvents(ctx context.Context, req *messages.PublishRequest) (*messages.PublishReply, error) {
 	resp := &messages.PublishReply{
-		Uuid:           serv.uuid,
-		AcceptedIndex:  serv.GetAcceptedIndex(),
-		PersistedIndex: serv.GetPersistedIndex(),
+		Uuid: serv.uuid,
 	}
 
 	// the value in the request is optional
@@ -111,7 +98,7 @@ func (serv *shipperServer) PublishEvents(ctx context.Context, req *messages.Publ
 	}
 
 	if len(req.Events) == 0 {
-		return resp, nil
+		return nil, status.Error(codes.InvalidArgument, "publish request must contain at least one event")
 	}
 
 	if serv.cfg.StrictMode {
@@ -124,7 +111,7 @@ func (serv *shipperServer) PublishEvents(ctx context.Context, req *messages.Publ
 	}
 
 	// we block until at least one event from the batch is published
-	_, err := serv.publisher.Publish(ctx, req.Events[0])
+	acceptedIndex, err := serv.publisher.Publish(ctx, req.Events[0])
 	if err != nil {
 		return nil, status.Error(codes.Unavailable, err.Error())
 	}
@@ -132,9 +119,10 @@ func (serv *shipperServer) PublishEvents(ctx context.Context, req *messages.Publ
 
 	// then we try to publish the rest without blocking
 	for _, e := range req.Events[1:] {
-		_, err := serv.publisher.TryPublish(e)
+		id, err := serv.publisher.TryPublish(e)
 		if err == nil {
 			resp.AcceptedCount++
+			acceptedIndex = id
 			continue
 		}
 
@@ -148,15 +136,13 @@ func (serv *shipperServer) PublishEvents(ctx context.Context, req *messages.Publ
 		break
 	}
 
-	resp.AcceptedIndex = serv.GetAcceptedIndex()
-	resp.PersistedIndex = serv.GetPersistedIndex()
+	resp.AcceptedIndex = uint64(acceptedIndex)
 
 	serv.logger.
-		Debugf("finished publishing a batch. Events = %d, accepted = %d, accepted index = %d, persisted index = %d",
+		Debugf("finished publishing a batch. Events = %d, accepted = %d, accepted index = %d",
 			len(req.Events),
 			resp.AcceptedCount,
 			resp.AcceptedIndex,
-			resp.PersistedIndex,
 		)
 
 	return resp, nil
@@ -167,10 +153,13 @@ func (serv *shipperServer) PersistedIndex(req *messages.PersistedIndexRequest, p
 	serv.logger.Debug("new subscriber for persisted index change")
 	defer serv.logger.Debug("unsubscribed from persisted index change")
 
-	persistedIndex := serv.GetPersistedIndex()
-	err := producer.Send(&messages.PersistedIndexReply{
+	persistedIndex, err := serv.publisher.PersistedIndex()
+	if err != nil {
+		return status.Error(codes.Unavailable, err.Error())
+	}
+	err = producer.Send(&messages.PersistedIndexReply{
 		Uuid:           serv.uuid,
-		PersistedIndex: persistedIndex,
+		PersistedIndex: uint64(persistedIndex),
 	})
 	if err != nil {
 		return err
@@ -194,14 +183,14 @@ func (serv *shipperServer) PersistedIndex(req *messages.PersistedIndexRequest, p
 			return fmt.Errorf("server is stopped: %w", serv.ctx.Err())
 
 		case <-ticker.C:
-			newPersistedIndex := serv.GetPersistedIndex()
-			if newPersistedIndex == persistedIndex {
+			newPersistedIndex, err := serv.publisher.PersistedIndex()
+			if err != nil || newPersistedIndex == persistedIndex {
 				continue
 			}
 			persistedIndex = newPersistedIndex
-			err := producer.Send(&messages.PersistedIndexReply{
+			err = producer.Send(&messages.PersistedIndexReply{
 				Uuid:           serv.uuid,
-				PersistedIndex: persistedIndex,
+				PersistedIndex: uint64(persistedIndex),
 			})
 			if err != nil {
 				return fmt.Errorf("failed to send the update: %w", err)

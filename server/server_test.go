@@ -329,7 +329,7 @@ func createConsumers(t *testing.T, ctx context.Context, client pb.ProducerClient
 		stop:      cancel,
 		consumers: make([]pb.Producer_PersistedIndexClient, 0, count),
 	}
-	for i := 0; i < 50; i++ {
+	for i := 0; i < count; i++ {
 		consumer, err := client.PersistedIndex(ctx, &messages.PersistedIndexRequest{
 			PollingInterval: durationpb.New(pollingInterval),
 		})
@@ -344,7 +344,6 @@ func assertIndices(t *testing.T, reply *messages.PublishReply, pir *messages.Per
 	require.NotNil(t, reply, "reply cannot be nil")
 	require.Equal(t, uint32(acceptedCount), reply.AcceptedCount, "accepted count does not match")
 	require.Equal(t, uint64(acceptedIndex), reply.AcceptedIndex, "accepted index does not match")
-	require.Equal(t, uint64(persistedIndex), reply.PersistedIndex, "persisted index does not match")
 	require.Equal(t, uint64(persistedIndex), pir.PersistedIndex, "persisted index reply does not match")
 }
 
@@ -375,18 +374,15 @@ func (l consumerList) assertConsumed(t *testing.T, value uint64) bool {
 }
 
 func (l consumerList) assertClosedServer(t *testing.T) bool {
+	result := true
 	for _, c := range l.consumers {
 		_, err := c.Recv()
-		if err == nil {
-			return false
-		}
-
-		if !strings.Contains(err.Error(), "server is stopped: context canceled") {
-			return false
+		if err == nil || !strings.Contains(err.Error(), "server is stopped: context canceled") {
+			result = false
 		}
 	}
 
-	return true
+	return result
 }
 
 type publisherMock struct {
@@ -408,10 +404,6 @@ func (p *publisherMock) TryPublish(event *messages.Event) (queue.EntryID, error)
 	return queue.EntryID(len(p.q)), nil
 }
 
-func (p *publisherMock) AcceptedIndex() queue.EntryID {
-	return queue.EntryID(len(p.q))
-}
-
-func (p *publisherMock) PersistedIndex() queue.EntryID {
-	return p.persistedIndex
+func (p *publisherMock) PersistedIndex() (queue.EntryID, error) {
+	return p.persistedIndex, nil
 }

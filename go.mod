@@ -11,7 +11,7 @@ require (
 )
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220722175030-7cb39607b349
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220810153818-dd118efed5a5
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20220804181728-b0328d2fe484
 	github.com/elastic/elastic-agent-shipper-client v0.4.0
 	github.com/elastic/go-ucfg v0.8.6
@@ -28,7 +28,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/elastic/go-licenser v0.4.1 // indirect
-	github.com/elastic/go-structform v0.0.9 // indirect
+	github.com/elastic/go-structform v0.0.10 // indirect
 	github.com/elastic/go-sysinfo v1.8.1 // indirect
 	github.com/elastic/go-windows v1.0.1 // indirect
 	github.com/fatih/color v1.13.0 // indirect
