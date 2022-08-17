@@ -33,7 +33,7 @@ used by Beats like Filebeat and Metricbeat when they are started by Elastic agen
 Data shipper support in the Elastic Agent is under active development. The shipper currently depends on a running Elastic agent instance to
 start but it will soon be possible to run the shipper in standalone mode for development: https://github.com/elastic/elastic-agent-shipper/issues/83
 
-The [reference shipper configuration file](https://github.com/elastic/elastic-agent-shipper/blob/main/elastic-agent-shipper.yml) defines the avilable
+The [reference shipper configuration file](https://github.com/elastic/elastic-agent-shipper/blob/main/elastic-agent-shipper.yml) defines the available
 configuration options.
 
 ## Contributing
