@@ -5,21 +5,27 @@
 package common
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
+	"strings"
 
 	"io"
 	"os"
 	"os/exec"
 
 	"github.com/magefile/mage/mg"
+	"github.com/magefile/mage/sh"
 	"github.com/pkg/errors"
 )
 
-func GoUnitTest(ctx context.Context) error {
+func GoUnitTest(ctx context.Context, testCoverage bool) error {
 	mg.Deps(InstallGoTestTools)
 
 	fmt.Println(">> go test:", "Unit Testing") //nolint:forbidigo // just for tests
+	var testArgs []string
 
 	gotestsumArgs := []string{"--no-color"}
 	if mg.Verbose() {
@@ -34,7 +40,15 @@ func GoUnitTest(ctx context.Context) error {
 	CreateDir(fileName + ".out")
 	gotestsumArgs = append(gotestsumArgs, "--jsonfile", fileName+".out"+".json")
 
-	var testArgs []string
+	covFile := fileName + ".cov"
+	if testCoverage {
+		CreateDir(covFile)
+		covFile = CreateDir(filepath.Clean(covFile))
+		testArgs = append(testArgs,
+			"-covermode=atomic",
+			"-coverprofile="+covFile,
+		)
+	}
 
 	testArgs = append(testArgs, []string{"./..."}...)
 
@@ -66,6 +80,54 @@ func GoUnitTest(ctx context.Context) error {
 		goTestErr = exitErr
 	}
 
+	// Generate a HTML code coverage report.
+	var htmlCoverReport string
+	if testCoverage {
+		htmlCoverReport = strings.TrimSuffix(covFile,
+			filepath.Ext(covFile)) + ".html"
+		coverToHTML := sh.RunCmd("go", "tool", "cover",
+			"-html="+covFile,
+			"-o", htmlCoverReport)
+		if err = coverToHTML(); err != nil {
+			return errors.Wrap(err, "failed to write HTML code coverage report")
+		}
+	}
+
+	// Generate an XML code coverage report.
+	var codecovReport string
+	if testCoverage {
+		fmt.Println(">> go run gocover-cobertura:", covFile, "Started")
+
+		// execute gocover-cobertura in order to create cobertura report
+		// install pre-requisites
+		installCobertura := sh.RunCmd("go", "install", "github.com/boumenot/gocover-cobertura@latest")
+		if err = installCobertura(); err != nil {
+			return errors.Wrap(err, "failed to install gocover-cobertura")
+		}
+
+		codecovReport = strings.TrimSuffix(covFile,
+			filepath.Ext(covFile)) + "-cov.xml"
+
+		coverage, err := ioutil.ReadFile(covFile)
+		if err != nil {
+			return errors.Wrap(err, "failed to read code coverage report")
+		}
+
+		coberturaFile, err := os.Create(codecovReport)
+		if err != nil {
+			return err
+		}
+		defer coberturaFile.Close()
+
+		coverToXML := exec.Command("gocover-cobertura")
+		coverToXML.Stdout = coberturaFile
+		coverToXML.Stderr = os.Stderr
+		coverToXML.Stdin = bytes.NewReader(coverage)
+		if err = coverToXML.Run(); err != nil {
+			return errors.Wrap(err, "failed to write XML code coverage report")
+		}
+		fmt.Println(">> go run gocover-cobertura:", covFile, "Created")
+	}
 	// Return an error indicating that testing failed.
 	if goTestErr != nil {
 		fmt.Println(">> go test:", "Unit Tests : Test Failed") //nolint:forbidigo // just for tests

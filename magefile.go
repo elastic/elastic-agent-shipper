@@ -19,6 +19,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent-shipper/dev-tools/common"
 	"github.com/elastic/elastic-agent-shipper/tools"
+	"github.com/pkg/errors"
 
 	//mage:import
 
@@ -59,13 +60,13 @@ func (Build) Clean(test string) {
 func (Build) CheckBinaries() error {
 	path := filepath.Join("build", "binaries")
 	for _, platform := range devtools.PlatformFiles {
-		var execName = "elastic-agent-shipper"
+		var execName = devtools.ProjectName
 		if strings.Contains(platform, "windows") {
 			execName += ".exe"
 		}
-		binary := filepath.Join(path, fmt.Sprintf("%s-%s-%s", "elastic-agent-shipper", tools.DefaultBeatVersion, platform), execName)
-		if _, err := os.Stat(binary); os.IsNotExist(err) {
-			return err
+		binary := filepath.Join(path, fmt.Sprintf("%s-%s-%s", devtools.ProjectName, tools.DefaultBeatVersion, platform), execName)
+		if _, err := os.Stat(binary); err != nil {
+			return errors.Wrap(err, "Build: binary check failed")
 		}
 	}
 
@@ -86,13 +87,19 @@ func InstallGoReleaser() error {
 func (Build) Binary() error {
 	InstallGoReleaser()
 
-	args := []string{"build", "--rm-dist", "--skip-validate"}
+	args := []string{"build", "--rm-dist", "--skip-validate", "--debug"}
 
 	// Environment variable
-	version := tools.DefaultBeatVersion
 	env := map[string]string{
-		"CGO_ENABLED": devtools.EnvOrDefault("CGO_ENABLED", "0"),
-		"DEV":         devtools.EnvOrDefault("DEV", "false"),
+		"CGO_ENABLED":     devtools.EnvOrDefault("CGO_ENABLED", "0"),
+		"DEV":             devtools.EnvOrDefault("DEV", "false"),
+		"DEFAULT_VERSION": tools.DefaultBeatVersion,
+	}
+
+	versionQualifier, versionQualified := os.LookupEnv("VERSION_QUALIFIER")
+	if versionQualified {
+		env["VERSION_QUALIFIER"] = versionQualifier
+		env["DEFAULT_VERSION"] += fmt.Sprintf("-%s", versionQualifier)
 	}
 
 	if snapshotEnv := os.Getenv("SNAPSHOT"); snapshotEnv != "" {
@@ -102,10 +109,9 @@ func (Build) Binary() error {
 		}
 		if isSnapshot {
 			args = append(args, "--snapshot")
-			version += "-SNAPSHOT"
+			env["DEFAULT_VERSION"] += fmt.Sprintf("-%s", "SNAPSHOT")
 		}
 	}
-	env["DEFAULT_VERSION"] = version
 
 	platforms := os.Getenv("PLATFORM")
 	switch platforms {
@@ -116,6 +122,9 @@ func (Build) Binary() error {
 		arch := strings.Split(platforms, "/")[1]
 		env["GOOS"] = goos
 		env["GOARCH"] = arch
+		if platforms != "linux/386" {
+			goos = platforms
+		}
 		args = append(args, "--id", goos, "--single-target")
 	case "all":
 	default:
@@ -144,8 +153,9 @@ func (Test) Integration(ctx context.Context) error {
 
 // Unit runs all the unit tests (use alias `mage unitTest`).
 func (Test) Unit(ctx context.Context) error {
+	testCoverage := devtools.BoolEnvOrFalse("TEST_COVERAGE")
 	//mg.Deps(Build.Binary, Build.TestBinaries)
-	return devtools.GoUnitTest(ctx)
+	return devtools.GoUnitTest(ctx, testCoverage)
 }
 
 //CHECKS

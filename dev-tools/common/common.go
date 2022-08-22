@@ -20,6 +20,8 @@ import (
 	"github.com/elastic/elastic-agent-libs/dev-tools/mage/gotool"
 )
 
+const ProjectName = "elastic-agent-shipper"
+
 var PlatformFiles = []string{"darwin-aarch64", "darwin-x86_64", "linux-arm64", "linux-x86_64", "linux-x86", "windows-x86_64", "windows-x86"}
 
 // CreateDir creates the parent directory for the given file.
@@ -62,4 +64,15 @@ func EnvOrDefault(buildEnv string, defaultValue string) string {
 		return strconv.FormatBool(boolVal)
 	}
 	return defaultValue
+}
+
+func BoolEnvOrFalse(buildEnv string) bool {
+	if val := os.Getenv(buildEnv); val != "" {
+		boolVal, err := strconv.ParseBool(val)
+		if err != nil {
+			return false
+		}
+		return boolVal
+	}
+	return false
 }
