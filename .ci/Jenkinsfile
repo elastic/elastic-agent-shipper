@@ -38,8 +38,6 @@ pipeline {
         stash allowEmpty: true, name: 'source', useDefaultExcludes: false
         dir("${BASE_DIR}"){
           setEnvVar('GO_VERSION', readFile(".go-version").trim())
-          // TODO: get the version for this project
-          setEnvVar('VERSION', sh(label: 'Get version', script: 'make get-version', returnStdout: true)?.trim())
         }
         setEnvVar('IS_BRANCH_AVAILABLE', isBranchUnifiedReleaseAvailable(env.BRANCH_NAME))
       }
@@ -49,6 +47,7 @@ pipeline {
         withGithubNotify(context: "Check") {
           withMageEnv(version: "${env.GO_VERSION}"){
             dir("${BASE_DIR}"){
+              setEnvVar('VERSION', sh(label: 'Get version', script: 'mage version', returnStdout: true)?.trim())
               cmd(label: 'mage notice', script: 'mage -v notice')
               cmd(label: 'mage check', script: 'mage -v check')
             }

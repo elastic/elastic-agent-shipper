@@ -215,3 +215,8 @@ func Notice() error {
 	// See https://github.com/golang/go/issues/43994#issuecomment-770053099
 	return gotool.Mod.Tidy()
 }
+
+// Version returns the default beat version
+func Version() {
+	fmt.Println(tools.DefaultBeatVersion)
+}
