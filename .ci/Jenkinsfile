@@ -67,9 +67,6 @@ pipeline {
         }
         stages {
           stage('Build'){
-            environment {
-              SNAPSHOT = 'true'
-            }
             steps {
               withGithubNotify(context: "Build-${PLATFORM}") {
                 whenTrue(isUnix()) {
@@ -101,8 +98,16 @@ pipeline {
             }
           }
           stage('Publish Snapshot') {
+            environment {
+              SNAPSHOT = 'true'
+            }
             steps {
               withGithubNotify(context: "Publish-${PLATFORM}") {
+                dir("${BASE_DIR}"){
+                  withMageEnv(version: "${env.GO_VERSION}"){
+                    cmd(label: 'Go build', script: 'mage -v build:all')
+                  }
+                }
                 publishArtifacts(type: 'snapshot')
               }
             }
@@ -120,7 +125,7 @@ pipeline {
                 unstash 'source'
                 dir("${BASE_DIR}"){
                   withMageEnv(version: "${env.GO_VERSION}"){
-                    cmd(label: 'Go build', script: 'mage -v build')
+                    cmd(label: 'Go build', script: 'mage -v build:all')
                   }
                 }
                 publishArtifacts(type: 'staging')
