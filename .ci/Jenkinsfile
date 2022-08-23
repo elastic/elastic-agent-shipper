@@ -102,7 +102,7 @@ pipeline {
               SNAPSHOT = 'true'
             }
             steps {
-              withGithubNotify(context: "Publish-${PLATFORM}") {
+              withGithubNotify(context: "Publish-Snapshot-${PLATFORM}") {
                 dir("${BASE_DIR}"){
                   withMageEnv(version: "${env.GO_VERSION}"){
                     cmd(label: 'Go build', script: 'mage -v build:all')
@@ -113,12 +113,20 @@ pipeline {
             }
           }
           stage('Publish Release') {
-            when { not { branch 'main' } }
+            when {
+              allOf {
+                // The Unified Release process keeps moving branches as soon as a new
+                // minor version is created, therefore old release branches won't be able
+                // to use the release manager as their definition is removed.
+                expression { return env.IS_BRANCH_AVAILABLE == "true" }
+                not { branch 'main' }
+              }
+            }
             environment {
               SNAPSHOT = 'false'
             }
             steps {
-              withGithubNotify(context: "Package-${PLATFORM}") {
+              withGithubNotify(context: "Publish-Release-${PLATFORM}") {
                 whenTrue(isUnix()) {
                   deleteDir()
                 }
