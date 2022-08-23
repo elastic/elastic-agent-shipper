@@ -96,7 +96,7 @@ func GoUnitTest(ctx context.Context, testCoverage bool) error {
 	// Generate an XML code coverage report.
 	var codecovReport string
 	if testCoverage {
-		fmt.Println(">> go run gocover-cobertura:", covFile, "Started")
+		fmt.Println(">> go run gocover-cobertura:", covFile, "Started") //nolint:forbidigo // just for tests
 
 		// execute gocover-cobertura in order to create cobertura report
 		// install pre-requisites
@@ -126,7 +126,7 @@ func GoUnitTest(ctx context.Context, testCoverage bool) error {
 		if err = coverToXML.Run(); err != nil {
 			return errors.Wrap(err, "failed to write XML code coverage report")
 		}
-		fmt.Println(">> go run gocover-cobertura:", covFile, "Created")
+		fmt.Println(">> go run gocover-cobertura:", covFile, "Created") //nolint:forbidigo // just for tests
 	}
 	// Return an error indicating that testing failed.
 	if goTestErr != nil {
