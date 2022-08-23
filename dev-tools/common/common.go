@@ -22,7 +22,19 @@ import (
 
 const ProjectName = "elastic-agent-shipper"
 
-var PlatformFiles = []string{"darwin-aarch64", "darwin-x86_64", "linux-arm64", "linux-x86_64", "linux-x86", "windows-x86_64", "windows-x86"}
+var PlatformFiles = map[string][]string{
+	"windows":       {"windows-x86_64", "windows-x86"},
+	"linux":         {"linux-arm64", "linux-x86_64", "linux-x86"},
+	"darwin":        {"darwin-aarch64", "darwin-x86_64"},
+	"darwin/amd64":  {"darwin-x86_64"},
+	"darwin/arm64":  {"darwin-aarch64"},
+	"linux/386":     {"linux-x86"},
+	"linux/amd64":   {"linux-x86_64"},
+	"linux/arm64":   {"linux-arm64"},
+	"windows/386":   {"windows-x86"},
+	"windows/amd64": {"windows-x86_64"},
+	"all":           {"darwin-aarch64", "darwin-x86_64", "linux-arm64", "linux-x86_64", "linux-x86", "windows-x86_64", "windows-x86"},
+}
 
 // CreateDir creates the parent directory for the given file.
 func CreateDir(file string) string {

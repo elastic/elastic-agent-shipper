@@ -34,7 +34,7 @@ func GoUnitTest(ctx context.Context, testCoverage bool) error {
 		gotestsumArgs = append(gotestsumArgs, "-f", "standard-quiet")
 	}
 	//create report files
-	fileName := "build/TEST-go-unit"
+	fileName := filepath.Join("build", "TEST-go-unit")
 	CreateDir(fileName + ".xml")
 	gotestsumArgs = append(gotestsumArgs, "--junitfile", fileName+".xml")
 	CreateDir(fileName + ".out")

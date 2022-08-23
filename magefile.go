@@ -56,23 +56,6 @@ func (Build) Clean(test string) {
 	os.RemoveAll("build") // nolint:errcheck //not required
 }
 
-// CheckBinaries checks if the binaries are generated (for now).
-func (Build) CheckBinaries() error {
-	path := filepath.Join("build", "binaries")
-	for _, platform := range devtools.PlatformFiles {
-		var execName = devtools.ProjectName
-		if strings.Contains(platform, "windows") {
-			execName += ".exe"
-		}
-		binary := filepath.Join(path, fmt.Sprintf("%s-%s-%s", devtools.ProjectName, tools.DefaultBeatVersion, platform), execName)
-		if _, err := os.Stat(binary); err != nil {
-			return errors.Wrap(err, "Build: binary check failed")
-		}
-	}
-
-	return nil
-}
-
 // InstallGoReleaser target installs goreleaser
 func InstallGoReleaser() error {
 	return gotool.Install(
@@ -88,7 +71,6 @@ func (Build) Binary() error {
 	InstallGoReleaser()
 
 	args := []string{"build", "--rm-dist", "--skip-validate"}
-
 	// Environment variable
 	env := map[string]string{
 		"CGO_ENABLED":     devtools.EnvOrDefault("CGO_ENABLED", "0"),
@@ -113,27 +95,33 @@ func (Build) Binary() error {
 		}
 	}
 
-	platforms := os.Getenv("PLATFORM")
-	switch platforms {
+	platform := os.Getenv("PLATFORM")
+	if platform != "" && devtools.PlatformFiles[platform] == nil {
+		return errors.New("Platform not recognized, only supported options: all, darwin, linux, windows, darwin/amd64, darwin/arm64, linux/386, linux/amd64, linux/arm64, windows/386, windows/amd64")
+	}
+	switch platform {
 	case "windows", "linux", "darwin":
-		args = append(args, "--id", platforms)
+		args = append(args, "--id", platform)
 	case "darwin/amd64", "darwin/arm64", "linux/386", "linux/amd64", "linux/arm64", "windows/386", "windows/amd64":
-		goos := strings.Split(platforms, "/")[0]
-		arch := strings.Split(platforms, "/")[1]
+		goos := strings.Split(platform, "/")[0]
+		arch := strings.Split(platform, "/")[1]
 		env["GOOS"] = goos
 		env["GOARCH"] = arch
-		if platforms != "linux/386" {
-			goos = platforms
-		}
 		args = append(args, "--id", goos, "--single-target")
 	case "all":
 	default:
 		goos := runtime.GOOS
+		goarch := runtime.GOARCH
+		platform = goos + "/" + goarch
 		args = append(args, "--id", goos, "--single-target")
 	}
-	fmt.Println(">> build: Building binary for", platforms) //nolint:forbidigo // it's ok to use fmt.println in mage
-	sh.RunWithV(env, "goreleaser", args...)
-	return nil
+	fmt.Println(">> build: Building binary for", platform) //nolint:forbidigo // it's ok to use fmt.println in mage
+	err := sh.RunWithV(env, "goreleaser", args...)
+	if err != nil {
+		return errors.Wrapf(err, "Build failed on %s", platform)
+	}
+	return CheckBinaries(platform, env["DEFAULT_VERSION"])
+
 }
 
 // TEST
@@ -181,7 +169,28 @@ func CheckLicense() error {
 	)
 }
 
-// License should generate the license headers
+// CheckBinaries checks if the binaries are generated (for now).
+func CheckBinaries(platform string, version string) error {
+	path := filepath.Join("build", "binaries")
+	selectedPlatformFiles := devtools.PlatformFiles[platform]
+	if selectedPlatformFiles == nil {
+		return errors.New("No selected platform files found")
+	}
+	for _, platform := range selectedPlatformFiles {
+		var execName = devtools.ProjectName
+		if strings.Contains(platform, "windows") {
+			execName += ".exe"
+		}
+		binary := filepath.Join(path, fmt.Sprintf("%s-%s-%s", devtools.ProjectName, version, platform), execName)
+		if _, err := os.Stat(binary); err != nil {
+			return errors.Wrap(err, "Build: binary check failed")
+		}
+	}
+
+	return nil
+}
+
+// License generates the license headers or returns an error
 func License() error {
 	mg.Deps(mage.InstallGoLicenser)
 	return gotool.Licenser(
