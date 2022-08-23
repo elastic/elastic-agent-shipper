@@ -12,9 +12,8 @@ pipeline {
     DRA_OUTPUT = 'release-manager.out'
     SLACK_CHANNEL = '#elastic-agent-control-plane'        // TODO: what slack channel
     NOTIFY_TO = 'fleet-server+build-package@elastic.co'   // TODO: what dist liist?
-
     JOB_GCS_BUCKET = credentials('gcs-bucket')
-    JOB_GCS_CREDENTIALS = 'beats-ci-gcs-plugin'
+    JOB_GCS_CREDENTIALS = 'fleet-ci-gcs-plugin'
   }
   options {
     timeout(time: 1, unit: 'HOURS')
