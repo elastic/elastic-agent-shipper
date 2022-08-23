@@ -9,6 +9,13 @@ import (
 	"os"
 
 	"github.com/elastic/elastic-agent-shipper/cmd"
+	"github.com/elastic/elastic-agent-shipper/tools"
+)
+
+var (
+	Version   string = tools.DefaultBeatVersion
+	Commit    string
+	BuildTime string
 )
 
 func main() {

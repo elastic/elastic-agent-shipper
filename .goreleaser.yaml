@@ -1,0 +1,66 @@
+# Make sure to check the documentation at https://goreleaser.com
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+builds:
+  - id: darwin
+    binary: '{{ .ProjectName }}-{{ .Env.DEFAULT_VERSION }}-{{ .Os }}-{{ if eq .Arch "amd64" }}x86_64{{ end }}{{ if eq .Arch "arm64" }}aarch64{{ end }}/{{ .ProjectName }}'
+    goos:
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -buildmode=pie
+    ldflags:
+      - '{{ if eq .Env.DEV "false" }}-s -w{{ end }}'
+      - -X main.Version={{ .Env.DEFAULT_VERSION }} -X main.Commit={{.Commit}} -X main.BuildTime={{.Date}}
+    gcflags:
+      - '{{ if eq .Env.DEV "true" }}all=-N -l{{ end }}'
+    no_unique_dist_dir: true
+  - id: linux
+    binary: '{{ .ProjectName }}-{{ .Env.DEFAULT_VERSION }}-{{ .Os }}-{{ if eq .Arch "amd64" }}x86_64{{ end }}{{ if eq .Arch "386" }}x86{{ end }}{{ if eq .Arch "arm64" }}{{ .Arch }}{{ end }}/{{ .ProjectName }}'
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+      - 386
+    no_unique_dist_dir: true
+    ldflags:
+      - '{{ if eq .Env.DEV "false" }}-s -w{{end}}'
+      - -X main.Version={{ .Env.DEFAULT_VERSION }} -X main.Commit={{.Commit}} -X main.BuildTime={{.Date}}
+    gcflags:
+      - '{{ if eq .Env.DEV "true" }}all=-N -l{{ end }}'
+    overrides:
+      - goos: linux
+        goarch: amd64
+        goarm: ''
+        gomips: ''
+        flags:
+          - -buildmode=pie
+      - goos: linux
+        goarch: arm64
+        goarm: ''
+        gomips: ''
+        flags:
+          - -buildmode=pie
+  - id: windows
+    binary: '{{ .ProjectName }}-{{ .Env.DEFAULT_VERSION }}-{{ .Os }}-{{ if eq .Arch "amd64" }}x86_64{{ end }}{{ if eq .Arch "386" }}x86{{ end }}/{{ .ProjectName }}'
+    goos:
+      - windows
+    goarch:
+      - amd64
+      - 386
+    no_unique_dist_dir: true
+    flags:
+      - -buildmode=pie
+    ldflags:
+      - '{{ if eq .Env.DEV "false" }}-s -w{{ end }}'
+      - -X main.Version={{ .Env.DEFAULT_VERSION }} -X main.Commit={{.Commit}} -X main.BuildTime={{.Date}}
+    gcflags:
+      - '{{ if eq .Env.DEV "true" }}all=-N -l{{ end }}'
+changelog:
+  skip: true
+dist: build/binaries

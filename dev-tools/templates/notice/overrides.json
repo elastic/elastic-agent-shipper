@@ -22,4 +22,3 @@
 {"name": "github.com/elastic/e2e-testing", "licenceType": "Elastic"}
 {"name": "github.com/elastic/elastic-agent-shipper-client", "licenceType": "Elastic"}
 {"name": "github.com/awslabs/kinesis-aggregation/go/v2", "licenceType": "Apache-2.0", "url": "https://github.com/awslabs/kinesis-aggregation/blob/master/LICENSE.txt"}
-
