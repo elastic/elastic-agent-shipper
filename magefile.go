@@ -47,7 +47,7 @@ type Build mg.Namespace
 
 // All builds binaries for the all os/arch.
 func (Build) All() {
-	os.Setenv("PLATFORM", "all")
+	os.Setenv("PLATFORMS", "all")
 	mg.Deps(Build.Binary)
 }
 
@@ -64,7 +64,7 @@ func InstallGoReleaser() error {
 }
 
 // Binary will create the project binaries found in /build/binaries (use `mage build`)
-// ENV PLATFORM = all, darwin, linux, windows, darwin/amd64, darwin/arm64, linux/386, linux/amd64, linux/arm64, windows/386, windows/amd64
+// ENV PLATFORMS = all, darwin, linux, windows, darwin/amd64, darwin/arm64, linux/386, linux/amd64, linux/arm64, windows/386, windows/amd64
 // ENV SNAPSHOT = true/false
 // ENV DEV = true/false
 func (Build) Binary() error {
@@ -95,7 +95,7 @@ func (Build) Binary() error {
 		}
 	}
 
-	platform := os.Getenv("PLATFORM")
+	platform := os.Getenv("PLATFORMS")
 	if platform != "" && devtools.PlatformFiles[platform] == nil {
 		return errors.Errorf("Platform %s not recognized, only supported options: all, darwin, linux, windows, darwin/amd64, darwin/arm64, linux/386, linux/amd64, linux/arm64, windows/386, windows/amd64", platform)
 	}
