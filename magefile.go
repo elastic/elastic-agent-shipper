@@ -2,8 +2,8 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build mage
-// +build mage
+///go:build mage
+/// +build mage
 
 package main
 
@@ -97,7 +97,7 @@ func (Build) Binary() error {
 
 	platform := os.Getenv("PLATFORM")
 	if platform != "" && devtools.PlatformFiles[platform] == nil {
-		return errors.New("Platform not recognized, only supported options: all, darwin, linux, windows, darwin/amd64, darwin/arm64, linux/386, linux/amd64, linux/arm64, windows/386, windows/amd64")
+		return errors.Errorf("Platform %s not recognized, only supported options: all, darwin, linux, windows, darwin/amd64, darwin/arm64, linux/386, linux/amd64, linux/arm64, windows/386, windows/amd64", platform)
 	}
 	switch platform {
 	case "windows", "linux", "darwin":
