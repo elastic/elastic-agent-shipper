@@ -8,7 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,20 +26,24 @@ import (
 
 // Publisher contains all operations required for the shipper server to publish incoming events.
 type Publisher interface {
-	io.Closer
-
-	// AcceptedIndex returns the current sequential index of the accepted events
-	AcceptedIndex() queue.EntryID
 	// PersistedIndex returns the current sequential index of the persisted events
-	PersistedIndex() queue.EntryID
-	// Publish publishes the given event and returns the current accepted index (after this event)
-	Publish(*messages.Event) (queue.EntryID, error)
+	PersistedIndex() (queue.EntryID, error)
+
+	// Publish publishes the given event and returns its index.
+	// It blocks until the event is published or the given context is canceled
+	// (or the target queue is closed).
+	Publish(ctx context.Context, event *messages.Event) (queue.EntryID, error)
+
+	// TryPublish publishes the given event and returns its index.
+	// If the event cannot be published without blocking, TryPublish returns an error.
+	TryPublish(event *messages.Event) (queue.EntryID, error)
 }
 
 // ShipperServer contains all the gRPC operations for the shipper endpoints.
 type ShipperServer interface {
+	Close() error
+
 	pb.ProducerServer
-	io.Closer
 }
 
 type shipperServer struct {
@@ -52,11 +56,13 @@ type shipperServer struct {
 	ctx   context.Context
 	stop  func()
 
+	cfg Config
+
 	pb.UnimplementedProducerServer
 }
 
 // NewShipperServer creates a new server instance for handling gRPC endpoints.
-func NewShipperServer(publisher Publisher) (ShipperServer, error) {
+func NewShipperServer(cfg Config, publisher Publisher) (ShipperServer, error) {
 	if publisher == nil {
 		return nil, errors.New("publisher cannot be nil")
 	}
@@ -71,6 +77,7 @@ func NewShipperServer(publisher Publisher) (ShipperServer, error) {
 		logger:    logp.NewLogger("shipper-server"),
 		publisher: publisher,
 		close:     &sync.Once{},
+		cfg:       cfg,
 	}
 
 	s.ctx, s.stop = context.WithCancel(context.Background())
@@ -78,35 +85,44 @@ func NewShipperServer(publisher Publisher) (ShipperServer, error) {
 	return &s, nil
 }
 
-// GetAcceptedIndex returns the accepted index
-func (serv *shipperServer) GetAcceptedIndex() uint64 {
-	return uint64(serv.publisher.AcceptedIndex())
-}
-
-// GetPersistedIndex returns the persisted index
-func (serv *shipperServer) GetPersistedIndex() uint64 {
-	return uint64(serv.publisher.PersistedIndex())
-}
-
 // PublishEvents is the server implementation of the gRPC PublishEvents call.
-func (serv *shipperServer) PublishEvents(_ context.Context, req *messages.PublishRequest) (*messages.PublishReply, error) {
+func (serv *shipperServer) PublishEvents(ctx context.Context, req *messages.PublishRequest) (*messages.PublishReply, error) {
 	resp := &messages.PublishReply{
 		Uuid: serv.uuid,
 	}
 
 	// the value in the request is optional
 	if req.Uuid != "" && req.Uuid != serv.uuid {
-		resp.AcceptedIndex = serv.GetAcceptedIndex()
-		resp.PersistedIndex = serv.GetPersistedIndex()
 		serv.logger.Debugf("shipper UUID does not match, all events rejected. Expected = %s, actual = %s", serv.uuid, req.Uuid)
-
 		return resp, status.Error(codes.FailedPrecondition, fmt.Sprintf("UUID does not match. Expected = %s, actual = %s", serv.uuid, req.Uuid))
 	}
 
-	for _, e := range req.Events {
-		_, err := serv.publisher.Publish(e)
+	if len(req.Events) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "publish request must contain at least one event")
+	}
+
+	if serv.cfg.StrictMode {
+		for _, e := range req.Events {
+			err := serv.validateEvent(e)
+			if err != nil {
+				return nil, status.Error(codes.InvalidArgument, err.Error())
+			}
+		}
+	}
+
+	// we block until at least one event from the batch is published
+	acceptedIndex, err := serv.publisher.Publish(ctx, req.Events[0])
+	if err != nil {
+		return nil, status.Error(codes.Unavailable, err.Error())
+	}
+	resp.AcceptedCount++
+
+	// then we try to publish the rest without blocking
+	for _, e := range req.Events[1:] {
+		id, err := serv.publisher.TryPublish(e)
 		if err == nil {
 			resp.AcceptedCount++
+			acceptedIndex = id
 			continue
 		}
 
@@ -120,15 +136,13 @@ func (serv *shipperServer) PublishEvents(_ context.Context, req *messages.Publis
 		break
 	}
 
-	resp.AcceptedIndex = serv.GetAcceptedIndex()
-	resp.PersistedIndex = serv.GetPersistedIndex()
+	resp.AcceptedIndex = uint64(acceptedIndex)
 
 	serv.logger.
-		Debugf("finished publishing a batch. Events = %d, accepted = %d, accepted index = %d, persisted index = %d",
+		Debugf("finished publishing a batch. Events = %d, accepted = %d, accepted index = %d",
 			len(req.Events),
 			resp.AcceptedCount,
 			resp.AcceptedIndex,
-			resp.PersistedIndex,
 		)
 
 	return resp, nil
@@ -139,10 +153,13 @@ func (serv *shipperServer) PersistedIndex(req *messages.PersistedIndexRequest, p
 	serv.logger.Debug("new subscriber for persisted index change")
 	defer serv.logger.Debug("unsubscribed from persisted index change")
 
-	persistedIndex := serv.GetPersistedIndex()
-	err := producer.Send(&messages.PersistedIndexReply{
+	persistedIndex, err := serv.publisher.PersistedIndex()
+	if err != nil {
+		return status.Error(codes.Unavailable, err.Error())
+	}
+	err = producer.Send(&messages.PersistedIndexReply{
 		Uuid:           serv.uuid,
-		PersistedIndex: persistedIndex,
+		PersistedIndex: uint64(persistedIndex),
 	})
 	if err != nil {
 		return err
@@ -166,14 +183,14 @@ func (serv *shipperServer) PersistedIndex(req *messages.PersistedIndexRequest, p
 			return fmt.Errorf("server is stopped: %w", serv.ctx.Err())
 
 		case <-ticker.C:
-			newPersistedIndex := serv.GetPersistedIndex()
-			if newPersistedIndex == persistedIndex {
+			newPersistedIndex, err := serv.publisher.PersistedIndex()
+			if err != nil || newPersistedIndex == persistedIndex {
 				continue
 			}
 			persistedIndex = newPersistedIndex
-			err := producer.Send(&messages.PersistedIndexReply{
+			err = producer.Send(&messages.PersistedIndexReply{
 				Uuid:           serv.uuid,
-				PersistedIndex: persistedIndex,
+				PersistedIndex: uint64(persistedIndex),
 			})
 			if err != nil {
 				return fmt.Errorf("failed to send the update: %w", err)
@@ -189,4 +206,66 @@ func (serv *shipperServer) Close() error {
 	})
 
 	return nil
+}
+
+func (serv *shipperServer) validateEvent(m *messages.Event) error {
+	var msgs []string
+
+	if err := m.Timestamp.CheckValid(); err != nil {
+		msgs = append(msgs, fmt.Sprintf("timestamp: %s", err))
+	}
+
+	if err := serv.validateDataStream(m.DataStream); err != nil {
+		msgs = append(msgs, fmt.Sprintf("datastream: %s", err))
+	}
+
+	if err := serv.validateSource(m.Source); err != nil {
+		msgs = append(msgs, fmt.Sprintf("source: %s", err))
+	}
+
+	if len(msgs) == 0 {
+		return nil
+	}
+
+	return errors.New(strings.Join(msgs, "; "))
+}
+
+func (serv *shipperServer) validateSource(s *messages.Source) error {
+	if s == nil {
+		return fmt.Errorf("cannot be nil")
+	}
+
+	var msgs []string
+	if s.InputId == "" {
+		msgs = append(msgs, "input_id is a required field")
+	}
+
+	if len(msgs) == 0 {
+		return nil
+	}
+
+	return errors.New(strings.Join(msgs, "; "))
+}
+
+func (serv *shipperServer) validateDataStream(ds *messages.DataStream) error {
+	if ds == nil {
+		return fmt.Errorf("cannot be nil")
+	}
+
+	var msgs []string
+	if ds.Dataset == "" {
+		msgs = append(msgs, "dataset is a required field")
+	}
+	if ds.Namespace == "" {
+		msgs = append(msgs, "namespace is a required field")
+	}
+	if ds.Type == "" {
+		msgs = append(msgs, "type is a required field")
+	}
+
+	if len(msgs) == 0 {
+		return nil
+	}
+
+	return errors.New(strings.Join(msgs, "; "))
 }

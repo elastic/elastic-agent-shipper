@@ -18,7 +18,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -54,19 +56,14 @@ func TestPublish(t *testing.T) {
 	publisher := &publisherMock{
 		persistedIndex: 42,
 	}
-	shipper, err := NewShipperServer(publisher)
+	shipper, err := NewShipperServer(DefaultConfig(), publisher)
 	defer func() { _ = shipper.Close() }()
 	require.NoError(t, err)
 	client, stop := startServer(t, ctx, shipper)
 	defer stop()
 
 	// get the current UUID
-	pirCtx, cancel := context.WithCancel(ctx)
-	consumer, err := client.PersistedIndex(pirCtx, &messages.PersistedIndexRequest{})
-	require.NoError(t, err)
-	pir, err := consumer.Recv()
-	require.NoError(t, err)
-	cancel() // close the stream
+	pir := getPersistedIndex(t, ctx, client)
 
 	t.Run("should successfully publish a batch", func(t *testing.T) {
 		publisher.q = make([]*messages.Event, 0, 3)
@@ -76,9 +73,7 @@ func TestPublish(t *testing.T) {
 			Events: events,
 		})
 		require.NoError(t, err)
-		require.Equal(t, uint32(len(events)), reply.AcceptedCount)
-		require.Equal(t, uint64(len(events)), reply.AcceptedIndex)
-		require.Equal(t, uint64(publisher.persistedIndex), pir.PersistedIndex)
+		assertIndices(t, reply, pir, len(events), len(events), int(publisher.persistedIndex))
 	})
 
 	t.Run("should grow accepted index", func(t *testing.T) {
@@ -89,25 +84,19 @@ func TestPublish(t *testing.T) {
 			Events: events,
 		})
 		require.NoError(t, err)
-		require.Equal(t, uint32(len(events)), reply.AcceptedCount)
-		require.Equal(t, uint64(1), reply.AcceptedIndex)
-		require.Equal(t, uint64(publisher.persistedIndex), pir.PersistedIndex)
+		assertIndices(t, reply, pir, len(events), 1, int(publisher.persistedIndex))
 		reply, err = client.PublishEvents(ctx, &messages.PublishRequest{
 			Uuid:   pir.Uuid,
 			Events: events,
 		})
 		require.NoError(t, err)
-		require.Equal(t, uint32(len(events)), reply.AcceptedCount)
-		require.Equal(t, uint64(2), reply.AcceptedIndex)
-		require.Equal(t, uint64(publisher.persistedIndex), pir.PersistedIndex)
+		assertIndices(t, reply, pir, len(events), 2, int(publisher.persistedIndex))
 		reply, err = client.PublishEvents(ctx, &messages.PublishRequest{
 			Uuid:   pir.Uuid,
 			Events: events,
 		})
 		require.NoError(t, err)
-		require.Equal(t, uint32(len(events)), reply.AcceptedCount)
-		require.Equal(t, uint64(3), reply.AcceptedIndex)
-		require.Equal(t, uint64(publisher.persistedIndex), pir.PersistedIndex)
+		assertIndices(t, reply, pir, len(events), 3, int(publisher.persistedIndex))
 	})
 
 	t.Run("should return different count when queue is full", func(t *testing.T) {
@@ -118,9 +107,7 @@ func TestPublish(t *testing.T) {
 			Events: events,
 		})
 		require.NoError(t, err)
-		require.Equal(t, uint32(1), reply.AcceptedCount)
-		require.Equal(t, uint64(1), reply.AcceptedIndex)
-		require.Equal(t, uint64(publisher.persistedIndex), pir.PersistedIndex)
+		assertIndices(t, reply, pir, 1, 1, int(publisher.persistedIndex))
 	})
 
 	t.Run("should return an error when uuid does not match", func(t *testing.T) {
@@ -134,6 +121,127 @@ func TestPublish(t *testing.T) {
 		require.Contains(t, err.Error(), "UUID does not match")
 		require.Nil(t, reply)
 	})
+
+	t.Run("should return validation errors", func(t *testing.T) {
+		cases := []struct {
+			name        string
+			event       *messages.Event
+			expectedMsg string
+		}{
+			{
+				name: "no timestamp",
+				event: &messages.Event{
+					Source: &messages.Source{
+						InputId:  "input",
+						StreamId: "stream",
+					},
+					DataStream: &messages.DataStream{
+						Type:      "log",
+						Dataset:   "default",
+						Namespace: "default",
+					},
+					Metadata: sampleValues,
+					Fields:   sampleValues,
+				},
+				expectedMsg: "invalid nil Timestamp",
+			},
+			{
+				name: "no source",
+				event: &messages.Event{
+					Timestamp: timestamppb.Now(),
+					DataStream: &messages.DataStream{
+						Type:      "log",
+						Dataset:   "default",
+						Namespace: "default",
+					},
+					Metadata: sampleValues,
+					Fields:   sampleValues,
+				},
+				expectedMsg: "source: cannot be nil",
+			},
+			{
+				name: "no input ID",
+				event: &messages.Event{
+					Timestamp: timestamppb.Now(),
+					Source: &messages.Source{
+						StreamId: "stream",
+					},
+					DataStream: &messages.DataStream{
+						Type:      "log",
+						Dataset:   "default",
+						Namespace: "default",
+					},
+					Metadata: sampleValues,
+					Fields:   sampleValues,
+				},
+				expectedMsg: "source: input_id is a required field",
+			},
+			{
+				name: "no datastream",
+				event: &messages.Event{
+					Timestamp: timestamppb.Now(),
+					Source: &messages.Source{
+						InputId:  "input",
+						StreamId: "stream",
+					},
+					Metadata: sampleValues,
+					Fields:   sampleValues,
+				},
+				expectedMsg: "datastream: cannot be nil",
+			},
+			{
+				name: "invalid data stream",
+				event: &messages.Event{
+					Timestamp: timestamppb.Now(),
+					Source: &messages.Source{
+						InputId:  "input",
+						StreamId: "stream",
+					},
+					DataStream: &messages.DataStream{},
+					Metadata:   sampleValues,
+					Fields:     sampleValues,
+				},
+				expectedMsg: "datastream: dataset is a required field; namespace is a required field; type is a required field",
+			},
+		}
+
+		publisher.q = make([]*messages.Event, 0, len(cases))
+
+		cfg := Config{
+			StrictMode: true, // so we can test the validation
+		}
+
+		strictShipper, err := NewShipperServer(cfg, publisher)
+		defer func() { _ = strictShipper.Close() }()
+		require.NoError(t, err)
+		strictClient, stop := startServer(t, ctx, strictShipper)
+		defer stop()
+		strictPir := getPersistedIndex(t, ctx, strictClient)
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				reply, err := strictClient.PublishEvents(ctx, &messages.PublishRequest{
+					Uuid:   strictPir.Uuid,
+					Events: []*messages.Event{tc.event},
+				})
+				require.Error(t, err)
+				require.Nil(t, reply)
+
+				status, ok := status.FromError(err)
+				require.True(t, ok, "expected gRPC error")
+				require.Equal(t, codes.InvalidArgument, status.Code())
+				require.Contains(t, status.Message(), tc.expectedMsg)
+
+				// no validation in non-strict mode
+				reply, err = client.PublishEvents(ctx, &messages.PublishRequest{
+					Uuid:   pir.Uuid,
+					Events: []*messages.Event{tc.event},
+				})
+				require.NoError(t, err)
+				require.Equal(t, uint32(1), reply.AcceptedCount, "should accept in non-strict mode")
+			})
+		}
+	})
 }
 
 func TestPersistedIndex(t *testing.T) {
@@ -142,7 +250,7 @@ func TestPersistedIndex(t *testing.T) {
 	publisher := &publisherMock{persistedIndex: 42}
 
 	t.Run("server should send updates to the clients", func(t *testing.T) {
-		shipper, err := NewShipperServer(publisher)
+		shipper, err := NewShipperServer(DefaultConfig(), publisher)
 		defer func() { _ = shipper.Close() }()
 		require.NoError(t, err)
 		client, stop := startServer(t, ctx, shipper)
@@ -168,7 +276,7 @@ func TestPersistedIndex(t *testing.T) {
 	})
 
 	t.Run("server should properly shutdown", func(t *testing.T) {
-		shipper, err := NewShipperServer(publisher)
+		shipper, err := NewShipperServer(DefaultConfig(), publisher)
 		require.NoError(t, err)
 		client, stop := startServer(t, ctx, shipper)
 		defer stop()
@@ -221,7 +329,7 @@ func createConsumers(t *testing.T, ctx context.Context, client pb.ProducerClient
 		stop:      cancel,
 		consumers: make([]pb.Producer_PersistedIndexClient, 0, count),
 	}
-	for i := 0; i < 50; i++ {
+	for i := 0; i < count; i++ {
 		consumer, err := client.PersistedIndex(ctx, &messages.PersistedIndexRequest{
 			PollingInterval: durationpb.New(pollingInterval),
 		})
@@ -230,6 +338,23 @@ func createConsumers(t *testing.T, ctx context.Context, client pb.ProducerClient
 	}
 
 	return cl
+}
+
+func assertIndices(t *testing.T, reply *messages.PublishReply, pir *messages.PersistedIndexReply, acceptedCount int, acceptedIndex int, persistedIndex int) {
+	require.NotNil(t, reply, "reply cannot be nil")
+	require.Equal(t, uint32(acceptedCount), reply.AcceptedCount, "accepted count does not match")
+	require.Equal(t, uint64(acceptedIndex), reply.AcceptedIndex, "accepted index does not match")
+	require.Equal(t, uint64(persistedIndex), pir.PersistedIndex, "persisted index reply does not match")
+}
+
+func getPersistedIndex(t *testing.T, ctx context.Context, client pb.ProducerClient) *messages.PersistedIndexReply {
+	pirCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	consumer, err := client.PersistedIndex(pirCtx, &messages.PersistedIndexRequest{})
+	require.NoError(t, err)
+	pir, err := consumer.Recv()
+	require.NoError(t, err)
+	return pir
 }
 
 type consumerList struct {
@@ -249,18 +374,15 @@ func (l consumerList) assertConsumed(t *testing.T, value uint64) bool {
 }
 
 func (l consumerList) assertClosedServer(t *testing.T) bool {
+	result := true
 	for _, c := range l.consumers {
 		_, err := c.Recv()
-		if err == nil {
-			return false
-		}
-
-		if !strings.Contains(err.Error(), "server is stopped: context canceled") {
-			return false
+		if err == nil || !strings.Contains(err.Error(), "server is stopped: context canceled") {
+			result = false
 		}
 	}
 
-	return true
+	return result
 }
 
 type publisherMock struct {
@@ -269,7 +391,11 @@ type publisherMock struct {
 	persistedIndex queue.EntryID
 }
 
-func (p *publisherMock) Publish(event *messages.Event) (queue.EntryID, error) {
+func (p *publisherMock) Publish(_ context.Context, event *messages.Event) (queue.EntryID, error) {
+	return p.TryPublish(event)
+}
+
+func (p *publisherMock) TryPublish(event *messages.Event) (queue.EntryID, error) {
 	if len(p.q) == cap(p.q) {
 		return queue.EntryID(0), queue.ErrQueueIsFull
 	}
@@ -278,10 +404,6 @@ func (p *publisherMock) Publish(event *messages.Event) (queue.EntryID, error) {
 	return queue.EntryID(len(p.q)), nil
 }
 
-func (p *publisherMock) AcceptedIndex() queue.EntryID {
-	return queue.EntryID(len(p.q))
-}
-
-func (p *publisherMock) PersistedIndex() queue.EntryID {
-	return p.persistedIndex
+func (p *publisherMock) PersistedIndex() (queue.EntryID, error) {
+	return p.persistedIndex, nil
 }

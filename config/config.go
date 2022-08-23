@@ -10,16 +10,19 @@ import (
 	"io/ioutil"
 	"path/filepath"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/go-ucfg/json"
+
 	"github.com/elastic/elastic-agent-shipper/monitoring"
 	"github.com/elastic/elastic-agent-shipper/queue"
-	"github.com/elastic/go-ucfg/json"
+	"github.com/elastic/elastic-agent-shipper/server"
 )
 
 const (
 	defaultConfigName = "elastic-agent-shipper.yml"
-	defaultPort       = 50051
 )
 
 var (
@@ -37,12 +40,9 @@ func init() {
 //ShipperConfig defines the options present in the config file
 type ShipperConfig struct {
 	Log     logp.Config       `config:"logging"`
-	TLS     bool              `config:"tls"`
-	Cert    string            `config:"cert"`       //TLS cert file, if TLS is enabled
-	Key     string            `config:"key"`        //TLS Keyfile, if specified
-	Port    int               `config:"port"`       //Port to listen on
 	Monitor monitoring.Config `config:"monitoring"` //Queue monitoring settings
 	Queue   queue.Config      `config:"queue"`      //Queue settings
+	Server  server.Config     `config:"server"`     //gRPC Server settings
 }
 
 // ReadConfig returns the populated config from the specified path
@@ -60,16 +60,31 @@ func ReadConfig() (ShipperConfig, error) {
 	}
 	// systemd environment will send us to stdout environment, which we want
 	config := ShipperConfig{
-		Port:    defaultPort,
 		Log:     logp.DefaultConfig(logp.SystemdEnvironment),
 		Monitor: monitoring.DefaultConfig(),
 		Queue:   queue.DefaultConfig(),
+		Server:  server.DefaultConfig(),
 	}
 	err = raw.Unpack(&config)
 	if err != nil {
 		return config, fmt.Errorf("error unpacking shipper config: %w", err)
 	}
 	return config, nil
+}
+
+// ShipperConfigFromUnitConfig converts the configuration provided by Agent to the internal
+// configuration object used by the shipper.
+// Currently this just converts the given struct to json and tries to deserialize it into the
+// ShipperConfig struct. This is not the right way to do this, but this gets the build and
+// tests passing again with the new version of elastic-agent-client. Migrating fully to this
+// new config structure is part of the overall agent V2 transition, for more details see
+// https://github.com/elastic/elastic-agent/issues/617.
+func ShipperConfigFromUnitConfig(logLevel client.UnitLogLevel, config *proto.UnitExpectedConfig) (ShipperConfig, error) {
+	jsonConfig, err := config.GetSource().MarshalJSON()
+	if err != nil {
+		return ShipperConfig{}, err
+	}
+	return ReadConfigFromJSON(string(jsonConfig))
 }
 
 // ReadConfigFromJSON reads the event in from a JSON config. I believe @blakerouse told me
@@ -80,10 +95,10 @@ func ReadConfigFromJSON(raw string) (ShipperConfig, error) {
 		return ShipperConfig{}, fmt.Errorf("error parsing string config: %w", err)
 	}
 	shipperConfig := ShipperConfig{
-		Port:    defaultPort,
 		Log:     logp.DefaultConfig(logp.SystemdEnvironment),
 		Monitor: monitoring.DefaultConfig(),
 		Queue:   queue.DefaultConfig(),
+		Server:  server.DefaultConfig(),
 	}
 	err = rawCfg.Unpack(&shipperConfig)
 	if err != nil {
