@@ -69,6 +69,9 @@ pipeline {
         }
         stages {
           stage('Build'){
+            environment {
+              SNAPSHOT = 'true'
+            }
             steps {
               withGithubNotify(context: "Build-${PLATFORM}") {
                 whenTrue(isUnix()) {
@@ -99,18 +102,30 @@ pipeline {
               }
             }
           }
-          stage('Package Snapshot') {
-            // to run twice, one for snapshot and one for release.
+          stage('Publish Snapshot') {
+            steps {
+              withGithubNotify(context: "Publish-${PLATFORM}") {
+                publishArtifacts(type: 'snapshot')
+              }
+            }
+          }
+          stage('Publish Release') {
+            when { not { branch 'main' } }
+            environment {
+              SNAPSHOT = 'false'
+            }
             steps {
               withGithubNotify(context: "Package-${PLATFORM}") {
+                whenTrue(isUnix()) {
+                  deleteDir()
+                }
+                unstash 'source'
                 dir("${BASE_DIR}"){
-                  runIfNoMainAndNoStaging() {
-                    withMageEnv(){
-                      cmd(label: 'Go package', script: 'mage package')
-                      publishArtifacts(type: 'TBC')
-                    }
+                  withMageEnv(version: "${env.GO_VERSION}"){
+                    cmd(label: 'Go build', script: 'mage -v build')
                   }
                 }
+                publishArtifacts(type: 'staging')
               }
             }
           }
@@ -194,14 +209,6 @@ def publishArtifacts(def args = [:]) {
     pattern: "${BASE_DIR}/build/distributions/**/*",  // TODO: where the files are stored
     sharedPublicly: true,
     showInline: true)
-}
-
-def runIfNoMainAndNoStaging(Closure body) {
-  if (env.BRANCH_NAME.equals('main') && env.TYPE == 'staging') {
-    echo 'INFO: staging artifacts for the main branch are not required.'
-  } else {
-    body()
-  }
 }
 
 def runReleaseManager(def args = [:]) {
