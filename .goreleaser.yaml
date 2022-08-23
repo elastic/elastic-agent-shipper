@@ -36,14 +36,12 @@ builds:
     overrides:
       - goos: linux
         goarch: amd64
-        goamd64: v1
         goarm: ''
         gomips: ''
         flags:
           - -buildmode=pie
       - goos: linux
-        goarch: arm
-        goamd64: v1
+        goarch: arm64
         goarm: ''
         gomips: ''
         flags:

@@ -87,7 +87,7 @@ func InstallGoReleaser() error {
 func (Build) Binary() error {
 	InstallGoReleaser()
 
-	args := []string{"build", "--rm-dist", "--skip-validate", "--debug"}
+	args := []string{"build", "--rm-dist", "--skip-validate"}
 
 	// Environment variable
 	env := map[string]string{
