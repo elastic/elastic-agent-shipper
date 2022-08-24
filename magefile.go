@@ -216,7 +216,9 @@ func Notice() error {
 	return gotool.Mod.Tidy()
 }
 
-// Version returns the default beat version
+// RELEASE HELPERS
+
+// Version returns current stack version, used for the release process
 func Version() {
 	fmt.Println(tools.DefaultBeatVersion)
 }
