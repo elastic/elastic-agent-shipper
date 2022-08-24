@@ -215,3 +215,10 @@ func Notice() error {
 	// See https://github.com/golang/go/issues/43994#issuecomment-770053099
 	return gotool.Mod.Tidy()
 }
+
+// RELEASE HELPERS
+
+// GetVersion returns current stack version, used for the release process
+func GetVersion() {
+	fmt.Println(tools.DefaultBeatVersion)
+}
