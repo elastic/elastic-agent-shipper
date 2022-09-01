@@ -23,7 +23,6 @@ func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "elastic-agent-shipper [subcommand]",
 	}
-	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.config"))
 	// logging flags
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("v"))
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("e"))
