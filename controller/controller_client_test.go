@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package server
+package controller
 
 import (
 	"context"
@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	structpb "google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client/mock"
@@ -48,8 +49,12 @@ func TestAgentControl(t *testing.T) {
 								Id:             unitOneID,
 								Type:           proto.UnitType_OUTPUT,
 								ConfigStateIdx: 1,
-								Config:         `{"logging": {"level": "debug"}}`, // hack to make my life easier
-								State:          proto.State_HEALTHY,
+								Config: &proto.UnitExpectedConfig{
+									Source: MustNewStruct(t, map[string]interface{}{
+										"logging": map[string]interface{}{"level": "debug"},
+									}),
+								},
+								State: proto.State_HEALTHY,
 							},
 						},
 					}
@@ -62,7 +67,6 @@ func TestAgentControl(t *testing.T) {
 								Id:             unitOneID,
 								Type:           proto.UnitType_OUTPUT,
 								ConfigStateIdx: 1,
-								Config:         "{}",
 								State:          proto.State_STOPPED,
 							},
 						},
@@ -74,7 +78,6 @@ func TestAgentControl(t *testing.T) {
 						Units: nil,
 					}
 				}
-
 			}
 
 			//gotInvalid = true
@@ -109,4 +112,12 @@ func TestAgentControl(t *testing.T) {
 	assert.True(t, gotConfig, "config state")
 	assert.True(t, gotHealthy, "healthy state")
 	assert.True(t, gotStopped, "stopped state")
+}
+
+func MustNewStruct(t *testing.T, contents map[string]interface{}) *structpb.Struct {
+	result, err := structpb.NewStruct(contents)
+	if err != nil {
+		t.Fatalf("failed to create test struct for contents [%v]: %v", contents, err)
+	}
+	return result
 }

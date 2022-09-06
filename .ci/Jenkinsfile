@@ -78,8 +78,8 @@ pipeline {
             steps {
               withGithubNotify(context: "Test-${PLATFORM}") {
                 dir("${BASE_DIR}"){
-                  withGoEnv(){
-                    goTestJUnit(options: '-v ./...', output: 'junit-report.xml')
+                  withMageEnv(){
+                    cmd(label: 'Go unitTest', script: 'mage unitTest')
                   }
                 }
               }

@@ -15,7 +15,7 @@ import (
 	"github.com/spf13/cobra"
 
 	_ "github.com/elastic/elastic-agent-libs/logp/configure"
-	"github.com/elastic/elastic-agent-shipper/server"
+	"github.com/elastic/elastic-agent-shipper/controller"
 )
 
 // NewCommand returns a new command structure
@@ -41,7 +41,7 @@ func runCmd() *cobra.Command {
 		Use:   "run",
 		Short: "Start the elastic-agent-shipper.",
 		Run: func(_ *cobra.Command, _ []string) {
-			if err := server.LoadAndRun(); err != nil {
+			if err := controller.LoadAndRun(); err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n\n", err)
 				os.Exit(1)
 			}

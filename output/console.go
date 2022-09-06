@@ -37,7 +37,7 @@ func (out *ConsoleOutput) Start() {
 				break
 			}
 			for i := 0; i < batch.Count(); i++ {
-				if event, ok := batch.Event(i).(*messages.Event); ok {
+				if event, ok := batch.Entry(i).(*messages.Event); ok {
 					out.send(event)
 				}
 			}

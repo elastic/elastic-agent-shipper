@@ -47,7 +47,5 @@ fleet.yml
 # agent
 build/
 elastic-agent-shipper
+dist/
 
-
-# VSCode
-/.vscode

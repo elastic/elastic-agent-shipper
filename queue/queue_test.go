@@ -5,6 +5,7 @@
 package queue
 
 import (
+	"context"
 	"os"
 	"testing"
 	"time"
@@ -27,7 +28,7 @@ func TestMemoryQueueSimpleBatch(t *testing.T) {
 	eventCount := 100
 	events := make([]messages.Event, eventCount)
 	for i := 0; i < eventCount; i++ {
-		_, err = queue.Publish(&events[i])
+		_, err = queue.Publish(context.Background(), &events[i])
 		assert.NoError(t, err, "couldn't publish to queue")
 	}
 
@@ -39,7 +40,7 @@ func TestMemoryQueueSimpleBatch(t *testing.T) {
 
 	assert.Equal(t, batch.Count(), eventCount)
 	for i := 0; i < eventCount; i++ {
-		event, ok := batch.Event(i).(*messages.Event)
+		event, ok := batch.Entry(i).(*messages.Event)
 		assert.True(t, ok, "queue output should have the same concrete type as its input")
 		// Need to use assert.True since assert.Equal* uses value comparison
 		// for unequal pointers.
@@ -142,7 +143,7 @@ func TestQueueTypes(t *testing.T) {
 		tracker := [10]bool{}
 		for idx := range tracker {
 			e := makeEvent(idx)
-			_, err = queue.Publish(e)
+			_, err = queue.Publish(context.Background(), e)
 			assert.NoError(t, err, "couldn't publish to queue")
 		}
 
@@ -152,7 +153,7 @@ func TestQueueTypes(t *testing.T) {
 			assert.NoError(t, err, "couldn't get queue batch")
 			for i := 0; i < batch.Count(); i++ {
 				//get each event and mark the index as received
-				event, ok := batch.Event(i).(*messages.Event)
+				event, ok := batch.Entry(i).(*messages.Event)
 				require.True(t, ok)
 				data := event.GetFields().GetData()
 				testField, prs := data["message"]

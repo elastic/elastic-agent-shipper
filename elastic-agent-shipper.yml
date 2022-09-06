@@ -1,29 +1,111 @@
-###################### Shipper Configuration Example #########################
+# ========================= Shipper Configuration File ========================
 
-# This file is an example configuration file highlighting only the most common
-# options.
+# ================================== General ==================================
 
-# The gRPC port that the shipper will listen on
-port: 50052
-tls: false
-#cert: # path to TLS cert
-#key: # path to TLS keyfile
+server:
+  # StrictMode means that every incoming event will be validated against the list of required
+  # fields. This introduces some additional overhead but can be really handy for client developers
+  # on the debugging stage. Normally, it should be disabled during production use and enabled for
+  # testing. In production it is preferable to send events to the output if at all possible.
+  strict_mode: false
+  # The gRPC port that the shipper will listen on.
+  port: 50052
+  # Whether to use TLS for gRPC communication or not.
+  tls: false
+  # A path to a TLS certifcate.
+  # cert:
+  # A path to a TLS keyfile.
+  # key:
 
-#log level
-logging.level: debug
-logging.selectors: ["*"]
-logging.to_stderr: true
+# ================================== Logging ==================================
 
-queue:
-  test: #There is no actual "test" queue type, remove this later.
-    events: 512
+logging:
+  # Sets log level. The default log level is info.
+  # Available log levels are: error, warning, info, debug
+  level: debug
+  # Enable debug output for selected components. To enable all selectors use ["*"]
+  # Other available selectors are "beat", "publisher", "service"
+  # Multiple selectors can be chained.
+  selectors: ["*"]
+  # Send all logging output to stderr. The default is false.
+  logging.to_stderr: true
+
+# ================================== Monitoring ==================================
 
 monitoring:
+  # Whether metrics reporting is enabled.
   enabled: true
+  # Metrics reporting interval.
   interval: 5s
+  # Whether to report metrics periodically in the logs.
   log: true
+  # exposes metrics using http
   http:
+    # enables the http endpoint
     enabled: true
+    # The HTTP endpoint will bind to this hostname, IP address, unix socket or named pipe.
+    # When using IP addresses, it is recommended to only use localhost.
     host: "localhost"
+    # Port on which the HTTP endpoint will bind. Default is 0 meaning feature is disabled.
     port: 8282
+    # Name of the reported metrics object
     name: "queue"
+
+# ================================== Queue ====================================
+
+# Internal queue configuration for buffering events to be published.
+#queue:
+  # Queue type by name (default 'mem')
+  # The memory queue will present all available events to the output, the moment the output is ready
+  # to serve another batch of events.
+  #mem:
+    # Max number of events the queue can buffer.
+    #events: 4096
+
+    # Hints the minimum number of events stored in the queue,
+    # before providing a batch of events to the outputs.
+    # The default value is set to 2048.
+    # A value of 0 ensures events are immediately available
+    # to be sent to the outputs.
+    #flush.min_events: 256
+
+    # Maximum duration after which events are available to the outputs,
+    # if the number of events stored in the queue is < `flush.min_events`.
+    #flush.timeout: 5ms
+
+  # The disk queue stores incoming events on disk until the output is
+  # ready for them. This allows a higher event limit than the memory-only
+  # queue and lets pending events persist through a restart.
+  #disk:
+    # The directory path to store the queue's data.
+    #path: "path/to/diskqueue"
+
+    # The maximum space the queue should occupy on disk. Depending on
+    # input settings, events that exceed this limit are delayed (if
+    # persistent, like a log file) or discarded (if ephemeral, like a
+    # UDP packet).
+    #max_size: 10GB
+
+    # The maximum size of a single queue data file. Data in the queue is
+    # stored in smaller segments that are deleted after all their events
+    # have been processed.
+    #segment_size: 1GB
+
+    # The number of events to read from disk to memory while waiting for
+    # the output to request them.
+    #read_ahead: 512
+
+    # The number of events to accept from inputs while waiting for them
+    # to be written to disk. If event data arrives faster than it
+    # can be written to disk, this setting prevents it from overflowing
+    # main memory.
+    #write_ahead: 2048
+
+    # The duration to wait before retrying when the queue encounters a disk
+    # write error.
+    #retry_interval: 1s
+
+    # The maximum length of time to wait before retrying on a disk write
+    # error. If the queue encounters repeated errors, it will double the
+    # length of its retry interval each time, up to this maximum.
+    #max_retry_interval: 30s
