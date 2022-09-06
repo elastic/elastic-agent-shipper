@@ -19,7 +19,7 @@ import (
 
 // LoadAndRun loads the config object and runs the gRPC server
 func LoadAndRun() error {
-	cfg, err := config.ReadConfig()
+	cfg, err := config.ReadConfigFromFile()
 	switch {
 	case err == nil:
 		return RunUnmanaged(cfg)

@@ -40,8 +40,8 @@ type ShipperConfig struct {
 	Server  server.Config     `config:"server"`     //gRPC Server settings
 }
 
-// ReadConfig returns the populated config from the specified path
-func ReadConfig() (ShipperConfig, error) {
+// ReadConfigFromFile returns the populated config from the specified path
+func ReadConfigFromFile() (ShipperConfig, error) {
 	if configFilePath == "" {
 		return ShipperConfig{}, ErrConfigIsNotSet
 	}
@@ -54,23 +54,12 @@ func ReadConfig() (ShipperConfig, error) {
 	if err != nil {
 		return ShipperConfig{}, fmt.Errorf("error reading config from yaml: %w", err)
 	}
-	// systemd environment will send us to stdout environment, which we want
-	config := ShipperConfig{
-		Log:     logp.DefaultConfig(logp.SystemdEnvironment),
-		Monitor: monitoring.DefaultConfig(),
-		Queue:   queue.DefaultConfig(),
-		Server:  server.DefaultConfig(),
-	}
-	err = raw.Unpack(&config)
-	if err != nil {
-		return config, fmt.Errorf("error unpacking shipper config: %w", err)
+
+	unpacker := func(cfg *ShipperConfig) error {
+		return raw.Unpack(cfg)
 	}
 
-	err = logp.Configure(config.Log)
-	if err != nil {
-		return config, fmt.Errorf("error configuring the logger: %w", err)
-	}
-	return config, nil
+	return readConfig(unpacker)
 }
 
 // ShipperConfigFromUnitConfig converts the configuration provided by Agent to the internal
@@ -95,15 +84,35 @@ func ReadConfigFromJSON(raw string) (ShipperConfig, error) {
 	if err != nil {
 		return ShipperConfig{}, fmt.Errorf("error parsing string config: %w", err)
 	}
-	shipperConfig := ShipperConfig{
+
+	unpacker := func(cfg *ShipperConfig) error {
+		return rawCfg.Unpack(cfg)
+	}
+
+	return readConfig(unpacker)
+}
+
+type rawUnpacker func(cfg *ShipperConfig) error
+
+func readConfig(unpacker rawUnpacker) (config ShipperConfig, err error) {
+	// systemd environment will send us to stdout environment, which we want
+	config = ShipperConfig{
 		Log:     logp.DefaultConfig(logp.SystemdEnvironment),
 		Monitor: monitoring.DefaultConfig(),
 		Queue:   queue.DefaultConfig(),
 		Server:  server.DefaultConfig(),
 	}
-	err = rawCfg.Unpack(&shipperConfig)
+
+	err = unpacker(&config)
 	if err != nil {
-		return shipperConfig, fmt.Errorf("error unpacking shipper config: %w", err)
+		return config, fmt.Errorf("error unpacking shipper config: %w", err)
 	}
-	return shipperConfig, err
+
+	// otherwise the logging configuration is just ignored
+	err = logp.Configure(config.Log)
+	if err != nil {
+		return config, fmt.Errorf("error configuring the logger: %w", err)
+	}
+
+	return config, nil
 }
