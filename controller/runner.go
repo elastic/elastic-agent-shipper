@@ -139,6 +139,17 @@ func (r *ServerRunner) Close() (err error) {
 	// initialization can fail on each step, so it's possible that the runner
 	// is partially initialized and we have to account for that.
 	r.once.Do(func() {
+		// we must stop the shipper first which is closing index subscriptions
+		// otherwise `GracefulStop` will hang forever
+		if r.shipper != nil {
+			r.log.Debugf("shipper is shutting down...")
+			err = r.shipper.Close()
+			if err != nil {
+				r.log.Error(err)
+			}
+			r.shipper = nil
+			r.log.Debugf("shipper is stopped.")
+		}
 		if r.server != nil {
 			r.log.Debugf("gRPC server is shutting down...")
 			r.server.GracefulStop()
@@ -168,15 +179,6 @@ func (r *ServerRunner) Close() (err error) {
 			r.out.Wait()
 			r.out = nil
 			r.log.Debugf("all pending events are flushed")
-		}
-		if r.shipper != nil {
-			r.log.Debugf("shipper is shutting down...")
-			err = r.shipper.Close()
-			if err != nil {
-				r.log.Error(err)
-			}
-			r.shipper = nil
-			r.log.Debugf("shipper is stopped.")
 		}
 	})
 
