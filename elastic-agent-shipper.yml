@@ -53,59 +53,59 @@ monitoring:
 
 # ================================== Queue ====================================
 
- # Internal queue configuration for buffering events to be published.
- #queue:
-   # Queue type by name (default 'mem')
-   # The memory queue will present all available events to the output, the moment the output is ready
-   # to serve another batch of events.
-   #mem:
-     # Max number of events the queue can buffer.
-     #events: 4096
+# Internal queue configuration for buffering events to be published.
+#queue:
+  # Queue type by name (default 'mem')
+  # The memory queue will present all available events to the output, the moment the output is ready
+  # to serve another batch of events.
+  #mem:
+    # Max number of events the queue can buffer.
+    #events: 4096
 
-     # Hints the minimum number of events stored in the queue,
-     # before providing a batch of events to the outputs.
-     # The default value is set to 2048.
-     # A value of 0 ensures events are immediately available
-     # to be sent to the outputs.
-     #flush.min_events: 256
+    # Hints the minimum number of events stored in the queue,
+    # before providing a batch of events to the outputs.
+    # The default value is set to 2048.
+    # A value of 0 ensures events are immediately available
+    # to be sent to the outputs.
+    #flush.min_events: 256
 
-     # Maximum duration after which events are available to the outputs,
-     # if the number of events stored in the queue is < `flush.min_events`.
-     #flush.timeout: 5ms
+    # Maximum duration after which events are available to the outputs,
+    # if the number of events stored in the queue is < `flush.min_events`.
+    #flush.timeout: 5ms
 
-   # The disk queue stores incoming events on disk until the output is
-   # ready for them. This allows a higher event limit than the memory-only
-   # queue and lets pending events persist through a restart.
-   #disk:
-     # The directory path to store the queue's data.
-     #path: "path/to/diskqueue"
+  # The disk queue stores incoming events on disk until the output is
+  # ready for them. This allows a higher event limit than the memory-only
+  # queue and lets pending events persist through a restart.
+  #disk:
+    # The directory path to store the queue's data.
+    #path: "path/to/diskqueue"
 
-     # The maximum space the queue should occupy on disk. Depending on
-     # input settings, events that exceed this limit are delayed (if
-     # persistent, like a log file) or discarded (if ephemeral, like a
-     # UDP packet).
-     #max_size: 10GB
+    # The maximum space the queue should occupy on disk. Depending on
+    # input settings, events that exceed this limit are delayed (if
+    # persistent, like a log file) or discarded (if ephemeral, like a
+    # UDP packet).
+    #max_size: 10GB
 
-     # The maximum size of a single queue data file. Data in the queue is
-     # stored in smaller segments that are deleted after all their events
-     # have been processed.
-     #segment_size: 1GB
+    # The maximum size of a single queue data file. Data in the queue is
+    # stored in smaller segments that are deleted after all their events
+    # have been processed.
+    #segment_size: 1GB
 
-     # The number of events to read from disk to memory while waiting for
-     # the output to request them.
-     #read_ahead: 512
+    # The number of events to read from disk to memory while waiting for
+    # the output to request them.
+    #read_ahead: 512
 
-     # The number of events to accept from inputs while waiting for them
-     # to be written to disk. If event data arrives faster than it
-     # can be written to disk, this setting prevents it from overflowing
-     # main memory.
-     #write_ahead: 2048
+    # The number of events to accept from inputs while waiting for them
+    # to be written to disk. If event data arrives faster than it
+    # can be written to disk, this setting prevents it from overflowing
+    # main memory.
+    #write_ahead: 2048
 
-     # The duration to wait before retrying when the queue encounters a disk
-     # write error.
-     #retry_interval: 1s
+    # The duration to wait before retrying when the queue encounters a disk
+    # write error.
+    #retry_interval: 1s
 
-     # The maximum length of time to wait before retrying on a disk write
-     # error. If the queue encounters repeated errors, it will double the
-     # length of its retry interval each time, up to this maximum.
-     #max_retry_interval: 30s
+    # The maximum length of time to wait before retrying on a disk write
+    # error. If the queue encounters repeated errors, it will double the
+    # length of its retry interval each time, up to this maximum.
+    #max_retry_interval: 30s
