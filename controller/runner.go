@@ -140,33 +140,43 @@ func (r *ServerRunner) Close() (err error) {
 	// is partially initialized and we have to account for that.
 	r.once.Do(func() {
 		if r.server != nil {
+			r.log.Debugf("gRPC server is shutting down...")
 			r.server.GracefulStop()
 			r.server = nil
+			r.log.Debugf("gRPC server is stopped, all connections closed.")
 		}
 		if r.monitoring != nil {
+			r.log.Debugf("monitoring is shutting down...")
 			r.monitoring.End()
 			r.monitoring = nil
+			r.log.Debugf("monitoring is stopped.")
 		}
 		if r.queue != nil {
+			r.log.Debugf("queue is shutting down...")
 			err := r.queue.Close()
 			if err != nil {
 				r.log.Error(err)
 			}
 			r.queue = nil
+			r.log.Debugf("queue is stopped.")
 		}
 		if r.out != nil {
 			// The output will shut down once the queue is closed.
 			// We call Wait to give it a chance to finish with events
 			// it has already read.
+			r.log.Debugf("waiting for pending events in the output...")
 			r.out.Wait()
 			r.out = nil
+			r.log.Debugf("all pending events are flushed")
 		}
 		if r.shipper != nil {
+			r.log.Debugf("shipper is shutting down...")
 			err = r.shipper.Close()
 			if err != nil {
 				r.log.Error(err)
 			}
 			r.shipper = nil
+			r.log.Debugf("shipper is stopped.")
 		}
 	})
 

@@ -65,6 +65,11 @@ func ReadConfig() (ShipperConfig, error) {
 	if err != nil {
 		return config, fmt.Errorf("error unpacking shipper config: %w", err)
 	}
+
+	err = logp.Configure(config.Log)
+	if err != nil {
+		return config, fmt.Errorf("error configuring the logger: %w", err)
+	}
 	return config, nil
 }
 
