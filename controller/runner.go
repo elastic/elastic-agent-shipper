@@ -31,10 +31,13 @@ type Output interface {
 // ServerRunner starts and gracefully stops the shipper server on demand.
 // The server runner is not re-usable and should be abandoned after `Close` or canceled context.
 type ServerRunner struct {
-	log  *logp.Logger
-	cfg  config.ShipperConfig
-	once sync.Once
-	mu   sync.Mutex
+	log *logp.Logger
+	cfg config.ShipperConfig
+	// to protect the `Close` function from multiple concurrent calls,
+	// so we avoid race conditions
+	closeOnce sync.Once
+	// to make sure that `Close` is not called before `Start` fully finished
+	startMutex sync.Mutex
 
 	server     *grpc.Server
 	shipper    server.ShipperServer
@@ -103,29 +106,29 @@ func NewServerRunner(cfg config.ShipperConfig) (r *ServerRunner, err error) {
 // Start runs the shipper server according to the set configuration.
 // The server stops after calling `Close`, this function blocks until then.
 func (r *ServerRunner) Start() (err error) {
-	r.mu.Lock()
+	r.startMutex.Lock()
 	if r.server == nil {
-		r.mu.Unlock()
+		r.startMutex.Unlock()
 		return fmt.Errorf("failed to start a server runner that was previously closed")
 	}
 
 	addr := fmt.Sprintf("localhost:%d", r.cfg.Server.Port)
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
-		r.mu.Unlock()
+		r.startMutex.Unlock()
 		return fmt.Errorf("failed to listen on %s: %w", addr, err)
 	}
 
 	// Testing that the server is running and only then unlock the mutex.
 	// Otherwise if `Close` is called at the same time as `Start` it causes race condition.
 	go func() {
-		defer r.mu.Unlock()
+		defer r.startMutex.Unlock()
 		con, err := net.Dial("tcp", addr)
 		if err != nil {
 			r.log.Errorf("failed to test connection with the gRPC server on %s", addr)
 			return
 		}
-		defer con.Close()
+		_ = con.Close()
 		r.log.Debugf("gRPC server is ready and is listening on %s", addr)
 	}()
 
@@ -134,11 +137,11 @@ func (r *ServerRunner) Start() (err error) {
 
 // Close shuts the whole shipper server down. Can be called only once, following calls are noop.
 func (r *ServerRunner) Close() (err error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.startMutex.Lock()
+	defer r.startMutex.Unlock()
 	// initialization can fail on each step, so it's possible that the runner
 	// is partially initialized and we have to account for that.
-	r.once.Do(func() {
+	r.closeOnce.Do(func() {
 		// we must stop the shipper first which is closing index subscriptions
 		// otherwise `GracefulStop` will hang forever
 		if r.shipper != nil {
