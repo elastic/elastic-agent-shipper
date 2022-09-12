@@ -27,9 +27,6 @@ import (
 )
 
 type Config struct {
-}
-
-type elasticsearchConfig struct {
 	Protocol           string            `config:"protocol"`
 	Path               string            `config:"path"`
 	Params             map[string]string `config:"parameters"`
@@ -55,12 +52,12 @@ type Backoff struct {
 	Max  time.Duration
 }
 
-const (
+/*const (
 	defaultBulkSize = 50
-)
+)*/
 
 var (
-	defaultConfig = elasticsearchConfig{
+	defaultConfig = Config{
 		Protocol:         "",
 		Path:             "",
 		Params:           nil,
@@ -80,7 +77,7 @@ var (
 	}
 )
 
-func (c *elasticsearchConfig) Validate() error {
+func (c *Config) Validate() error {
 	if c.APIKey != "" && (c.Username != "" || c.Password != "") {
 		return fmt.Errorf("cannot set both api_key and username/password")
 	}

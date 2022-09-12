@@ -4,18 +4,26 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 	"github.com/elastic/elastic-agent-shipper/queue"
 )
 
 type ElasticSearchOutput struct {
+	logger *logp.Logger
+	config *Config
+
 	queue *queue.Queue
 
 	wg sync.WaitGroup
 }
 
-func NewElasticSearch(queue *queue.Queue) *ElasticSearchOutput {
-	return &ElasticSearchOutput{queue: queue}
+func NewElasticSearch(config *Config, queue *queue.Queue) *ElasticSearchOutput {
+	return &ElasticSearchOutput{
+		logger: logp.NewLogger("elasticsearch-output"),
+		config: config,
+		queue:  queue,
+	}
 }
 
 func (out *ElasticSearchOutput) Start() {
@@ -33,7 +41,7 @@ func (out *ElasticSearchOutput) Start() {
 				break
 			}
 			for i := 0; i < batch.Count(); i++ {
-				if event, ok := batch.Event(i).(*messages.Event); ok {
+				if event, ok := batch.Entry(i).(*messages.Event); ok {
 					out.send(event)
 				}
 			}
