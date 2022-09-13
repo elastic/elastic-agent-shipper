@@ -18,12 +18,24 @@
 package elasticsearch
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"net/http"
+	"strings"
+	"time"
 
-	"github.com/elastic/beats/libbeat/outputs"
-	"github.com/elastic/beats/libbeat/outputs/outil"
+	"github.com/elastic/beats/v7/libbeat/beat"
+	"github.com/elastic/beats/v7/libbeat/beat/events"
 	"github.com/elastic/beats/v7/libbeat/esleg/eslegclient"
+	"github.com/elastic/beats/v7/libbeat/outputs"
+	"github.com/elastic/beats/v7/libbeat/outputs/outil"
+	"github.com/elastic/beats/v7/libbeat/publisher"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/elastic-agent-libs/testing"
+	"github.com/elastic/elastic-agent-libs/version"
+	"go.elastic.co/apm"
 )
 
 var (
@@ -54,7 +66,6 @@ type ClientSettings struct {
 	NonIndexableAction string
 }
 
-/*
 type bulkResultStats struct {
 	acked        int // number of events ACKed by Elasticsearch
 	duplicates   int // number of events failed with `create` due to ID already being indexed
@@ -66,7 +77,7 @@ type bulkResultStats struct {
 const (
 	defaultEventType = "doc"
 )
-*/
+
 // NewClient instantiates a new client.
 func NewClient(
 	s ClientSettings,
@@ -172,7 +183,7 @@ func (client *Client) Clone() *Client {
 	)
 	return c
 }
-
+*/
 func (client *Client) Publish(ctx context.Context, batch publisher.Batch) error {
 	events := batch.Events()
 	rest, err := client.publishEvents(ctx, events)
@@ -273,7 +284,7 @@ func (client *Client) publishEvents(ctx context.Context, data []publisher.Event)
 // bulkEncodePublishRequest encodes all bulk requests and returns slice of events
 // successfully added to the list of bulk items and the list of bulk items.
 func (client *Client) bulkEncodePublishRequest(version version.V, data []publisher.Event) ([]publisher.Event, []interface{}) {
-	okEvents := data[:0]
+	/*okEvents := data[:0]
 	bulkItems := []interface{}{}
 	for i := range data {
 		event := &data[i].Content
@@ -290,7 +301,8 @@ func (client *Client) bulkEncodePublishRequest(version version.V, data []publish
 		}
 		okEvents = append(okEvents, data[i])
 	}
-	return okEvents, bulkItems
+	return okEvents, bulkItems*/
+	return nil, nil
 }
 
 func (client *Client) createEventBulkMeta(version version.V, event *beat.Event) (interface{}, error) {
@@ -444,4 +456,3 @@ func (client *Client) String() string {
 func (client *Client) Test(d testing.Driver) {
 	client.conn.Test(d)
 }
-*/

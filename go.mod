@@ -11,7 +11,6 @@ require (
 )
 
 require (
-	github.com/elastic/beats v7.6.2+incompatible
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220810153818-dd118efed5a5
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20220804181728-b0328d2fe484
 	github.com/elastic/elastic-agent-shipper-client v0.4.0
@@ -20,6 +19,7 @@ require (
 	github.com/magefile/mage v1.13.0
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.7.1
+	go.elastic.co/apm v1.15.0
 	go.elastic.co/go-licence-detector v0.5.0
 	golang.org/x/net v0.0.0-20220809184613-07c6da5e1ced
 	gotest.tools/gotestsum v1.7.0
@@ -69,6 +69,7 @@ require (
 	go.uber.org/multierr v1.8.0 // indirect
 	go.uber.org/zap v1.22.0 // indirect
 	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa // indirect
+	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
 	golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab // indirect
