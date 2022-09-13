@@ -17,7 +17,16 @@
 
 package elasticsearch
 
-/*var (
+import (
+	"errors"
+
+	"github.com/elastic/beats/libbeat/outputs"
+	"github.com/elastic/beats/libbeat/outputs/outil"
+	"github.com/elastic/beats/v7/libbeat/esleg/eslegclient"
+	"github.com/elastic/elastic-agent-libs/logp"
+)
+
+var (
 	errPayloadTooLarge = errors.New("the bulk payload is too large for the server. Consider to adjust `http.max_content_length` parameter in Elasticsearch or `bulk_max_size` in the beat. The batch has been dropped")
 
 	ErrTooOld = errors.New("Elasticsearch is too old. Please upgrade the instance. If you would like to connect to older instances set output.elasticsearch.allow_older_versions to true.")
@@ -45,6 +54,7 @@ type ClientSettings struct {
 	NonIndexableAction string
 }
 
+/*
 type bulkResultStats struct {
 	acked        int // number of events ACKed by Elasticsearch
 	duplicates   int // number of events failed with `create` due to ID already being indexed
@@ -56,7 +66,7 @@ type bulkResultStats struct {
 const (
 	defaultEventType = "doc"
 )
-
+*/
 // NewClient instantiates a new client.
 func NewClient(
 	s ClientSettings,
@@ -123,6 +133,7 @@ func NewClient(
 	return client, nil
 }
 
+/*
 // Clone clones a client.
 func (client *Client) Clone() *Client {
 	// when cloning the connection callback and params are not copied. A
