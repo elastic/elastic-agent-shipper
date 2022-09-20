@@ -11,6 +11,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	pb "github.com/elastic/elastic-agent-shipper-client/pkg/proto"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/elastic/elastic-agent-shipper/config"
 	"github.com/elastic/elastic-agent-shipper/monitoring"
@@ -119,20 +120,29 @@ func (r *ServerRunner) Start() (err error) {
 		return fmt.Errorf("failed to listen on %s: %w", addr, err)
 	}
 
+	var wg errgroup.Group
+	wg.Go(func() error {
+		return r.server.Serve(lis)
+	})
+
 	// Testing that the server is running and only then unlock the mutex.
 	// Otherwise if `Close` is called at the same time as `Start` it causes race condition.
-	go func() {
+	wg.Go(func() error {
 		defer r.startMutex.Unlock()
 		con, err := net.Dial("tcp", addr)
 		if err != nil {
-			r.log.Errorf("failed to test connection with the gRPC server on %s", addr)
-			return
+			err = fmt.Errorf("failed to test connection with the gRPC server on %s: %w", addr, err)
+			r.log.Error(err)
+			// this will stop the other go routine in the wait group
+			r.server.Stop()
+			return err
 		}
 		_ = con.Close()
 		r.log.Debugf("gRPC server is ready and is listening on %s", addr)
-	}()
+		return nil
+	})
 
-	return r.server.Serve(lis)
+	return wg.Wait()
 }
 
 // Close shuts the whole shipper server down. Can be called only once, following calls are noop.
