@@ -8,8 +8,12 @@
 package main
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -29,7 +33,10 @@ import (
 )
 
 const (
-	GoreleaserRepo = "github.com/goreleaser/goreleaser@v1.6.3"
+	GoreleaserRepo   = "github.com/goreleaser/goreleaser@v1.6.3"
+	platformsEnvName = "PLATFORMS"
+	specFileName     = devtools.ProjectName + ".spec"
+	configFileName   = devtools.ProjectName + ".yml"
 )
 
 // Aliases are shortcuts to long target names.
@@ -52,7 +59,7 @@ func (Build) All() {
 }
 
 // Clean removes the build directory.
-func (Build) Clean(test string) {
+func (Build) Clean() {
 	os.RemoveAll("build") // nolint:errcheck //not required
 }
 
@@ -95,7 +102,7 @@ func (Build) Binary() error {
 		}
 	}
 
-	platform := os.Getenv("PLATFORMS")
+	platform := os.Getenv(platformsEnvName)
 	if platform != "" && devtools.PlatformFiles[platform] == nil {
 		return errors.Errorf("Platform %s not recognized, only supported options: all, darwin, linux, windows, darwin/amd64, darwin/arm64, linux/386, linux/amd64, linux/arm64, windows/386, windows/amd64", platform)
 	}
@@ -177,11 +184,7 @@ func CheckBinaries(platform string, version string) error {
 		return errors.New("No selected platform files found")
 	}
 	for _, platform := range selectedPlatformFiles {
-		var execName = devtools.ProjectName
-		if strings.Contains(platform, "windows") {
-			execName += ".exe"
-		}
-		binary := filepath.Join(path, fmt.Sprintf("%s-%s-%s", devtools.ProjectName, version, platform), execName)
+		binary := binaryName(path, version, platform)
 		if _, err := os.Stat(binary); err != nil {
 			return errors.Wrap(err, "Build: binary check failed")
 		}
@@ -214,4 +217,199 @@ func Notice() error {
 	// "go mod download all" isn't smart enough to know the minimum set of deps needed.
 	// See https://github.com/golang/go/issues/43994#issuecomment-770053099
 	return gotool.Mod.Tidy()
+}
+
+// PACKAGE
+
+// Package runs all the checks including licence, notice, gomod, git changes, followed by binary build.
+func Package() {
+	// these are not allowed in parallel
+	mg.SerialDeps(
+		Build.Clean,
+		CheckLicense,
+		Notice,
+		mage.Deps.CheckModuleTidy,
+		mage.CheckNoChanges,
+		Build.Binary,
+	)
+
+	version, err := fullVersion()
+	if err != nil {
+		panic(err)
+	}
+
+	platforms := devtools.PlatformFiles[os.Getenv(platformsEnvName)]
+	// current by default
+	if platforms == nil {
+		platforms = devtools.PlatformFiles[runtime.GOOS+"/"+runtime.GOARCH]
+	}
+
+	commonFiles := []string{
+		specFileName,
+		configFileName,
+	}
+	archivePath := filepath.Join("build", "packages")
+	if err := os.MkdirAll(archivePath, 0755); err != nil {
+		panic(err)
+	}
+
+	for _, platform := range platforms {
+		isWindows := platform == "windows-x86" || platform == "windows-x86_64"
+
+		// grab binary
+		binaryPath := binaryFilePath(version, platform)
+
+		// prepare package
+		var err error
+		if isWindows {
+			archiveFileName := devtools.ProjectName + platform + ".zip"
+			err = prepareZipArchive(archivePath, archiveFileName, append(commonFiles, binaryPath))
+		} else {
+			archiveFileName := devtools.ProjectName + platform + ".tar.gz"
+			err = prepareTarArchive(archivePath, archiveFileName, append(commonFiles, binaryPath))
+		}
+
+		if err != nil {
+			panic(err)
+		}
+
+	}
+}
+
+func prepareZipArchive(path, archiveFileName string, files []string) error {
+	// remove if it exists
+	_ = os.Remove(path)
+
+	archiveFullName := filepath.Join(path, archiveFileName)
+	archiveFile, err := os.Create(archiveFullName)
+	if err != nil {
+		return errors.Wrapf(err, "failed to create %q", archiveFullName)
+	}
+	defer archiveFile.Close()
+
+	zipWriter := zip.NewWriter(archiveFile)
+	defer zipWriter.Close()
+
+	addFile := func(filePath string, zipWriter *zip.Writer) error {
+		file, err := os.Open(filePath)
+		if err != nil {
+			return errors.Wrap(err, "failed opening a file")
+		}
+		defer file.Close()
+
+		stat, err := file.Stat()
+		if err != nil {
+			return errors.Wrap(err, "failed retrieving stat info for a file")
+		}
+
+		header, err := zip.FileInfoHeader(stat)
+		header.Method = zip.Deflate
+
+		hWriter, err := zipWriter.CreateHeader(header)
+		if err != nil {
+			return errors.Wrap(err, "failed writing zip header")
+		}
+
+		if _, err := io.Copy(hWriter, file); err != nil {
+			return errors.Wrap(err, "failed adding a file into an archive")
+		}
+		return nil
+	}
+
+	for _, filePath := range files {
+		if err := addFile(filePath, zipWriter); err != nil {
+			return errors.Wrapf(err, "failed adding file %q into zip archive", filePath)
+		}
+	}
+
+	return nil
+}
+
+func prepareTarArchive(path, archiveFileName string, files []string) error {
+	// remove if it exists
+	_ = os.Remove(path)
+
+	archiveFullName := filepath.Join(path, archiveFileName)
+	archiveFile, err := os.Create(archiveFullName)
+	if err != nil {
+		return errors.Wrapf(err, "failed to create %q", archiveFullName)
+	}
+	defer archiveFile.Close()
+
+	gzipWriter := gzip.NewWriter(archiveFile)
+	defer gzipWriter.Close()
+
+	tarWriter := tar.NewWriter(gzipWriter)
+	defer tarWriter.Close()
+
+	addFile := func(filePath string, tarWriter *tar.Writer) error {
+		file, err := os.Open(filePath)
+		if err != nil {
+			return errors.Wrap(err, "failed opening a file")
+		}
+		defer file.Close()
+
+		stat, err := file.Stat()
+		if err != nil {
+			return errors.Wrap(err, "failed retrieving stat info for a file")
+		}
+
+		header := &tar.Header{
+			Name:    filePath,
+			Size:    stat.Size(),
+			Mode:    int64(stat.Mode()),
+			ModTime: stat.ModTime(),
+		}
+
+		if err := tarWriter.WriteHeader(header); err != nil {
+			return errors.Wrap(err, "failed writing tar header")
+		}
+
+		if _, err := io.Copy(tarWriter, file); err != nil {
+			return errors.Wrap(err, "failed adding a file into an archive")
+		}
+
+		return nil
+	}
+
+	for _, filePath := range files {
+		if err := addFile(filePath, tarWriter); err != nil {
+			return errors.Wrapf(err, "failed adding file %q into tar archive", filePath)
+		}
+	}
+
+	return nil
+}
+
+func fullVersion() (string, error) {
+	version := tools.DefaultBeatVersion
+	if versionQualifier, versionQualified := os.LookupEnv("VERSION_QUALIFIER"); versionQualified {
+		version += fmt.Sprintf("-%s", versionQualifier)
+	}
+
+	if snapshotEnv := os.Getenv("SNAPSHOT"); snapshotEnv != "" {
+		isSnapshot, err := strconv.ParseBool(snapshotEnv)
+		if err != nil {
+			return "", err
+		}
+		if isSnapshot {
+			version += fmt.Sprintf("-%s", "SNAPSHOT")
+		}
+	}
+
+	return version, nil
+}
+
+func binaryFilePath(version, platform string) string {
+	path := filepath.Join("build", "binaries")
+	return binaryName(path, version, platform)
+}
+
+func binaryName(path, version, platform string) string {
+	var execName = devtools.ProjectName
+	if strings.Contains(platform, "windows") {
+		execName += ".exe"
+	}
+
+	return filepath.Join(path, fmt.Sprintf("%s-%s-%s", devtools.ProjectName, version, platform), execName)
 }
