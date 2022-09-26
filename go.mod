@@ -17,7 +17,6 @@ require (
 	github.com/elastic/go-ucfg v0.8.6
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/magefile/mage v1.13.0
-	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.7.1
 	go.elastic.co/go-licence-detector v0.5.0
 	golang.org/x/net v0.0.0-20220809184613-07c6da5e1ced
@@ -53,6 +52,7 @@ require (
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/pierrec/lz4/v4 v4.1.15 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/santhosh-tekuri/jsonschema v1.2.4 // indirect
