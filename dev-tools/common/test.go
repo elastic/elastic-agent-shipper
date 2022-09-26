@@ -7,6 +7,7 @@ package common
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
@@ -18,7 +19,6 @@ import (
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	"github.com/pkg/errors"
 )
 
 func GoUnitTest(ctx context.Context, testCoverage bool) error {
@@ -59,7 +59,7 @@ func GoUnitTest(ctx context.Context, testCoverage bool) error {
 	var outputs []io.Writer
 	fileOutput, err := os.Create(CreateDir(fileName + ".out"))
 	if err != nil {
-		return errors.Wrap(err, "failed to create go test output file")
+		return fmt.Errorf("failed to create go test output file: %w", err)
 	}
 	defer fileOutput.Close()
 	outputs = append(outputs, fileOutput)
@@ -74,7 +74,7 @@ func GoUnitTest(ctx context.Context, testCoverage bool) error {
 		// Command ran.
 		var exitErr *exec.ExitError
 		if !errors.As(err, &exitErr) {
-			return errors.Wrap(err, "failed to execute go")
+			return fmt.Errorf("failed to execute go: %w", err)
 		}
 		// Command ran but failed. Process the output.
 		goTestErr = exitErr
@@ -89,7 +89,7 @@ func GoUnitTest(ctx context.Context, testCoverage bool) error {
 			"-html="+covFile,
 			"-o", htmlCoverReport)
 		if err = coverToHTML(); err != nil {
-			return errors.Wrap(err, "failed to write HTML code coverage report")
+			return fmt.Errorf("failed to write HTML code coverage report: %w", err)
 		}
 	}
 
@@ -102,7 +102,7 @@ func GoUnitTest(ctx context.Context, testCoverage bool) error {
 		// install pre-requisites
 		installCobertura := sh.RunCmd("go", "install", "github.com/boumenot/gocover-cobertura@latest")
 		if err = installCobertura(); err != nil {
-			return errors.Wrap(err, "failed to install gocover-cobertura")
+			return fmt.Errorf("failed to install gocover-cobertura: %w", err)
 		}
 
 		codecovReport = strings.TrimSuffix(covFile,
@@ -110,7 +110,7 @@ func GoUnitTest(ctx context.Context, testCoverage bool) error {
 
 		coverage, err := ioutil.ReadFile(covFile)
 		if err != nil {
-			return errors.Wrap(err, "failed to read code coverage report")
+			return fmt.Errorf("failed to read code coverage report: %w", err)
 		}
 
 		coberturaFile, err := os.Create(codecovReport)
@@ -124,14 +124,14 @@ func GoUnitTest(ctx context.Context, testCoverage bool) error {
 		coverToXML.Stderr = os.Stderr
 		coverToXML.Stdin = bytes.NewReader(coverage)
 		if err = coverToXML.Run(); err != nil {
-			return errors.Wrap(err, "failed to write XML code coverage report")
+			return fmt.Errorf("failed to write XML code coverage report: %w", err)
 		}
 		fmt.Println(">> go run gocover-cobertura:", covFile, "Created") //nolint:forbidigo // just for tests
 	}
 	// Return an error indicating that testing failed.
 	if goTestErr != nil {
 		fmt.Println(">> go test:", "Unit Tests : Test Failed") //nolint:forbidigo // just for tests
-		return errors.Wrap(goTestErr, "go test returned a non-zero value")
+		return fmt.Errorf("go test returned a non-zero value: %w", goTestErr)
 	}
 
 	fmt.Println(">> go test:", "Unit Tests : Test Passed") //nolint:forbidigo // just for tests
