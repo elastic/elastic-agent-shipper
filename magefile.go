@@ -9,6 +9,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -19,7 +20,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent-shipper/dev-tools/common"
 	"github.com/elastic/elastic-agent-shipper/tools"
-	"github.com/pkg/errors"
 
 	//mage:import
 
@@ -97,7 +97,7 @@ func (Build) Binary() error {
 
 	platform := os.Getenv("PLATFORMS")
 	if platform != "" && devtools.PlatformFiles[platform] == nil {
-		return errors.Errorf("Platform %s not recognized, only supported options: all, darwin, linux, windows, darwin/amd64, darwin/arm64, linux/386, linux/amd64, linux/arm64, windows/386, windows/amd64", platform)
+		return fmt.Errorf("Platform %s not recognized, only supported options: all, darwin, linux, windows, darwin/amd64, darwin/arm64, linux/386, linux/amd64, linux/arm64, windows/386, windows/amd64", platform)
 	}
 	switch platform {
 	case "windows", "linux", "darwin":
@@ -118,7 +118,7 @@ func (Build) Binary() error {
 	fmt.Println(">> build: Building binary for", platform) //nolint:forbidigo // it's ok to use fmt.println in mage
 	err := sh.RunWithV(env, "goreleaser", args...)
 	if err != nil {
-		return errors.Wrapf(err, "Build failed on %s", platform)
+		return fmt.Errorf("Build failed on %s: %w", platform, err)
 	}
 	return CheckBinaries(platform, env["DEFAULT_VERSION"])
 
@@ -183,7 +183,7 @@ func CheckBinaries(platform string, version string) error {
 		}
 		binary := filepath.Join(path, fmt.Sprintf("%s-%s-%s", devtools.ProjectName, version, platform), execName)
 		if _, err := os.Stat(binary); err != nil {
-			return errors.Wrap(err, "Build: binary check failed")
+			return fmt.Errorf("Build: binary check failed: %w", err)
 		}
 	}
 
