@@ -61,6 +61,7 @@ by running `mage -l` from the root of the repository. The most commonly used com
 * `mage build` to build the data shipper binary.
 * `mage check` to check license files and dependencies.
 * `mage lint` to lint the source code using [golangci-lint](https://golangci-lint.run/).
+* `mage package` to produce release artifacts.
 * `go test ./...` to run all tests.
 
 Run mage commands with the `-v` flag for more detailed output, for example `mage -v check`.

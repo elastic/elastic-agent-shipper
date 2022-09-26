@@ -1,0 +1,16 @@
+version: 2
+outputs:
+  - name: elasticsearch
+    description: Elasticsearch
+    platforms: &platforms
+      - linux/amd64
+      - linux/arm64
+      - darwin/amd64
+      - darwin/arm64
+      - windows/amd64
+      - container/amd64
+      - container/arm64
+  - name: logstash
+    description: Logstash
+    platforms: *platforms
+  

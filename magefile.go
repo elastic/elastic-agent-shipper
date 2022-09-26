@@ -12,8 +12,10 @@ import (
 	"archive/zip"
 	"compress/gzip"
 	"context"
+	"crypto/sha512"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -35,7 +37,7 @@ import (
 const (
 	GoreleaserRepo   = "github.com/goreleaser/goreleaser@v1.6.3"
 	platformsEnvName = "PLATFORMS"
-	specFileName     = devtools.ProjectName + ".spec"
+	specFileName     = devtools.ProjectName + ".spec.yml"
 	configFileName   = devtools.ProjectName + ".yml"
 )
 
@@ -225,11 +227,6 @@ func Notice() error {
 func Package() {
 	// these are not allowed in parallel
 	mg.SerialDeps(
-		Build.Clean,
-		CheckLicense,
-		Notice,
-		mage.Deps.CheckModuleTidy,
-		mage.CheckNoChanges,
 		Build.Binary,
 	)
 
@@ -244,42 +241,74 @@ func Package() {
 		platforms = devtools.PlatformFiles[runtime.GOOS+"/"+runtime.GOARCH]
 	}
 
-	commonFiles := []string{
-		specFileName,
-		configFileName,
-	}
-	archivePath := filepath.Join("build", "packages")
+	archivePath := filepath.Join("build", "distributions")
 	if err := os.MkdirAll(archivePath, 0755); err != nil {
 		panic(err)
 	}
 
 	for _, platform := range platforms {
-		isWindows := platform == "windows-x86" || platform == "windows-x86_64"
+		isWindows := strings.Contains(platform, "windows")
 
 		// grab binary
 		binaryPath := binaryFilePath(version, platform)
 
 		// prepare package
 		var err error
+		var archiveFileName string
+		targetDir := fmt.Sprintf("%s-%s", devtools.ProjectName, platform)
 		if isWindows {
-			archiveFileName := devtools.ProjectName + platform + ".zip"
-			err = prepareZipArchive(archivePath, archiveFileName, append(commonFiles, binaryPath))
+			archiveFileName = fmt.Sprintf("%s-%s.zip", devtools.ProjectName, platform)
+			err = prepareZipArchive(
+				archivePath,
+				targetDir,
+				archiveFileName,
+				map[string]string{
+					specFileName:       specFileName,
+					configFileName:     configFileName,
+					execName(platform): binaryPath,
+				},
+			)
 		} else {
-			archiveFileName := devtools.ProjectName + platform + ".tar.gz"
-			err = prepareTarArchive(archivePath, archiveFileName, append(commonFiles, binaryPath))
+			archiveFileName = fmt.Sprintf("%s-%s.tar.gz", devtools.ProjectName, platform)
+			err = prepareTarArchive(
+				archivePath,
+				targetDir,
+				archiveFileName,
+				map[string]string{
+					specFileName:       specFileName,
+					configFileName:     configFileName,
+					execName(platform): binaryPath,
+				},
+			)
 		}
 
 		if err != nil {
 			panic(err)
 		}
 
+		// generate sha sum
+		archiveFullPath := filepath.Join(archivePath, archiveFileName)
+		archive, err := os.Open(archiveFullPath)
+		if err != nil {
+			panic(errors.Wrapf(err, "failed opening archive %q", archiveFileName))
+		}
+
+		h := sha512.New()
+		if _, err := io.Copy(h, archive); err != nil {
+			panic(errors.Wrapf(err, "failed computing hash for archive %q", archiveFileName))
+		}
+
+		shaFile := archiveFullPath + ".sha512"
+		content := fmt.Sprintf("%x  %s\n", h.Sum(nil), archiveFileName)
+		if err := ioutil.WriteFile(shaFile, []byte(content), 0644); err != nil {
+			panic(errors.Wrapf(err, "failed writing hash for archive %q", archiveFileName))
+		}
+
+		archive.Close()
 	}
 }
 
-func prepareZipArchive(path, archiveFileName string, files []string) error {
-	// remove if it exists
-	_ = os.Remove(path)
-
+func prepareZipArchive(path, targetDir, archiveFileName string, files map[string]string) error {
 	archiveFullName := filepath.Join(path, archiveFileName)
 	archiveFile, err := os.Create(archiveFullName)
 	if err != nil {
@@ -290,7 +319,7 @@ func prepareZipArchive(path, archiveFileName string, files []string) error {
 	zipWriter := zip.NewWriter(archiveFile)
 	defer zipWriter.Close()
 
-	addFile := func(filePath string, zipWriter *zip.Writer) error {
+	addFile := func(fileName, filePath string, zipWriter *zip.Writer) error {
 		file, err := os.Open(filePath)
 		if err != nil {
 			return errors.Wrap(err, "failed opening a file")
@@ -304,6 +333,7 @@ func prepareZipArchive(path, archiveFileName string, files []string) error {
 
 		header, err := zip.FileInfoHeader(stat)
 		header.Method = zip.Deflate
+		header.Name = filepath.Join(targetDir, fileName)
 
 		hWriter, err := zipWriter.CreateHeader(header)
 		if err != nil {
@@ -316,8 +346,8 @@ func prepareZipArchive(path, archiveFileName string, files []string) error {
 		return nil
 	}
 
-	for _, filePath := range files {
-		if err := addFile(filePath, zipWriter); err != nil {
+	for fileName, filePath := range files {
+		if err := addFile(fileName, filePath, zipWriter); err != nil {
 			return errors.Wrapf(err, "failed adding file %q into zip archive", filePath)
 		}
 	}
@@ -325,10 +355,7 @@ func prepareZipArchive(path, archiveFileName string, files []string) error {
 	return nil
 }
 
-func prepareTarArchive(path, archiveFileName string, files []string) error {
-	// remove if it exists
-	_ = os.Remove(path)
-
+func prepareTarArchive(path, targetDir, archiveFileName string, files map[string]string) error {
 	archiveFullName := filepath.Join(path, archiveFileName)
 	archiveFile, err := os.Create(archiveFullName)
 	if err != nil {
@@ -342,7 +369,7 @@ func prepareTarArchive(path, archiveFileName string, files []string) error {
 	tarWriter := tar.NewWriter(gzipWriter)
 	defer tarWriter.Close()
 
-	addFile := func(filePath string, tarWriter *tar.Writer) error {
+	addFile := func(fileName, filePath string, tarWriter *tar.Writer) error {
 		file, err := os.Open(filePath)
 		if err != nil {
 			return errors.Wrap(err, "failed opening a file")
@@ -355,7 +382,7 @@ func prepareTarArchive(path, archiveFileName string, files []string) error {
 		}
 
 		header := &tar.Header{
-			Name:    filePath,
+			Name:    filepath.Join(targetDir, fileName),
 			Size:    stat.Size(),
 			Mode:    int64(stat.Mode()),
 			ModTime: stat.ModTime(),
@@ -372,8 +399,8 @@ func prepareTarArchive(path, archiveFileName string, files []string) error {
 		return nil
 	}
 
-	for _, filePath := range files {
-		if err := addFile(filePath, tarWriter); err != nil {
+	for fileName, filePath := range files {
+		if err := addFile(fileName, filePath, tarWriter); err != nil {
 			return errors.Wrapf(err, "failed adding file %q into tar archive", filePath)
 		}
 	}
@@ -406,10 +433,14 @@ func binaryFilePath(version, platform string) string {
 }
 
 func binaryName(path, version, platform string) string {
+	return filepath.Join(path, fmt.Sprintf("%s-%s-%s", devtools.ProjectName, version, platform), execName(platform))
+}
+
+func execName(platform string) string {
 	var execName = devtools.ProjectName
 	if strings.Contains(platform, "windows") {
 		execName += ".exe"
 	}
 
-	return filepath.Join(path, fmt.Sprintf("%s-%s-%s", devtools.ProjectName, version, platform), execName)
+	return execName
 }
