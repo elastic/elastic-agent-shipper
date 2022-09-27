@@ -7,10 +7,14 @@ package controller
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/signal"
 	"sync"
 	"sync/atomic"
+	"syscall"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper/config"
 )
@@ -42,6 +46,30 @@ func newClientHandler() clientHandler {
 		units:             make(map[string]*client.Unit),
 		shipperIsStopping: 0,
 	}
+}
+
+// Run starts the gRPC server
+func (c *clientHandler) Run(cfg config.ShipperConfig, unit *client.Unit) (err error) {
+	_ = unit.UpdateState(client.UnitStateConfiguring, "Initialising shipper server", nil)
+	runner, err := NewServerRunner(cfg)
+	if err != nil {
+		return err
+	}
+
+	handleShutdown(func() { _ = runner.Close() }, c.shutdownInit)
+
+	// This will get sent after the server has shutdown, signaling to the runloop that it can stop.
+	// The shipper has no queues connected right now, but once it does, this function can't run until
+	// after the queues have emptied and/or shutdown. We'll presumably have a better idea of how this
+	// will work once we have queues connected here.
+	defer func() {
+		c.log.Debugf("shipper has completed shutdown, stopping")
+		c.shutdownComplete.Done()
+	}()
+	c.shutdownComplete.Add(1)
+
+	_ = unit.UpdateState(client.UnitStateHealthy, "Shipper Running", nil)
+	return runner.Start()
 }
 
 func (c *clientHandler) addUnit(unit *client.Unit) {
@@ -230,4 +258,31 @@ func reportErrors(ctx context.Context, agentClient client.V2) {
 			log.Errorf("Got error from controller: %s", err)
 		}
 	}
+}
+
+// handle shutdown of the shipper
+func handleShutdown(shutdownFunc func(), externalSignal doneChan) {
+	log := logp.L()
+
+	// On termination signals, gracefully stop the shipper
+	sigc := make(chan os.Signal, 1)
+	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+
+	go func() {
+		select {
+		case <-externalSignal:
+			log.Debugf("Shutting down from agent controller")
+			shutdownFunc()
+			return
+		case sig := <-sigc:
+			switch sig {
+			case syscall.SIGINT, syscall.SIGTERM:
+				log.Debug("Received sigterm/sigint, stopping")
+			case syscall.SIGHUP:
+				log.Debug("Received sighup, stopping")
+			}
+			shutdownFunc()
+			return
+		}
+	}()
 }
