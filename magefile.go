@@ -13,6 +13,7 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/sha512"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -25,7 +26,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent-shipper/dev-tools/common"
 	"github.com/elastic/elastic-agent-shipper/tools"
-	"github.com/pkg/errors"
 
 	//mage:import
 
@@ -106,7 +106,7 @@ func (Build) Binary() error {
 
 	platform := os.Getenv(platformsEnvName)
 	if platform != "" && devtools.PlatformFiles[platform] == nil {
-		return errors.Errorf("Platform %s not recognized, only supported options: all, darwin, linux, windows, darwin/amd64, darwin/arm64, linux/386, linux/amd64, linux/arm64, windows/386, windows/amd64", platform)
+		return fmt.Errorf("Platform %s not recognized, only supported options: all, darwin, linux, windows, darwin/amd64, darwin/arm64, linux/386, linux/amd64, linux/arm64, windows/386, windows/amd64", platform)
 	}
 	switch platform {
 	case "windows", "linux", "darwin":
@@ -127,7 +127,7 @@ func (Build) Binary() error {
 	fmt.Println(">> build: Building binary for", platform) //nolint:forbidigo // it's ok to use fmt.println in mage
 	err := sh.RunWithV(env, "goreleaser", args...)
 	if err != nil {
-		return errors.Wrapf(err, "Build failed on %s", platform)
+		return fmt.Errorf("Build failed on %s: %w", platform, err)
 	}
 	return CheckBinaries(platform, env["DEFAULT_VERSION"])
 
@@ -188,7 +188,7 @@ func CheckBinaries(platform string, version string) error {
 	for _, platform := range selectedPlatformFiles {
 		binary := binaryName(path, version, platform)
 		if _, err := os.Stat(binary); err != nil {
-			return errors.Wrap(err, "Build: binary check failed")
+			return fmt.Errorf("Build: binary check failed: %w", err)
 		}
 	}
 
@@ -290,18 +290,18 @@ func Package() {
 		archiveFullPath := filepath.Join(archivePath, archiveFileName)
 		archive, err := os.Open(archiveFullPath)
 		if err != nil {
-			panic(errors.Wrapf(err, "failed opening archive %q", archiveFileName))
+			panic(fmt.Errorf("failed opening archive %q: %w", archiveFileName, err))
 		}
 
 		h := sha512.New()
 		if _, err := io.Copy(h, archive); err != nil {
-			panic(errors.Wrapf(err, "failed computing hash for archive %q", archiveFileName))
+			panic(fmt.Errorf("failed computing hash for archive %q: %w", archiveFileName, err))
 		}
 
 		shaFile := archiveFullPath + ".sha512"
 		content := fmt.Sprintf("%x  %s\n", h.Sum(nil), archiveFileName)
 		if err := ioutil.WriteFile(shaFile, []byte(content), 0644); err != nil {
-			panic(errors.Wrapf(err, "failed writing hash for archive %q", archiveFileName))
+			panic(fmt.Errorf("failed writing hash for archive %q: %w", archiveFileName, err))
 		}
 
 		archive.Close()
@@ -312,7 +312,7 @@ func prepareZipArchive(path, targetDir, archiveFileName string, files map[string
 	archiveFullName := filepath.Join(path, archiveFileName)
 	archiveFile, err := os.Create(archiveFullName)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create %q", archiveFullName)
+		return fmt.Errorf("failed to create %q: %w", archiveFullName, err)
 	}
 	defer archiveFile.Close()
 
@@ -322,13 +322,13 @@ func prepareZipArchive(path, targetDir, archiveFileName string, files map[string
 	addFile := func(fileName, filePath string, zipWriter *zip.Writer) error {
 		file, err := os.Open(filePath)
 		if err != nil {
-			return errors.Wrap(err, "failed opening a file")
+			return fmt.Errorf("failed opening a file: %w", err)
 		}
 		defer file.Close()
 
 		stat, err := file.Stat()
 		if err != nil {
-			return errors.Wrap(err, "failed retrieving stat info for a file")
+			return fmt.Errorf("failed retrieving stat info for a file: %w", err)
 		}
 
 		header, err := zip.FileInfoHeader(stat)
@@ -337,18 +337,18 @@ func prepareZipArchive(path, targetDir, archiveFileName string, files map[string
 
 		hWriter, err := zipWriter.CreateHeader(header)
 		if err != nil {
-			return errors.Wrap(err, "failed writing zip header")
+			return fmt.Errorf("failed writing zip header: %w", err)
 		}
 
 		if _, err := io.Copy(hWriter, file); err != nil {
-			return errors.Wrap(err, "failed adding a file into an archive")
+			return fmt.Errorf("failed adding a file into an archive: %w", err)
 		}
 		return nil
 	}
 
 	for fileName, filePath := range files {
 		if err := addFile(fileName, filePath, zipWriter); err != nil {
-			return errors.Wrapf(err, "failed adding file %q into zip archive", filePath)
+			return fmt.Errorf("failed adding file %q into zip archive: %w", filePath, err)
 		}
 	}
 
@@ -359,7 +359,7 @@ func prepareTarArchive(path, targetDir, archiveFileName string, files map[string
 	archiveFullName := filepath.Join(path, archiveFileName)
 	archiveFile, err := os.Create(archiveFullName)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create %q", archiveFullName)
+		return fmt.Errorf("failed to create %q: %w", archiveFullName, err)
 	}
 	defer archiveFile.Close()
 
@@ -372,13 +372,13 @@ func prepareTarArchive(path, targetDir, archiveFileName string, files map[string
 	addFile := func(fileName, filePath string, tarWriter *tar.Writer) error {
 		file, err := os.Open(filePath)
 		if err != nil {
-			return errors.Wrap(err, "failed opening a file")
+			return fmt.Errorf("failed opening a file: %w", err)
 		}
 		defer file.Close()
 
 		stat, err := file.Stat()
 		if err != nil {
-			return errors.Wrap(err, "failed retrieving stat info for a file")
+			return fmt.Errorf("failed retrieving stat info for a file: %w", err)
 		}
 
 		header := &tar.Header{
@@ -389,11 +389,11 @@ func prepareTarArchive(path, targetDir, archiveFileName string, files map[string
 		}
 
 		if err := tarWriter.WriteHeader(header); err != nil {
-			return errors.Wrap(err, "failed writing tar header")
+			return fmt.Errorf("failed writing tar header: %w", err)
 		}
 
 		if _, err := io.Copy(tarWriter, file); err != nil {
-			return errors.Wrap(err, "failed adding a file into an archive")
+			return fmt.Errorf("failed adding a file into an archive: %w", err)
 		}
 
 		return nil
@@ -401,7 +401,7 @@ func prepareTarArchive(path, targetDir, archiveFileName string, files map[string
 
 	for fileName, filePath := range files {
 		if err := addFile(fileName, filePath, tarWriter); err != nil {
-			return errors.Wrapf(err, "failed adding file %q into tar archive", filePath)
+			return fmt.Errorf("failed adding file %q into tar archive: %w", filePath, err)
 		}
 	}
 

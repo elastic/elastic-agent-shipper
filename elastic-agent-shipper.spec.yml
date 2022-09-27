@@ -11,8 +11,4 @@ outputs:
       - container/amd64
       - container/arm64
     command: {}
-  - name: logstash
-    description: Logstash
-    platforms: *platforms
-    command: {}
   
