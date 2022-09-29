@@ -103,3 +103,16 @@ pull_request_rules:
           To fixup this pull request, you need to add the backport labels for the needed
           branches, such as:
           * `backport-v8./d.0` is the label to automatically backport to the `8./d` branch. `/d` is the digit
+  - name: backport patches to 8.5 branch
+    conditions:
+      - merged
+      - label=backport-v8.5.0
+    actions:
+      backport:
+        assignees:
+          - "{{ author }}"
+        branches:
+          - "8.5"
+        labels:
+          - "backport"
+        title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"

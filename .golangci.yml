@@ -50,6 +50,7 @@ linters:
     - noctx # noctx finds sending http request without context.Context
     - unconvert # Remove unnecessary type conversions
     - wastedassign # wastedassign finds wasted assignment statements.
+    - gomodguard # check for blocked dependencies
 
 # all available settings of specific linters
 linters-settings:
