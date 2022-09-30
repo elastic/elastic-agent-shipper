@@ -45,6 +45,7 @@ const (
 // nolint: deadcode // it's used by `mage`.
 var Aliases = map[string]interface{}{
 	"build":           Build.Binary,
+	"package":         Package.Artifacts,
 	"unitTest":        Test.Unit,
 	"integrationTest": Test.Integration,
 }
@@ -223,8 +224,17 @@ func Notice() error {
 
 // PACKAGE
 
+// Package contains targets related to producting project archives
+type Package mg.Namespace
+
+// All builds binaries for the all os/arch and produces resulting archives.
+func (Package) All() {
+	os.Setenv("PLATFORMS", "all")
+	mg.Deps(Package.Artifacts)
+}
+
 // Package runs all the checks including licence, notice, gomod, git changes, followed by binary build.
-func Package() {
+func (Package) Artifacts() {
 	// these are not allowed in parallel
 	mg.SerialDeps(
 		Build.Binary,
