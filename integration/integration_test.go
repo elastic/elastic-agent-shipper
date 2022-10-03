@@ -295,7 +295,6 @@ func TestPublishMessage(t *testing.T) {
 		Fields:   sampleValues,
 	}
 	events := []*messages.Event{e}
-
 	_, err = client.PublishEvents(env.ctx, &messages.PublishRequest{
 		Events: events,
 	})
