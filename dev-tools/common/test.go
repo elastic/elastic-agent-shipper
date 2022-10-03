@@ -9,13 +9,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"path/filepath"
-	"strings"
-
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
@@ -33,7 +32,7 @@ func GoUnitTest(ctx context.Context, testCoverage bool) error {
 	} else {
 		gotestsumArgs = append(gotestsumArgs, "-f", "standard-quiet")
 	}
-	//create report files
+	// create report files
 	fileName := filepath.Join("build", "TEST-go-unit")
 	CreateDir(fileName + ".xml")
 	gotestsumArgs = append(gotestsumArgs, "--junitfile", fileName+".xml")
@@ -135,5 +134,63 @@ func GoUnitTest(ctx context.Context, testCoverage bool) error {
 	}
 
 	fmt.Println(">> go test:", "Unit Tests : Test Passed") //nolint:forbidigo // just for tests
+	return nil
+}
+
+func GoIntegrationTest(ctx context.Context) error {
+	mg.Deps(InstallGoTestTools)
+	fmt.Println(">> go test:", "Integration Testing") //nolint:forbidigo // just for tests
+	var testArgs []string
+	fileName := filepath.Join("build", "TEST-go-integration")
+
+	// Just run integration tests
+	testArgs = append(testArgs, "-tags=integration")
+	// Force integration tests to run each time
+	testArgs = append(testArgs, "-count=1")
+	// Make the timeout smaller
+	testArgs = append(testArgs, "-timeout=60s")
+
+	gotestsumArgs := []string{"--no-color"}
+	if mg.Verbose() {
+		gotestsumArgs = append(gotestsumArgs, "-f", "standard-verbose")
+	} else {
+		gotestsumArgs = append(gotestsumArgs, "-f", "standard-quiet")
+	}
+
+	testArgs = append(testArgs, []string{"./..."}...)
+
+	args := append(gotestsumArgs, append([]string{"--"}, testArgs...)...)
+
+	goTest := MakeCommand(ctx, map[string]string{}, "gotestsum", args...)
+	// Wire up the outputs.
+	var outputs []io.Writer
+	fileOutput, err := os.Create(CreateDir(fileName + ".out"))
+	if err != nil {
+		return fmt.Errorf("failed to create go test output file: %w", err)
+	}
+	defer fileOutput.Close()
+	outputs = append(outputs, fileOutput)
+
+	output := io.MultiWriter(outputs...)
+	goTest.Stdout = io.MultiWriter(output, os.Stdout)
+	goTest.Stderr = io.MultiWriter(output, os.Stderr)
+	err = goTest.Run()
+
+	var goTestErr *exec.ExitError
+	if err != nil {
+		// Command ran.
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) {
+			return fmt.Errorf("failed to execute go: %w", err)
+		}
+		// Command ran but failed. Process the output.
+		goTestErr = exitErr
+	}
+	if goTestErr != nil {
+		fmt.Println(">> go test:", "Integration Tests : Test Failed") //nolint:forbidigo // just for tests
+		return fmt.Errorf("go test returned a non-zero value: %w", goTestErr)
+	}
+
+	fmt.Println(">> go test:", "Integration Tests : Test Passed") //nolint:forbidigo // just for tests
 	return nil
 }

@@ -146,7 +146,16 @@ func (Test) All() {
 
 // Integration runs all the integration tests (use alias `mage integrationTest`).
 func (Test) Integration(ctx context.Context) error {
-	return nil
+	platform := runtime.GOOS + "/" + runtime.GOARCH
+	version := tools.DefaultBeatVersion
+	os.Setenv("PLATFORMS", platform)
+	mg.Deps(Build.Binary)
+	binary, err := absoluteBinaryPath(version, platform)
+	if err != nil {
+		return fmt.Errorf("error determining native binary: %w", err)
+	}
+	os.Setenv("INTEGRATION_TEST_BINARY", binary)
+	return devtools.GoIntegrationTest(ctx)
 }
 
 // Unit runs all the unit tests (use alias `mage unitTest`).
@@ -453,4 +462,24 @@ func execName(platform string) string {
 	}
 
 	return execName
+}
+
+func absoluteBinaryPath(version, platform string) (string, error) {
+	binary := ""
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("unable to get current working directory: %w", err)
+	}
+	selectedPlatformFiles := devtools.PlatformFiles[platform]
+	if selectedPlatformFiles == nil {
+		return "", fmt.Errorf("no platform files found for %s", platform)
+	}
+
+	for _, pf := range selectedPlatformFiles {
+		binary = filepath.Join(dir, binaryFilePath(version, pf))
+		if _, err := os.Stat(binary); err != nil {
+			return "", fmt.Errorf("error reading %s: %w", binary, err)
+		}
+	}
+	return binary, nil
 }
