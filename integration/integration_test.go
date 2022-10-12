@@ -25,6 +25,7 @@ import (
 
 type TestingEnvironment struct {
 	t          *testing.T
+	ctx        context.Context
 	process    *os.Process
 	stderrFile *os.File
 	stdoutFile *os.File
@@ -67,12 +68,22 @@ func NewTestingEnvironment(t *testing.T, config string) (*TestingEnvironment, er
 		return nil, fmt.Errorf("error creating process %s: %w", binaryFilename, err)
 	}
 
+	deadline, ok := t.Deadline()
+	if !ok {
+		// default deadline if test is run without a deadline -timeout 0
+		deadline = time.Now().Add(time.Second * 10)
+	}
+	ctx, cancel := context.WithDeadline(context.Background(), deadline.Add(time.Millisecond*-500))
+	t.Cleanup(cancel)
+
 	env := &TestingEnvironment{
 		t:          t,
+		ctx:        ctx,
 		process:    process,
 		stderrFile: stderrFile,
 		stdoutFile: stdoutFile,
 	}
+
 	return env, nil
 }
 
@@ -106,12 +117,8 @@ func (e *TestingEnvironment) GetStdout() (string, error) {
 func (e *TestingEnvironment) WaitUntil(location string, match string) (bool, error) {
 	var pFile *os.File
 	var filename string
-	deadline, ok := e.t.Deadline()
-	if !ok {
-		deadline = time.Now().Add(time.Second * 10)
-	}
 	ticker := time.NewTicker(time.Second)
-	timer := time.After(time.Until(deadline.Add(time.Millisecond * -500)))
+
 	defer func() { ticker.Stop() }()
 
 	switch location {
@@ -136,7 +143,7 @@ func (e *TestingEnvironment) WaitUntil(location string, match string) (bool, err
 			if strings.Contains(string(b), match) {
 				return true, nil
 			}
-		case <-timer:
+		case <-e.ctx.Done():
 			return false, nil
 		}
 	}
@@ -288,8 +295,8 @@ func TestPublishMessage(t *testing.T) {
 		Fields:   sampleValues,
 	}
 	events := []*messages.Event{e}
-	ctx := context.Background()
-	_, err = client.PublishEvents(ctx, &messages.PublishRequest{
+
+	_, err = client.PublishEvents(env.ctx, &messages.PublishRequest{
 		Events: events,
 	})
 	if err != nil {
