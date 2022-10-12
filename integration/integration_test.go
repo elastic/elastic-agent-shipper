@@ -275,26 +275,10 @@ func TestPublishMessage(t *testing.T) {
 	}
 
 	unique := "UniqueStringToLookForInOutput"
-	sampleValues, err := helpers.NewStruct(map[string]interface{}{
-		"string": unique,
-		"number": 42,
-	})
-
-	e := &messages.Event{
-		Timestamp: timestamppb.Now(),
-		Source: &messages.Source{
-			InputId:  "input",
-			StreamId: "stream",
-		},
-		DataStream: &messages.DataStream{
-			Type:      "log",
-			Dataset:   "default",
-			Namespace: "default",
-		},
-		Metadata: sampleValues,
-		Fields:   sampleValues,
+	events, err := createEvents([]string{unique})
+	if err != nil {
+		t.Fatalf("error creating events: %s\n", err)
 	}
-	events := []*messages.Event{e}
 
 	_, err = client.PublishEvents(env.ctx, &messages.PublishRequest{
 		Events: events,
@@ -319,4 +303,205 @@ func TestPublishMessage(t *testing.T) {
 		}
 		t.Fatalf("Event wasn't published.\nstderr:\n%s\nstdout:\n%s\n", stderr, stdout)
 	}
+}
+
+func TestDiskQueue(t *testing.T) {
+	var config strings.Builder
+	queue_path := t.TempDir()
+
+	_, _ = config.WriteString("server:\n")
+	_, _ = config.WriteString("  strict_mode: false\n")
+	_, _ = config.WriteString("  port: 50052\n")
+	_, _ = config.WriteString("  tls: false\n")
+	_, _ = config.WriteString("logging:\n")
+	_, _ = config.WriteString("  level: debug\n")
+	_, _ = config.WriteString("  selectors: [\"*\"]\n")
+	_, _ = config.WriteString("  to_stderr: true\n")
+	_, _ = config.WriteString("queue:\n")
+	_, _ = config.WriteString("  disk:\n")
+	_, _ = config.WriteString("    path: " + queue_path + "\n")
+	_, _ = config.WriteString("    max_size: 10G\n")
+
+	env, err := NewTestingEnvironment(t, config.String())
+	if err != nil {
+		t.Fatalf("Error creating environment: %s", err)
+	}
+	t.Cleanup(func() { env.Stop() })
+
+	found, err := env.WaitUntil("stderr", "gRPC server is ready and is listening on")
+	if err != nil {
+		t.Fatalf("Error waiting for server to start: %s", err)
+	}
+
+	if !found {
+		stderr, err := env.GetStderr()
+		if err != nil {
+			t.Errorf("Error getting standard error: %s", err)
+		}
+		stdout, err := env.GetStdout()
+		if err != nil {
+			t.Errorf("Error getting standard out: %s", err)
+		}
+		t.Fatalf("Test executable failed to start.\nstderr:\n%s\nstdout:\n%s\n", stderr, stdout)
+	}
+
+	client, err := env.NewClient("localhost:50052")
+	if err != nil {
+		t.Fatalf("Error creating client: %s", err)
+	}
+
+	unique := "UniqueStringToLookForInOutput"
+	events, err := createEvents([]string{unique})
+	if err != nil {
+		t.Fatalf("error creating events: %s\n", err)
+	}
+
+	_, err = client.PublishEvents(env.ctx, &messages.PublishRequest{
+		Events: events,
+	})
+	if err != nil {
+		stderr, err := env.GetStderr()
+		if err != nil {
+			t.Errorf("Error getting standard error: %s", err)
+		}
+		stdout, err := env.GetStdout()
+		if err != nil {
+			t.Errorf("Error getting standard out: %s", err)
+		}
+		t.Fatalf("Error publishing event: %s\nstderr:\n%s\nstdout:\n%s\n", err, stderr, stdout)
+	}
+
+	found, err = env.WaitUntil("stdout", unique)
+	if err != nil {
+		t.Fatalf("Error looking for publish results: %s", err)
+	}
+
+	if !found {
+		stderr, err := env.GetStderr()
+		if err != nil {
+			t.Errorf("Error getting standard error: %s", err)
+		}
+		stdout, err := env.GetStdout()
+		if err != nil {
+			t.Errorf("Error getting standard out: %s", err)
+		}
+		t.Fatalf("Event wasn't published.\nstderr:\n%s\nstdout:\n%s\n", stderr, stdout)
+	}
+}
+
+func TestCompressEncryptedDiskQueue(t *testing.T) {
+	var config strings.Builder
+	queue_path := t.TempDir()
+
+	_, _ = config.WriteString("server:\n")
+	_, _ = config.WriteString("  strict_mode: false\n")
+	_, _ = config.WriteString("  port: 50052\n")
+	_, _ = config.WriteString("  tls: false\n")
+	_, _ = config.WriteString("logging:\n")
+	_, _ = config.WriteString("  level: debug\n")
+	_, _ = config.WriteString("  selectors: [\"*\"]\n")
+	_, _ = config.WriteString("  to_stderr: true\n")
+	_, _ = config.WriteString("queue:\n")
+	_, _ = config.WriteString("  disk:\n")
+	_, _ = config.WriteString("    path: " + queue_path + "\n")
+	_, _ = config.WriteString("    max_size: 10G\n")
+	_, _ = config.WriteString("    use_compression: true\n")
+	_, _ = config.WriteString("    use_encryption: true\n")
+	_, _ = config.WriteString("    encryption_password: secret\n")
+
+	env, err := NewTestingEnvironment(t, config.String())
+	if err != nil {
+		t.Fatalf("Error creating environment: %s", err)
+	}
+	t.Cleanup(func() { env.Stop() })
+
+	found, err := env.WaitUntil("stderr", "gRPC server is ready and is listening on")
+	if err != nil {
+		t.Fatalf("Error waiting for server to start: %s", err)
+	}
+
+	if !found {
+		stderr, err := env.GetStderr()
+		if err != nil {
+			t.Errorf("Error getting standard error: %s", err)
+		}
+		stdout, err := env.GetStdout()
+		if err != nil {
+			t.Errorf("Error getting standard out: %s", err)
+		}
+		t.Fatalf("Test executable failed to start.\nstderr:\n%s\nstdout:\n%s\n", stderr, stdout)
+	}
+
+	client, err := env.NewClient("localhost:50052")
+	if err != nil {
+		t.Fatalf("Error creating client: %s", err)
+	}
+
+	unique := "UniqueStringToLookForInOutput"
+	events, err := createEvents([]string{unique})
+	if err != nil {
+		t.Fatalf("error creating events: %s\n", err)
+	}
+
+	_, err = client.PublishEvents(env.ctx, &messages.PublishRequest{
+		Events: events,
+	})
+	if err != nil {
+		stderr, err := env.GetStderr()
+		if err != nil {
+			t.Errorf("Error getting standard error: %s", err)
+		}
+		stdout, err := env.GetStdout()
+		if err != nil {
+			t.Errorf("Error getting standard out: %s", err)
+		}
+		t.Fatalf("Error publishing event: %s\nstderr:\n%s\nstdout:\n%s\n", err, stderr, stdout)
+	}
+
+	found, err = env.WaitUntil("stdout", unique)
+	if err != nil {
+		t.Fatalf("Error looking for publish results: %s", err)
+	}
+
+	if !found {
+		stderr, err := env.GetStderr()
+		if err != nil {
+			t.Errorf("Error getting standard error: %s", err)
+		}
+		stdout, err := env.GetStdout()
+		if err != nil {
+			t.Errorf("Error getting standard out: %s", err)
+		}
+		t.Fatalf("Event wasn't published.\nstderr:\n%s\nstdout:\n%s\n", stderr, stdout)
+	}
+}
+
+func createEvents(values []string) ([]*messages.Event, error) {
+	events := make([]*messages.Event, len(values))
+
+	for i, v := range values {
+		fields, err := helpers.NewStruct(map[string]interface{}{
+			"string": v,
+			"number": 42,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error making fields: %w", err)
+		}
+		e := &messages.Event{
+			Timestamp: timestamppb.Now(),
+			Source: &messages.Source{
+				InputId:  "input",
+				StreamId: "stream",
+			},
+			DataStream: &messages.DataStream{
+				Type:      "log",
+				Dataset:   "default",
+				Namespace: "default",
+			},
+			Metadata: fields,
+			Fields:   fields,
+		}
+		events[i] = e
+	}
+	return events, nil
 }
