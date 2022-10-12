@@ -30,11 +30,11 @@ import (
 	"github.com/elastic/beats/v7/libbeat/esleg/eslegclient"
 	"github.com/elastic/beats/v7/libbeat/outputs"
 	"github.com/elastic/beats/v7/libbeat/outputs/outil"
-	"github.com/elastic/beats/v7/libbeat/publisher"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing"
 	"github.com/elastic/elastic-agent-libs/version"
+	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 	"go.elastic.co/apm"
 )
 
@@ -184,25 +184,39 @@ func (client *Client) Clone() *Client {
 	return c
 }
 */
-func (client *Client) Publish(ctx context.Context, batch publisher.Batch) error {
-	events := batch.Events()
+
+/*type PublishResult struct {
+	retry []*messages.Event
+	drop []*messages.Event
+	err   error
+}
+
+func (client *Client) Publish(ctx context.Context, batch queue.Batch) error {
+	count := batch.Count()
+	events := make([]*messages.Event, count)
+	for i := 0; i < count; i++ {
+		events[i] = batch.Entry(i).(*messages.Event)
+	}
+*/
+
+/*func (client *Client) Publish(ctx context.Context, events []*messages.Event) error {
 	rest, err := client.publishEvents(ctx, events)
 
 	switch {
 	case err == errPayloadTooLarge:
-		batch.Drop()
+		// report fatal error
 	case len(rest) == 0:
 		batch.ACK()
 	default:
 		batch.RetryEvents(rest)
 	}
 	return err
-}
+}*/
 
 // PublishEvents sends all events to elasticsearch. On error a slice with all
 // events not published or confirmed to be processed by elasticsearch will be
 // returned. The input slice backing memory will be reused by return the value.
-func (client *Client) publishEvents(ctx context.Context, data []publisher.Event) ([]publisher.Event, error) {
+func (client *Client) publishEvents(ctx context.Context, data []*messages.Event) ([]*messages.Event, error) {
 	span, ctx := apm.StartSpan(ctx, "publishEvents", "output")
 	defer span.End()
 	begin := time.Now()
@@ -249,7 +263,7 @@ func (client *Client) publishEvents(ctx context.Context, data []publisher.Event)
 		time.Now().Sub(begin))
 
 	// check response for transient errors
-	var failedEvents []publisher.Event
+	var failedEvents []*messages.Event
 	var stats bulkResultStats
 	if status != 200 {
 		failedEvents = data
@@ -283,7 +297,8 @@ func (client *Client) publishEvents(ctx context.Context, data []publisher.Event)
 
 // bulkEncodePublishRequest encodes all bulk requests and returns slice of events
 // successfully added to the list of bulk items and the list of bulk items.
-func (client *Client) bulkEncodePublishRequest(version version.V, data []publisher.Event) ([]publisher.Event, []interface{}) {
+func (client *Client) bulkEncodePublishRequest(version version.V, data []*messages.Event) ([]*messages.Event, []interface{}) {
+	// TODO fix me
 	/*okEvents := data[:0]
 	bulkItems := []interface{}{}
 	for i := range data {
@@ -372,7 +387,7 @@ func (client *Client) getPipeline(event *beat.Event) (string, error) {
 // to be tried again due to error code returned for that items. If indexing an
 // event failed due to some error in the event itself (e.g. does not respect mapping),
 // the event will be dropped.
-func (client *Client) bulkCollectPublishFails(result eslegclient.BulkResult, data []publisher.Event) ([]publisher.Event, bulkResultStats) {
+func (client *Client) bulkCollectPublishFails(result eslegclient.BulkResult, data []*messages.Event) ([]*messages.Event, bulkResultStats) {
 	reader := newJSONReader(result)
 	if err := bulkReadToItems(reader); err != nil {
 		client.log.Errorf("failed to parse bulk response: %v", err.Error())
@@ -406,7 +421,7 @@ func (client *Client) bulkCollectPublishFails(result eslegclient.BulkResult, dat
 				stats.tooMany++
 			} else {
 				// hard failure, apply policy action
-				result, _ := data[i].Content.Meta.HasKey(dead_letter_marker_field)
+				/*result, _ := data[i].Content.Meta.HasKey(dead_letter_marker_field)
 				if result {
 					stats.nonIndexable++
 					client.log.Errorf("Can't deliver to dead letter index event %#v (status=%v): %s", data[i], status, msg)
@@ -425,11 +440,11 @@ func (client *Client) bulkCollectPublishFails(result eslegclient.BulkResult, dat
 						"error.type":    status,
 						"error.message": string(msg),
 					}
-				} else { // drop
-					stats.nonIndexable++
-					client.log.Warnf("Cannot index event %#v (status=%v): %s, dropping event!", data[i], status, msg)
-					continue
-				}
+				} else { // drop*/
+				stats.nonIndexable++
+				client.log.Warnf("Cannot index event %#v (status=%v): %s, dropping event!", data[i], status, msg)
+				continue
+				//}
 			}
 		}
 

@@ -26,6 +26,9 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 )
 
+// Config specifies all configurable parameters for the Elasticsearch output.
+// Currently these are identical to the parameters in the Beats Elasticsearch
+// output, however this is subject to change as we approach official release.
 type Config struct {
 	Protocol           string            `config:"protocol"`
 	Path               string            `config:"path"`

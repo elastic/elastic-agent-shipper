@@ -1,9 +1,15 @@
 package elasticsearch
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
+	"github.com/elastic/beats/v7/libbeat/beat"
+	"github.com/elastic/beats/v7/libbeat/common"
+	"github.com/elastic/beats/v7/libbeat/esleg/eslegclient"
+	"github.com/elastic/beats/v7/libbeat/outputs"
+	"github.com/elastic/beats/v7/libbeat/publisher"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 	"github.com/elastic/elastic-agent-shipper/queue"
@@ -28,7 +34,12 @@ func NewElasticSearch(config *Config, queue *queue.Queue) *ElasticSearchOutput {
 	return out
 }
 
-func (out *ElasticSearchOutput) Start() {
+func (out *ElasticSearchOutput) Start() error {
+	client, err := makeES(*out.config)
+	if err != nil {
+		return err
+	}
+
 	out.wg.Add(1)
 	go func() {
 		defer out.wg.Done()
@@ -42,10 +53,14 @@ func (out *ElasticSearchOutput) Start() {
 				// time for the output to shut down.
 				break
 			}
+			count := batch.Count()
+			events := make([]*messages.Event, count)
 			for i := 0; i < batch.Count(); i++ {
-				if event, ok := batch.Entry(i).(*messages.Event); ok {
-					out.send(event)
-				}
+				events[i] = batch.Entry(i).(*messages.Event)
+			}
+
+			for len(events) > 0 {
+				events, err = client.publishEvents(context.TODO(), events)
 			}
 			// This tells the queue that we're done with these events
 			// and they can be safely discarded. The Beats queue interface
@@ -57,6 +72,7 @@ func (out *ElasticSearchOutput) Start() {
 			batch.Done()
 		}
 	}()
+	return nil
 }
 
 func (*ElasticSearchOutput) send(event *messages.Event) {
@@ -71,37 +87,37 @@ func (out *ElasticSearchOutput) Wait() {
 	out.wg.Wait()
 }
 
-/*func makeES(
-	im outputs.IndexManager,
+func makeES(
+	/*im outputs.IndexManager,
 	beat beat.Info,
-	observer outputs.Observer,
-	cfg *config.C,
-) (outputs.Group, error) {
+	observer outputs.Observer,*/
+	config Config,
+) (Client, error) {
 	log := logp.NewLogger(logSelector)
-	if !cfg.HasField("bulk_max_size") {
+	/*if !cfg.HasField("bulk_max_size") {
 		cfg.SetInt("bulk_max_size", -1, defaultBulkSize)
-	}
+	}*/
 
 	index, pipeline, err := buildSelectors(im, beat, cfg)
 	if err != nil {
-		return outputs.Fail(err)
+		return nil, err
 	}
+	/*
+		config := defaultConfig
+		if err := cfg.Unpack(&config); err != nil {
+			return outputs.Fail(err)
+		}
 
-	config := defaultConfig
-	if err := cfg.Unpack(&config); err != nil {
-		return outputs.Fail(err)
-	}
+		policy, err := newNonIndexablePolicy(config.NonIndexablePolicy)
+		if err != nil {
+			log.Errorf("error while creating file identifier: %v", err)
+			return outputs.Fail(err)
+		}*/
 
-	policy, err := newNonIndexablePolicy(config.NonIndexablePolicy)
+	/*hosts, err := outputs.ReadHostList(cfg)
 	if err != nil {
-		log.Errorf("error while creating file identifier: %v", err)
 		return outputs.Fail(err)
-	}
-
-	hosts, err := outputs.ReadHostList(cfg)
-	if err != nil {
-		return outputs.Fail(err)
-	}
+	}*/
 
 	if proxyURL := config.Transport.Proxy.URL; proxyURL != nil && !config.Transport.Proxy.Disable {
 		log.Debugf("breaking down proxy URL. Scheme: '%s', host[:port]: '%s', path: '%s'", proxyURL.Scheme, proxyURL.Host, proxyURL.Path)
@@ -113,14 +129,14 @@ func (out *ElasticSearchOutput) Wait() {
 		params = nil
 	}
 
-	if policy.action() == dead_letter_index {
+	/*if policy.action() == dead_letter_index {
 		index = DeadLetterSelector{
 			Selector:        index,
 			DeadLetterIndex: policy.index(),
 		}
-	}
+	}*/
 
-	clients := make([]outputs.NetworkClient, len(hosts))
+	clients := make([]*Client, len(hosts))
 	for i, host := range hosts {
 		esURL, err := common.MakeURL(config.Protocol, config.Path, host, 9200)
 		if err != nil {
@@ -128,8 +144,8 @@ func (out *ElasticSearchOutput) Wait() {
 			return outputs.Fail(err)
 		}
 
-		var client outputs.NetworkClient
-		client, err = NewClient(ClientSettings{
+		//var client outputs.NetworkClient
+		client, err := NewClient(ClientSettings{
 			ConnectionSettings: eslegclient.ConnectionSettings{
 				URL:              esURL,
 				Beatname:         beat.Beat,
@@ -150,12 +166,52 @@ func (out *ElasticSearchOutput) Wait() {
 			NonIndexableAction: policy.action(),
 		}, &connectCallbackRegistry)
 		if err != nil {
-			return outputs.Fail(err)
+			return nil, err
 		}
 
-		client = outputs.WithBackoff(client, config.Backoff.Init, config.Backoff.Max)
 		clients[i] = client
 	}
 
 	return outputs.SuccessNet(config.LoadBalance, config.BulkMaxSize, config.MaxRetries, clients)
+}
+
+/*func SuccessNet(loadbalance bool, batchSize, retry int, netclients []NetworkClient) (Group, error) {
+	if !loadbalance {
+		return Success(batchSize, retry, NewFailoverClient(netclients))
+	}
+
+	clients := NetworkClients(netclients)
+	return Success(batchSize, retry, clients...)
 }*/
+
+// Client provides the minimal interface an output must implement to be usable
+// with the publisher pipeline.
+type OldClient interface {
+	Close() error
+
+	// Publish sends events to the clients sink. A client must synchronously or
+	// asynchronously ACK the given batch, once all events have been processed.
+	// Using Retry/Cancelled a client can return a batch of unprocessed events to
+	// the publisher pipeline. The publisher pipeline (if configured by the output
+	// factory) will take care of retrying/dropping events.
+	// Context is intended for carrying request-scoped values, not for cancellation.
+	Publish(context.Context, publisher.Batch) error
+
+	// String identifies the client type and endpoint.
+	String() string
+
+	// Connect establishes a connection to the clients sink.
+	// The connection attempt shall report an error if no connection could been
+	// established within the given time interval. A timeout value of 0 == wait
+	// forever.
+	Connect() error
+}
+
+// NewClientInterface is a placeholder specifying the API I expect to implement while
+// translating it from the Beats version
+type NewClientInterface interface {
+	Connect() error
+	Close() error
+
+	publishEvents(ctx context.Context, events []*messages.Event) ([]*messages.Event, error)
+}

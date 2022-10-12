@@ -17,6 +17,13 @@
 
 package elasticsearch
 
+import (
+	"github.com/elastic/beats/v7/libbeat/beat"
+	"github.com/elastic/beats/v7/libbeat/outputs"
+	"github.com/elastic/beats/v7/libbeat/outputs/outil"
+	"github.com/elastic/elastic-agent-libs/config"
+)
+
 //func something() {
 /*if !cfg.HasField("bulk_max_size") {
 	cfg.SetInt("bulk_max_size", -1, defaultBulkSize)
@@ -105,9 +112,9 @@ return outputs.SuccessNet(config.LoadBalance, config.BulkMaxSize, config.MaxRetr
 	outputs.RegisterType("elasticsearch", makeES)
 }*/
 
-/*const logSelector = "elasticsearch"
+const logSelector = "elasticsearch"
 
-func makeES(
+/*func makeES(
 	im outputs.IndexManager,
 	beat beat.Info,
 	observer outputs.Observer,
@@ -194,7 +201,7 @@ func makeES(
 	}
 
 	return outputs.SuccessNet(config.LoadBalance, config.BulkMaxSize, config.MaxRetries, clients)
-}
+}*/
 
 func buildSelectors(
 	im outputs.IndexManager,
@@ -227,4 +234,3 @@ func buildPipelineSelector(cfg *config.C) (outil.Selector, error) {
 		Case:             outil.SelectorLowerCase,
 	})
 }
-*/
