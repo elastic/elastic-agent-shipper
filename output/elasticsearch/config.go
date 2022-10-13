@@ -30,6 +30,7 @@ import (
 // Currently these are identical to the parameters in the Beats Elasticsearch
 // output, however this is subject to change as we approach official release.
 type Config struct {
+	Hosts              []string          `config:"hosts"`
 	Protocol           string            `config:"protocol"`
 	Path               string            `config:"path"`
 	Params             map[string]string `config:"parameters"`

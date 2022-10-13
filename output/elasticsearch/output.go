@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/elastic/beats/v7/libbeat/beat"
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/libbeat/esleg/eslegclient"
-	"github.com/elastic/beats/v7/libbeat/outputs"
 	"github.com/elastic/beats/v7/libbeat/publisher"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
@@ -60,7 +58,8 @@ func (out *ElasticSearchOutput) Start() error {
 			}
 
 			for len(events) > 0 {
-				events, err = client.publishEvents(context.TODO(), events)
+				events, _ = client.publishEvents(context.TODO(), events)
+				// TODO: error handling / retry backoff?
 			}
 			// This tells the queue that we're done with these events
 			// and they can be safely discarded. The Beats queue interface
@@ -75,11 +74,6 @@ func (out *ElasticSearchOutput) Start() error {
 	return nil
 }
 
-func (*ElasticSearchOutput) send(event *messages.Event) {
-	//nolint: forbidigo // Console output is intentional
-	fmt.Printf("%v\n", event)
-}
-
 // Wait until the output loop has finished. This doesn't stop the
 // loop by itself, so make sure you only call it when you close
 // the queue.
@@ -92,16 +86,16 @@ func makeES(
 	beat beat.Info,
 	observer outputs.Observer,*/
 	config Config,
-) (Client, error) {
+) (*Client, error) {
 	log := logp.NewLogger(logSelector)
 	/*if !cfg.HasField("bulk_max_size") {
 		cfg.SetInt("bulk_max_size", -1, defaultBulkSize)
 	}*/
 
-	index, pipeline, err := buildSelectors(im, beat, cfg)
+	/*index, pipeline, err := buildSelectors(im, beat, cfg)
 	if err != nil {
 		return nil, err
-	}
+	}*/
 	/*
 		config := defaultConfig
 		if err := cfg.Unpack(&config); err != nil {
@@ -136,12 +130,38 @@ func makeES(
 		}
 	}*/
 
-	clients := make([]*Client, len(hosts))
+	if len(config.Hosts) == 0 {
+		return nil, fmt.Errorf("hosts list cannot be empty")
+	}
+	host := config.Hosts[0]
+	esURL, err := common.MakeURL(config.Protocol, config.Path, host, 9200)
+	if err != nil {
+		log.Errorf("Invalid host param set: %s, Error: %+v", host, err)
+		return nil, err
+	}
+
+	return NewClient(ClientSettings{
+		ConnectionSettings: eslegclient.ConnectionSettings{
+			URL:              esURL,
+			Beatname:         "elastic-agent-shipper",
+			Kerberos:         config.Kerberos,
+			Username:         config.Username,
+			Password:         config.Password,
+			APIKey:           config.APIKey,
+			Parameters:       params,
+			Headers:          config.Headers,
+			CompressionLevel: config.CompressionLevel,
+			// TODO: No observer yet, is leaving it nil ok?
+			EscapeHTML: config.EscapeHTML,
+			Transport:  config.Transport,
+		},
+	}, &connectCallbackRegistry)
+	/*clients := make([]*Client, len(hosts))
 	for i, host := range hosts {
 		esURL, err := common.MakeURL(config.Protocol, config.Path, host, 9200)
 		if err != nil {
 			log.Errorf("Invalid host param set: %s, Error: %+v", host, err)
-			return outputs.Fail(err)
+			return nil, err
 		}
 
 		//var client outputs.NetworkClient
@@ -172,21 +192,14 @@ func makeES(
 		clients[i] = client
 	}
 
-	return outputs.SuccessNet(config.LoadBalance, config.BulkMaxSize, config.MaxRetries, clients)
+	return outputs.SuccessNet(config.LoadBalance, config.BulkMaxSize, config.MaxRetries, clients)*/
+
+	//return nil, nil
 }
-
-/*func SuccessNet(loadbalance bool, batchSize, retry int, netclients []NetworkClient) (Group, error) {
-	if !loadbalance {
-		return Success(batchSize, retry, NewFailoverClient(netclients))
-	}
-
-	clients := NetworkClients(netclients)
-	return Success(batchSize, retry, clients...)
-}*/
 
 // Client provides the minimal interface an output must implement to be usable
 // with the publisher pipeline.
-type OldClient interface {
+type OldClientInterface interface {
 	Close() error
 
 	// Publish sends events to the clients sink. A client must synchronously or
