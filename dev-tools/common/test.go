@@ -7,18 +7,17 @@ package common
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
-	"io"
-	"os"
-	"os/exec"
-
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	"github.com/pkg/errors"
 )
 
 func GoUnitTest(ctx context.Context, testCoverage bool) error {
@@ -33,7 +32,7 @@ func GoUnitTest(ctx context.Context, testCoverage bool) error {
 	} else {
 		gotestsumArgs = append(gotestsumArgs, "-f", "standard-quiet")
 	}
-	//create report files
+	// create report files
 	fileName := filepath.Join("build", "TEST-go-unit")
 	CreateDir(fileName + ".xml")
 	gotestsumArgs = append(gotestsumArgs, "--junitfile", fileName+".xml")
@@ -59,7 +58,7 @@ func GoUnitTest(ctx context.Context, testCoverage bool) error {
 	var outputs []io.Writer
 	fileOutput, err := os.Create(CreateDir(fileName + ".out"))
 	if err != nil {
-		return errors.Wrap(err, "failed to create go test output file")
+		return fmt.Errorf("failed to create go test output file: %w", err)
 	}
 	defer fileOutput.Close()
 	outputs = append(outputs, fileOutput)
@@ -74,7 +73,7 @@ func GoUnitTest(ctx context.Context, testCoverage bool) error {
 		// Command ran.
 		var exitErr *exec.ExitError
 		if !errors.As(err, &exitErr) {
-			return errors.Wrap(err, "failed to execute go")
+			return fmt.Errorf("failed to execute go: %w", err)
 		}
 		// Command ran but failed. Process the output.
 		goTestErr = exitErr
@@ -89,7 +88,7 @@ func GoUnitTest(ctx context.Context, testCoverage bool) error {
 			"-html="+covFile,
 			"-o", htmlCoverReport)
 		if err = coverToHTML(); err != nil {
-			return errors.Wrap(err, "failed to write HTML code coverage report")
+			return fmt.Errorf("failed to write HTML code coverage report: %w", err)
 		}
 	}
 
@@ -102,7 +101,7 @@ func GoUnitTest(ctx context.Context, testCoverage bool) error {
 		// install pre-requisites
 		installCobertura := sh.RunCmd("go", "install", "github.com/boumenot/gocover-cobertura@latest")
 		if err = installCobertura(); err != nil {
-			return errors.Wrap(err, "failed to install gocover-cobertura")
+			return fmt.Errorf("failed to install gocover-cobertura: %w", err)
 		}
 
 		codecovReport = strings.TrimSuffix(covFile,
@@ -110,7 +109,7 @@ func GoUnitTest(ctx context.Context, testCoverage bool) error {
 
 		coverage, err := ioutil.ReadFile(covFile)
 		if err != nil {
-			return errors.Wrap(err, "failed to read code coverage report")
+			return fmt.Errorf("failed to read code coverage report: %w", err)
 		}
 
 		coberturaFile, err := os.Create(codecovReport)
@@ -124,16 +123,74 @@ func GoUnitTest(ctx context.Context, testCoverage bool) error {
 		coverToXML.Stderr = os.Stderr
 		coverToXML.Stdin = bytes.NewReader(coverage)
 		if err = coverToXML.Run(); err != nil {
-			return errors.Wrap(err, "failed to write XML code coverage report")
+			return fmt.Errorf("failed to write XML code coverage report: %w", err)
 		}
 		fmt.Println(">> go run gocover-cobertura:", covFile, "Created") //nolint:forbidigo // just for tests
 	}
 	// Return an error indicating that testing failed.
 	if goTestErr != nil {
 		fmt.Println(">> go test:", "Unit Tests : Test Failed") //nolint:forbidigo // just for tests
-		return errors.Wrap(goTestErr, "go test returned a non-zero value")
+		return fmt.Errorf("go test returned a non-zero value: %w", goTestErr)
 	}
 
 	fmt.Println(">> go test:", "Unit Tests : Test Passed") //nolint:forbidigo // just for tests
+	return nil
+}
+
+func GoIntegrationTest(ctx context.Context) error {
+	mg.Deps(InstallGoTestTools)
+	fmt.Println(">> go test:", "Integration Testing") //nolint:forbidigo // just for tests
+	var testArgs []string
+	fileName := filepath.Join("build", "TEST-go-integration")
+
+	// Just run integration tests
+	testArgs = append(testArgs, "-tags=integration")
+	// Force integration tests to run each time
+	testArgs = append(testArgs, "-count=1")
+	// Make the timeout smaller
+	testArgs = append(testArgs, "-timeout=60s")
+
+	gotestsumArgs := []string{"--no-color"}
+	if mg.Verbose() {
+		gotestsumArgs = append(gotestsumArgs, "-f", "standard-verbose")
+	} else {
+		gotestsumArgs = append(gotestsumArgs, "-f", "standard-quiet")
+	}
+
+	testArgs = append(testArgs, []string{"./..."}...)
+
+	args := append(gotestsumArgs, append([]string{"--"}, testArgs...)...)
+
+	goTest := MakeCommand(ctx, map[string]string{}, "gotestsum", args...)
+	// Wire up the outputs.
+	var outputs []io.Writer
+	fileOutput, err := os.Create(CreateDir(fileName + ".out"))
+	if err != nil {
+		return fmt.Errorf("failed to create go test output file: %w", err)
+	}
+	defer fileOutput.Close()
+	outputs = append(outputs, fileOutput)
+
+	output := io.MultiWriter(outputs...)
+	goTest.Stdout = io.MultiWriter(output, os.Stdout)
+	goTest.Stderr = io.MultiWriter(output, os.Stderr)
+	err = goTest.Run()
+
+	var goTestErr *exec.ExitError
+	if err != nil {
+		// Command ran.
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) {
+			return fmt.Errorf("failed to execute go: %w", err)
+		}
+		// Command ran but failed. Process the output.
+		goTestErr = exitErr
+	}
+	if goTestErr != nil {
+		fmt.Println(">> go test:", "Integration Tests : Test Failed") //nolint:forbidigo // just for tests
+		return fmt.Errorf("go test returned a non-zero value: %w", goTestErr)
+	}
+
+	fmt.Println(">> go test:", "Integration Tests : Test Passed") //nolint:forbidigo // just for tests
 	return nil
 }

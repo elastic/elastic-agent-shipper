@@ -28,7 +28,7 @@ logging:
   # Multiple selectors can be chained.
   selectors: ["*"]
   # Send all logging output to stderr. The default is false.
-  logging.to_stderr: true
+  to_stderr: true
 
 # ================================== Monitoring ==================================
 

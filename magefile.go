@@ -8,8 +8,15 @@
 package main
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
 	"context"
+	"crypto/sha512"
+	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -19,7 +26,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent-shipper/dev-tools/common"
 	"github.com/elastic/elastic-agent-shipper/tools"
-	"github.com/pkg/errors"
 
 	//mage:import
 
@@ -29,13 +35,17 @@ import (
 )
 
 const (
-	GoreleaserRepo = "github.com/goreleaser/goreleaser@v1.6.3"
+	GoreleaserRepo   = "github.com/goreleaser/goreleaser@v1.6.3"
+	platformsEnvName = "PLATFORMS"
+	specFileName     = devtools.ProjectName + ".spec.yml"
+	configFileName   = devtools.ProjectName + ".yml"
 )
 
 // Aliases are shortcuts to long target names.
 // nolint: deadcode // it's used by `mage`.
 var Aliases = map[string]interface{}{
 	"build":           Build.Binary,
+	"package":         Package.Artifacts,
 	"unitTest":        Test.Unit,
 	"integrationTest": Test.Integration,
 }
@@ -52,7 +62,7 @@ func (Build) All() {
 }
 
 // Clean removes the build directory.
-func (Build) Clean(test string) {
+func (Build) Clean() {
 	os.RemoveAll("build") // nolint:errcheck //not required
 }
 
@@ -95,9 +105,9 @@ func (Build) Binary() error {
 		}
 	}
 
-	platform := os.Getenv("PLATFORMS")
+	platform := os.Getenv(platformsEnvName)
 	if platform != "" && devtools.PlatformFiles[platform] == nil {
-		return errors.Errorf("Platform %s not recognized, only supported options: all, darwin, linux, windows, darwin/amd64, darwin/arm64, linux/386, linux/amd64, linux/arm64, windows/386, windows/amd64", platform)
+		return fmt.Errorf("Platform %s not recognized, only supported options: all, darwin, linux, windows, darwin/amd64, darwin/arm64, linux/386, linux/amd64, linux/arm64, windows/386, windows/amd64", platform)
 	}
 	switch platform {
 	case "windows", "linux", "darwin":
@@ -118,7 +128,7 @@ func (Build) Binary() error {
 	fmt.Println(">> build: Building binary for", platform) //nolint:forbidigo // it's ok to use fmt.println in mage
 	err := sh.RunWithV(env, "goreleaser", args...)
 	if err != nil {
-		return errors.Wrapf(err, "Build failed on %s", platform)
+		return fmt.Errorf("Build failed on %s: %w", platform, err)
 	}
 	return CheckBinaries(platform, env["DEFAULT_VERSION"])
 
@@ -136,7 +146,16 @@ func (Test) All() {
 
 // Integration runs all the integration tests (use alias `mage integrationTest`).
 func (Test) Integration(ctx context.Context) error {
-	return nil
+	platform := runtime.GOOS + "/" + runtime.GOARCH
+	version := tools.DefaultBeatVersion
+	os.Setenv("PLATFORMS", platform)
+	mg.Deps(Build.Binary)
+	binary, err := absoluteBinaryPath(version, platform)
+	if err != nil {
+		return fmt.Errorf("error determining native binary: %w", err)
+	}
+	os.Setenv("INTEGRATION_TEST_BINARY", binary)
+	return devtools.GoIntegrationTest(ctx)
 }
 
 // Unit runs all the unit tests (use alias `mage unitTest`).
@@ -177,13 +196,9 @@ func CheckBinaries(platform string, version string) error {
 		return errors.New("No selected platform files found")
 	}
 	for _, platform := range selectedPlatformFiles {
-		var execName = devtools.ProjectName
-		if strings.Contains(platform, "windows") {
-			execName += ".exe"
-		}
-		binary := filepath.Join(path, fmt.Sprintf("%s-%s-%s", devtools.ProjectName, version, platform), execName)
+		binary := binaryName(path, version, platform)
 		if _, err := os.Stat(binary); err != nil {
-			return errors.Wrap(err, "Build: binary check failed")
+			return fmt.Errorf("Build: binary check failed: %w", err)
 		}
 	}
 
@@ -214,4 +229,257 @@ func Notice() error {
 	// "go mod download all" isn't smart enough to know the minimum set of deps needed.
 	// See https://github.com/golang/go/issues/43994#issuecomment-770053099
 	return gotool.Mod.Tidy()
+}
+
+// PACKAGE
+
+// Package contains targets related to producting project archives
+type Package mg.Namespace
+
+// All builds binaries for the all os/arch and produces resulting archives.
+func (Package) All() {
+	os.Setenv("PLATFORMS", "all")
+	mg.Deps(Package.Artifacts)
+}
+
+// Package runs all the checks including licence, notice, gomod, git changes, followed by binary build.
+func (Package) Artifacts() {
+	// these are not allowed in parallel
+	mg.SerialDeps(
+		Build.Binary,
+	)
+
+	version, err := fullVersion()
+	if err != nil {
+		panic(err)
+	}
+
+	platforms := devtools.PlatformFiles[os.Getenv(platformsEnvName)]
+	// current by default
+	if platforms == nil {
+		platforms = devtools.PlatformFiles[runtime.GOOS+"/"+runtime.GOARCH]
+	}
+
+	archivePath := filepath.Join("build", "distributions")
+	if err := os.MkdirAll(archivePath, 0755); err != nil {
+		panic(err)
+	}
+
+	for _, platform := range platforms {
+		isWindows := strings.Contains(platform, "windows")
+
+		// grab binary
+		binaryPath := binaryFilePath(version, platform)
+
+		// prepare package
+		var err error
+		var archiveFileName string
+		targetDir := fmt.Sprintf("%s-%s", devtools.ProjectName, platform)
+		if isWindows {
+			archiveFileName = fmt.Sprintf("%s-%s.zip", devtools.ProjectName, platform)
+			err = prepareZipArchive(
+				archivePath,
+				targetDir,
+				archiveFileName,
+				map[string]string{
+					specFileName:       specFileName,
+					configFileName:     configFileName,
+					execName(platform): binaryPath,
+				},
+			)
+		} else {
+			archiveFileName = fmt.Sprintf("%s-%s.tar.gz", devtools.ProjectName, platform)
+			err = prepareTarArchive(
+				archivePath,
+				targetDir,
+				archiveFileName,
+				map[string]string{
+					specFileName:       specFileName,
+					configFileName:     configFileName,
+					execName(platform): binaryPath,
+				},
+			)
+		}
+
+		if err != nil {
+			panic(err)
+		}
+
+		// generate sha sum
+		archiveFullPath := filepath.Join(archivePath, archiveFileName)
+		archive, err := os.Open(archiveFullPath)
+		if err != nil {
+			panic(fmt.Errorf("failed opening archive %q: %w", archiveFileName, err))
+		}
+
+		h := sha512.New()
+		if _, err := io.Copy(h, archive); err != nil {
+			panic(fmt.Errorf("failed computing hash for archive %q: %w", archiveFileName, err))
+		}
+
+		shaFile := archiveFullPath + ".sha512"
+		content := fmt.Sprintf("%x  %s\n", h.Sum(nil), archiveFileName)
+		if err := ioutil.WriteFile(shaFile, []byte(content), 0644); err != nil {
+			panic(fmt.Errorf("failed writing hash for archive %q: %w", archiveFileName, err))
+		}
+
+		archive.Close()
+	}
+}
+
+func prepareZipArchive(path, targetDir, archiveFileName string, files map[string]string) error {
+	archiveFullName := filepath.Join(path, archiveFileName)
+	archiveFile, err := os.Create(archiveFullName)
+	if err != nil {
+		return fmt.Errorf("failed to create %q: %w", archiveFullName, err)
+	}
+	defer archiveFile.Close()
+
+	zipWriter := zip.NewWriter(archiveFile)
+	defer zipWriter.Close()
+
+	addFile := func(fileName, filePath string, zipWriter *zip.Writer) error {
+		file, err := os.Open(filePath)
+		if err != nil {
+			return fmt.Errorf("failed opening a file: %w", err)
+		}
+		defer file.Close()
+
+		stat, err := file.Stat()
+		if err != nil {
+			return fmt.Errorf("failed retrieving stat info for a file: %w", err)
+		}
+
+		header, err := zip.FileInfoHeader(stat)
+		header.Method = zip.Deflate
+		header.Name = filepath.Join(targetDir, fileName)
+
+		hWriter, err := zipWriter.CreateHeader(header)
+		if err != nil {
+			return fmt.Errorf("failed writing zip header: %w", err)
+		}
+
+		if _, err := io.Copy(hWriter, file); err != nil {
+			return fmt.Errorf("failed adding a file into an archive: %w", err)
+		}
+		return nil
+	}
+
+	for fileName, filePath := range files {
+		if err := addFile(fileName, filePath, zipWriter); err != nil {
+			return fmt.Errorf("failed adding file %q into zip archive: %w", filePath, err)
+		}
+	}
+
+	return nil
+}
+
+func prepareTarArchive(path, targetDir, archiveFileName string, files map[string]string) error {
+	archiveFullName := filepath.Join(path, archiveFileName)
+	archiveFile, err := os.Create(archiveFullName)
+	if err != nil {
+		return fmt.Errorf("failed to create %q: %w", archiveFullName, err)
+	}
+	defer archiveFile.Close()
+
+	gzipWriter := gzip.NewWriter(archiveFile)
+	defer gzipWriter.Close()
+
+	tarWriter := tar.NewWriter(gzipWriter)
+	defer tarWriter.Close()
+
+	addFile := func(fileName, filePath string, tarWriter *tar.Writer) error {
+		file, err := os.Open(filePath)
+		if err != nil {
+			return fmt.Errorf("failed opening a file: %w", err)
+		}
+		defer file.Close()
+
+		stat, err := file.Stat()
+		if err != nil {
+			return fmt.Errorf("failed retrieving stat info for a file: %w", err)
+		}
+
+		header := &tar.Header{
+			Name:    filepath.Join(targetDir, fileName),
+			Size:    stat.Size(),
+			Mode:    int64(stat.Mode()),
+			ModTime: stat.ModTime(),
+		}
+
+		if err := tarWriter.WriteHeader(header); err != nil {
+			return fmt.Errorf("failed writing tar header: %w", err)
+		}
+
+		if _, err := io.Copy(tarWriter, file); err != nil {
+			return fmt.Errorf("failed adding a file into an archive: %w", err)
+		}
+
+		return nil
+	}
+
+	for fileName, filePath := range files {
+		if err := addFile(fileName, filePath, tarWriter); err != nil {
+			return fmt.Errorf("failed adding file %q into tar archive: %w", filePath, err)
+		}
+	}
+
+	return nil
+}
+
+func fullVersion() (string, error) {
+	version := tools.DefaultBeatVersion
+	if versionQualifier, versionQualified := os.LookupEnv("VERSION_QUALIFIER"); versionQualified {
+		version += fmt.Sprintf("-%s", versionQualifier)
+	}
+
+	if snapshotEnv := os.Getenv("SNAPSHOT"); snapshotEnv != "" {
+		isSnapshot, err := strconv.ParseBool(snapshotEnv)
+		if err != nil {
+			return "", err
+		}
+		if isSnapshot {
+			version += fmt.Sprintf("-%s", "SNAPSHOT")
+		}
+	}
+
+	return version, nil
+}
+
+func binaryFilePath(version, platform string) string {
+	path := filepath.Join("build", "binaries")
+	return binaryName(path, version, platform)
+}
+
+func binaryName(path, version, platform string) string {
+	return filepath.Join(path, fmt.Sprintf("%s-%s-%s", devtools.ProjectName, version, platform), execName(platform))
+}
+
+func execName(platform string) string {
+	var execName = devtools.ProjectName
+	if strings.Contains(platform, "windows") {
+		execName += ".exe"
+	}
+
+	return execName
+}
+
+func absoluteBinaryPath(version, platform string) (string, error) {
+	binary := ""
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("unable to get current working directory: %w", err)
+	}
+	selectedPlatformFiles := devtools.PlatformFiles[platform]
+	if selectedPlatformFiles == nil {
+		return "", fmt.Errorf("no platform files found for %s", platform)
+	}
+
+	for _, pf := range selectedPlatformFiles {
+		binary = filepath.Join(dir, binaryFilePath(version, pf))
+		if _, err := os.Stat(binary); err != nil {
+			return "", fmt.Errorf("error reading %s: %w", binary, err)
+		}
+	}
+	return binary, nil
 }

@@ -6,7 +6,7 @@ Data shipper for the Elastic Agent - a single, unified way to add monitoring for
 other types of data to a host.
 
 The data shipper is a new process in the Elastic agent system designed to centralize local data
-processing, queueuing, and publishing to the target output (Elasticsearch, Logstash, etc.).
+processing, queueing, and publishing to the target output (Elasticsearch, Logstash, etc.).
 
 The data shipper is a part of a larger effort to rearchitect the Elastic agent. In the initial Elastic
 agent architecture each underlying data collector (e.g. Filebeat) was required to implement its own
@@ -30,10 +30,20 @@ Data shipper clients must implement the shipper [gRPC API](https://github.com/el
 The reference client is the [Beats shipper output](https://github.com/elastic/beats/tree/main/libbeat/outputs/shipper), which is
 used by Beats like Filebeat and Metricbeat when they are started by Elastic agent integrations. 
 
-Data shipper support in the Elastic Agent is under active development. The shipper currently depends on a running Elastic agent instance to
-start but it will soon be possible to run the shipper in standalone mode for development: https://github.com/elastic/elastic-agent-shipper/issues/83
+Data shipper support in the Elastic Agent is under active development.
 
-The [reference shipper configuration file](https://github.com/elastic/elastic-agent-shipper/blob/main/elastic-agent-shipper.yml) defines the available
+The shipper currently can be run in 2 modes:
+
+* Under Elastic agent (managed mode): the main mode for running in production environments
+* Using a local config file (unmanaged mode): is supposed to be used for local development and testing
+
+To run the shipper in the unmanaged mode use this flag on the built binary:
+
+```sh
+./elastic-agent-shipper run -c elastic-agent-shipper.yml
+```
+
+Where `elastic-agent-shipper.yml` is a path to a local configuration file. The [reference shipper configuration file](https://github.com/elastic/elastic-agent-shipper/blob/main/elastic-agent-shipper.yml) defines the available
 configuration options.
 
 ## Contributing
@@ -61,6 +71,7 @@ by running `mage -l` from the root of the repository. The most commonly used com
 * `mage build` to build the data shipper binary.
 * `mage check` to check license files and dependencies.
 * `mage lint` to lint the source code using [golangci-lint](https://golangci-lint.run/).
+* `mage package` to produce release artifacts.
 * `go test ./...` to run all tests.
 
 Run mage commands with the `-v` flag for more detailed output, for example `mage -v check`.

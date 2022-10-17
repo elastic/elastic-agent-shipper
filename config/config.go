@@ -5,10 +5,10 @@
 package config
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"path/filepath"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -22,20 +22,15 @@ import (
 	"github.com/elastic/elastic-agent-shipper/server"
 )
 
-const (
-	defaultConfigName = "elastic-agent-shipper.yml"
-)
-
 var (
-	configPath     string
-	configFilePath string
+	configFilePath    string
+	ErrConfigIsNotSet = errors.New("config file is not set")
 )
 
 // A lot of the code here is the same as what's in elastic-agent, but it lives in an internal/ library
 func init() {
 	fs := flag.CommandLine
-	fs.StringVar(&configFilePath, "c", defaultConfigName, "Configuration file, relative to path.config")
-	fs.StringVar(&configPath, "path.config", configPath, "Config path is the directory Agent looks for its config file")
+	fs.StringVar(&configFilePath, "c", "", "Run the shipper in the unmanaged mode and use the given configuration file instead")
 }
 
 //ShipperConfig defines the options present in the config file
@@ -47,31 +42,26 @@ type ShipperConfig struct {
 	Output  output.Config     `config:"output"`     //Output settings
 }
 
-// ReadConfig returns the populated config from the specified path
-func ReadConfig() (ShipperConfig, error) {
-	path := configFile()
-
-	contents, err := ioutil.ReadFile(path)
+// ReadConfigFromFile returns the populated config from the specified path
+func ReadConfigFromFile() (ShipperConfig, error) {
+	if configFilePath == "" {
+		return ShipperConfig{}, ErrConfigIsNotSet
+	}
+	contents, err := ioutil.ReadFile(configFilePath)
 	if err != nil {
-		return ShipperConfig{}, fmt.Errorf("error reading input file %s: %w", path, err)
+		return ShipperConfig{}, fmt.Errorf("error reading input file %s: %w", configFilePath, err)
 	}
 
 	raw, err := config.NewConfigWithYAML(contents, "")
 	if err != nil {
 		return ShipperConfig{}, fmt.Errorf("error reading config from yaml: %w", err)
 	}
-	// systemd environment will send us to stdout environment, which we want
-	config := ShipperConfig{
-		Log:     logp.DefaultConfig(logp.SystemdEnvironment),
-		Monitor: monitoring.DefaultConfig(),
-		Queue:   queue.DefaultConfig(),
-		Server:  server.DefaultConfig(),
+
+	unpacker := func(cfg *ShipperConfig) error {
+		return raw.Unpack(cfg)
 	}
-	err = raw.Unpack(&config)
-	if err != nil {
-		return config, fmt.Errorf("error unpacking shipper config: %w", err)
-	}
-	return config, nil
+
+	return readConfig(unpacker)
 }
 
 // ShipperConfigFromUnitConfig converts the configuration provided by Agent to the internal
@@ -96,25 +86,35 @@ func ReadConfigFromJSON(raw string) (ShipperConfig, error) {
 	if err != nil {
 		return ShipperConfig{}, fmt.Errorf("error parsing string config: %w", err)
 	}
-	shipperConfig := ShipperConfig{
+
+	unpacker := func(cfg *ShipperConfig) error {
+		return rawCfg.Unpack(cfg)
+	}
+
+	return readConfig(unpacker)
+}
+
+type rawUnpacker func(cfg *ShipperConfig) error
+
+func readConfig(unpacker rawUnpacker) (config ShipperConfig, err error) {
+	// systemd environment will send us to stdout environment, which we want
+	config = ShipperConfig{
 		Log:     logp.DefaultConfig(logp.SystemdEnvironment),
 		Monitor: monitoring.DefaultConfig(),
 		Queue:   queue.DefaultConfig(),
 		Server:  server.DefaultConfig(),
 	}
-	err = rawCfg.Unpack(&shipperConfig)
-	if err != nil {
-		return shipperConfig, fmt.Errorf("error unpacking shipper config: %w", err)
-	}
-	return shipperConfig, err
-}
 
-func configFile() string {
-	if configFilePath == "" || configFilePath == defaultConfigName {
-		return filepath.Join(configPath, defaultConfigName)
+	err = unpacker(&config)
+	if err != nil {
+		return config, fmt.Errorf("error unpacking shipper config: %w", err)
 	}
-	if filepath.IsAbs(configFilePath) {
-		return configFilePath
+
+	// otherwise the logging configuration is just ignored
+	err = logp.Configure(config.Log)
+	if err != nil {
+		return config, fmt.Errorf("error configuring the logger: %w", err)
 	}
-	return filepath.Join(configPath, configFilePath)
+
+	return config, nil
 }

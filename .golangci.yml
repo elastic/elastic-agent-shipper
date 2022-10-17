@@ -50,6 +50,7 @@ linters:
     - noctx # noctx finds sending http request without context.Context
     - unconvert # Remove unnecessary type conversions
     - wastedassign # wastedassign finds wasted assignment statements.
+    - gomodguard # check for blocked dependencies
 
 # all available settings of specific linters
 linters-settings:
@@ -96,7 +97,7 @@ linters-settings:
 
   gosimple:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.18.5"
+    go: "1.18.7"
 
   nakedret:
     # make an issue if func has more lines of code than this setting and it has naked returns; default is 30
@@ -116,17 +117,17 @@ linters-settings:
 
   staticcheck:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.18.5"
+    go: "1.18.7"
     checks: ["all"]
 
   stylecheck:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.18.5"
+    go: "1.18.7"
     checks: ["all"]
 
   unused:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.18.5"
+    go: "1.18.7"
 
   gosec:
     excludes:

@@ -15,7 +15,6 @@ import (
 	"strings"
 
 	"github.com/magefile/mage/mg"
-	"github.com/pkg/errors"
 
 	"github.com/elastic/elastic-agent-libs/dev-tools/mage/gotool"
 )
@@ -41,7 +40,7 @@ func CreateDir(file string) string {
 	// Create the output directory.
 	if dir := filepath.Dir(file); dir != "." {
 		if err := os.MkdirAll(dir, 0755); err != nil {
-			panic(errors.Wrapf(err, "failed to create parent dir for %v", file))
+			panic(fmt.Errorf("failed to create parent dir for %v: %w", file, err))
 		}
 	}
 	return file
