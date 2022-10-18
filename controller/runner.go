@@ -44,7 +44,8 @@ type ServerRunner struct {
 	shipper    server.ShipperServer
 	queue      *queue.Queue
 	monitoring *monitoring.QueueMonitor
-	out        Output
+	console        Output
+	//output	*output.Output
 }
 
 // NewServerRunner creates a new runner that starts and stops the server.
@@ -80,8 +81,8 @@ func NewServerRunner(cfg config.ShipperConfig) (r *ServerRunner, err error) {
 
 	r.log.Debug("initializing the output...")
 	// TODO replace with the real output based on the config, Console is hard-coded for now
-	r.out = output.NewConsole(r.queue)
-	r.out.Start()
+	r.console = output.NewConsole(r.queue)
+	r.console.Start()
 	r.log.Debug("output was initialized.")
 
 	r.log.Debug("initializing the gRPC server...")
@@ -184,13 +185,13 @@ func (r *ServerRunner) Close() (err error) {
 			r.queue = nil
 			r.log.Debugf("queue is stopped.")
 		}
-		if r.out != nil {
+		if r.console != nil {
 			// The output will shut down once the queue is closed.
 			// We call Wait to give it a chance to finish with events
 			// it has already read.
 			r.log.Debugf("waiting for pending events in the output...")
-			r.out.Wait()
-			r.out = nil
+			r.console.Wait()
+			r.console = nil
 			r.log.Debugf("all pending events are flushed")
 		}
 	})

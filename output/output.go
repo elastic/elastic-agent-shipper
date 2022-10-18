@@ -1,7 +1,7 @@
 package output
 
-//import "github.com/elastic/elastic-agent-shipper/output/kafka"
+import "github.com/elastic/elastic-agent-shipper/output/kafka"
 
 type Config struct {
-	//kafka *kafka.Config `config:"kafka"`
+	kafka *kafka.Config `config:"kafka"`
 }

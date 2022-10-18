@@ -20,7 +20,7 @@ package kafka
 import (
 	"context"
 	"errors"
-	"fmt"
+	//"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -33,13 +33,16 @@ import (
 	"github.com/elastic/beats/v7/libbeat/outputs"
 	"github.com/elastic/beats/v7/libbeat/outputs/codec"
 	"github.com/elastic/beats/v7/libbeat/outputs/outil"
-	"github.com/elastic/beats/v7/libbeat/publisher"
+	//"github.com/elastic/beats/v7/libbeat/publisher"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/testing"
 	"github.com/elastic/elastic-agent-libs/transport"
+	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
+	"go.elastic.co/apm"
+
 )
 
-type client struct {
+type Client struct {
 	log      *logp.Logger
 	observer outputs.Observer
 	hosts    []string
@@ -58,12 +61,12 @@ type client struct {
 	wg sync.WaitGroup
 }
 
-type msgRef struct {
-	client *client
+type MsgRef struct {
+	client *Client
 	count  int32
 	total  int
-	failed []publisher.Event
-	batch  publisher.Batch
+	failed []messages.Event
+	//batch  publisher.Batch
 
 	err error
 }
@@ -78,11 +81,11 @@ func newKafkaClient(
 	index string,
 	key *fmtstr.EventFormatString,
 	topic outil.Selector,
-	headers []header,
+	headers []Header,
 	writer codec.Codec,
 	cfg *sarama.Config,
-) (*client, error) {
-	c := &client{
+) (*Client, error) {
+	c := &Client{
 		log:      logp.NewLogger(logSelector),
 		observer: observer,
 		hosts:    hosts,
@@ -113,7 +116,7 @@ func newKafkaClient(
 	return c, nil
 }
 
-func (c *client) Connect() error {
+func (c *Client) Connect() error {
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
@@ -135,7 +138,7 @@ func (c *client) Connect() error {
 	return nil
 }
 
-func (c *client) Close() error {
+func (c *Client) Close() error {
 	c.mux.Lock()
 	defer c.mux.Unlock()
 	c.log.Debug("closed kafka client")
@@ -152,122 +155,183 @@ func (c *client) Close() error {
 	return nil
 }
 
-func (c *client) Publish(_ context.Context, batch publisher.Batch) error {
-	events := batch.Events()
-	c.observer.NewBatch(len(events))
+// PublishEvents sends all events to elasticsearch. On error a slice with all
+// events not published or confirmed to be processed by elasticsearch will be
+// returned. The input slice backing memory will be reused by return the value.
+func (client *Client) publishEvents(ctx context.Context, data []*messages.Event) ([]*messages.Event, error) {
 
-	ref := &msgRef{
-		client: c,
-		count:  int32(len(events)),
-		total:  len(events),
-		failed: nil,
-		batch:  batch,
+	span, ctx := apm.StartSpan(ctx, "publishEvents", "output")
+	defer span.End()
+	//RB APM resinstate
+	//begin := time.Now()
+
+	st := client.observer
+
+
+	//ref := &MsgRef{
+	//	//client: c,
+	//	count:  int32(len(data)),
+	//	total:  len(data),
+	//	failed: nil,
+	//	//batch:  batch,
+	//}
+
+	if st != nil {
+		st.NewBatch(len(data))
 	}
 
-	ch := c.producer.Input()
-	for i := range events {
-		d := &events[i]
-		msg, err := c.getEventMessage(d)
-		if err != nil {
-			c.log.Errorf("Dropping event: %+v", err)
-			ref.done()
-			c.observer.Dropped(1)
-			continue
-		}
-
-		msg.ref = ref
-		msg.initProducerMessage()
-		ch <- &msg.msg
+	if len(data) == 0 {
+		return nil, nil
 	}
 
-	return nil
+	origCount := len(data)
+	span.Context.SetLabel("events_original", origCount)
+
+
+	//ch := client.producer.Input()
+	//for i := range data {
+	//	d := &data[i]
+	//	msg, err := client.getEventMessage(d)
+	//	if err != nil {
+	//		client.log.Errorf("Dropping event: %+v", err)
+	//		//ref.done()
+	//		client.observer.Dropped(1)
+	//		continue
+	//	}
+	//
+	//	msg.ref = ref
+	//	msg.initProducerMessage()
+	//	ch <- &msg.msg
+	//}
+
+	return nil, nil
 }
 
-func (c *client) String() string {
+//func (c *Client) Publish(_ context.Context, batch publisher.Batch) error {
+//	events := batch.Events()
+//	c.observer.NewBatch(len(events))
+//
+//	ref := &MsgRef{
+//		client: c,
+//		count:  int32(len(events)),
+//		total:  len(events),
+//		failed: nil,
+//		batch:  batch,
+//	}
+//
+//	ch := c.producer.Input()
+//	for i := range events {
+//		d := &events[i]
+//		msg, err := c.getEventMessage(d)
+//		if err != nil {
+//			c.log.Errorf("Dropping event: %+v", err)
+//			ref.done()
+//			c.observer.Dropped(1)
+//			continue
+//		}
+//
+//		msg.ref = ref
+//		msg.initProducerMessage()
+//		ch <- &msg.msg
+//	}
+//
+//	return nil
+//}
+
+func (c *Client) String() string {
 	return "kafka(" + strings.Join(c.hosts, ",") + ")"
 }
 
-func (c *client) getEventMessage(data *publisher.Event) (*message, error) {
-	event := &data.Content
-	msg := &message{partition: -1, data: *data}
+func (c *Client) getEventMessage(data *messages.Event) (*Message, error) {
+	//event := &data.Content
+	//event := data
+	msg := &Message{partition: -1, data: *data}
 
-	value, err := data.Cache.GetValue("partition")
-	if err == nil {
-		if c.log.IsDebug() {
-			c.log.Debugf("got event.Meta[\"partition\"] = %v", value)
-		}
-		if partition, ok := value.(int32); ok {
-			msg.partition = partition
-		}
-	}
+	// RWB partition, topic and value are set on the event cache...
+	//value, err := data.Cache.GetValue("partition")
+	//if err == nil {
+	//	if c.log.IsDebug() {
+	//		c.log.Debugf("got event.Meta[\"partition\"] = %v", value)
+	//	}
+	//	if partition, ok := value.(int32); ok {
+	//		msg.partition = partition
+	//	}
+	//}
+	//
+	//value, err = data.Cache.GetValue("topic")
+	//if err == nil {
+	//	if c.log.IsDebug() {
+	//		c.log.Debugf("got event.Meta[\"topic\"] = %v", value)
+	//	}
+	//	if topic, ok := value.(string); ok {
+	//		msg.topic = topic
+	//	}
+	//}
+	//
 
-	value, err = data.Cache.GetValue("topic")
-	if err == nil {
-		if c.log.IsDebug() {
-			c.log.Debugf("got event.Meta[\"topic\"] = %v", value)
-		}
-		if topic, ok := value.(string); ok {
-			msg.topic = topic
-		}
-	}
+	//if msg.topic == "" {
+	//	topic, err := c.topic.Select(*event)
+	//
+	//	if err != nil {
+	//		return nil, fmt.Errorf("setting kafka topic failed with %v", err)
+	//	}
+	//	if topic == "" {
+	//		return nil, errNoTopicsSelected
+	//	}
+	//	msg.topic = topic
+	////	if _, err := data.Cache.Put("topic", topic); err != nil {
+	////		return nil, fmt.Errorf("setting kafka topic in publisher event failed: %v", err)
+	////	}
+	//}
 
-	if msg.topic == "" {
-		topic, err := c.topic.Select(event)
-		if err != nil {
-			return nil, fmt.Errorf("setting kafka topic failed with %v", err)
-		}
-		if topic == "" {
-			return nil, errNoTopicsSelected
-		}
-		msg.topic = topic
-		if _, err := data.Cache.Put("topic", topic); err != nil {
-			return nil, fmt.Errorf("setting kafka topic in publisher event failed: %v", err)
-		}
-	}
+	msg.topic = "ship"
 
-	serializedEvent, err := c.codec.Encode(c.index, event)
-	if err != nil {
-		if c.log.IsDebug() {
-			c.log.Debugf("failed event: %v", event)
-		}
-		return nil, err
-	}
-
-	buf := make([]byte, len(serializedEvent))
-	copy(buf, serializedEvent)
-	msg.value = buf
+	// We need to figure out how to switch between beat.event and event.
+	//serializedEvent, err := c.codec.Encode(c.index, event)
+	//if err != nil {
+	//	if c.log.IsDebug() {
+	//		c.log.Debugf("failed event: %v", event)
+	//	}
+	//	return nil, err
+	//}
+	//
+	//buf := make([]byte, len(serializedEvent))
+	//copy(buf, serializedEvent)
+	//msg.value = buf
 
 	// message timestamps have been added to kafka with version 0.10.0.0
-	if c.config.Version.IsAtLeast(sarama.V0_10_0_0) {
-		msg.ts = event.Timestamp
-	}
+    // RWB skip timestamps
+	//if c.config.Version.IsAtLeast(sarama.V0_10_0_0) {
+	//	msg.ts = event.Timestamp
+	//}
 
-	if c.key != nil {
-		if key, err := c.key.RunBytes(event); err == nil {
-			msg.key = key
-		}
-	}
+	// RWB figure out what runbytes are
+	//if c.key != nil {
+	//	if key, err := c.key.RunBytes(event); err == nil {
+	//		msg.key = key
+	//	}
+	//}
 
 	return msg, nil
 }
 
-func (c *client) successWorker(ch <-chan *sarama.ProducerMessage) {
+func (c *Client) successWorker(ch <-chan *sarama.ProducerMessage) {
 	defer c.wg.Done()
 	defer c.log.Debug("Stop kafka ack worker")
 
 	for libMsg := range ch {
-		msg := libMsg.Metadata.(*message)
+		msg := libMsg.Metadata.(*Message)
 		msg.ref.done()
 	}
 }
 
-func (c *client) errorWorker(ch <-chan *sarama.ProducerError) {
+func (c *Client) errorWorker(ch <-chan *sarama.ProducerError) {
 	breakerOpen := false
 	defer c.wg.Done()
 	defer c.log.Debug("Stop kafka error handler")
 
 	for errMsg := range ch {
-		msg := errMsg.Msg.Metadata.(*message)
+		msg := errMsg.Msg.Metadata.(*Message)
 		msg.ref.fail(msg, errMsg.Err)
 
 		if errMsg.Err == breaker.ErrBreakerOpen {
@@ -351,11 +415,11 @@ func (c *client) errorWorker(ch <-chan *sarama.ProducerError) {
 	}
 }
 
-func (r *msgRef) done() {
+func (r *MsgRef) done() {
 	r.dec()
 }
 
-func (r *msgRef) fail(msg *message, err error) {
+func (r *MsgRef) fail(msg *Message, err error) {
 	switch err {
 	case sarama.ErrInvalidMessage:
 		r.client.log.Errorf("Kafka (topic=%v): dropping invalid message", msg.topic)
@@ -383,7 +447,7 @@ func (r *msgRef) fail(msg *message, err error) {
 	r.dec()
 }
 
-func (r *msgRef) dec() {
+func (r *MsgRef) dec() {
 	i := atomic.AddInt32(&r.count, -1)
 	if i > 0 {
 		return
@@ -395,8 +459,10 @@ func (r *msgRef) dec() {
 	err := r.err
 	if err != nil {
 		failed := len(r.failed)
-		success := r.total - failed
-		r.batch.RetryEvents(r.failed)
+// RWB need to figure out what to bo with retries from restuls
+		success := r.total
+//		success := r.total - failed
+//		r.batch.RetryEvents(r.failed)
 
 		stats.Failed(failed)
 		if success > 0 {
@@ -405,12 +471,13 @@ func (r *msgRef) dec() {
 
 		r.client.log.Debugf("Kafka publish failed with: %+v", err)
 	} else {
-		r.batch.ACK()
+		// RWB I don't believe this is necessary.
+		//r.batch.ACK()
 		stats.Acked(r.total)
 	}
 }
 
-func (c *client) Test(d testing.Driver) {
+func (c *Client) Test(d testing.Driver) {
 	if c.config.Net.TLS.Enable == true {
 		d.Warn("TLS", "Kafka output doesn't support TLS testing")
 	}

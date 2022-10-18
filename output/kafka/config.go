@@ -39,22 +39,22 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 )
 
-type backoffConfig struct {
+type BackoffConfig struct {
 	Init time.Duration `config:"init"`
 	Max  time.Duration `config:"max"`
 }
 
-type header struct {
+type Header struct {
 	Key   string `config:"key"`
 	Value string `config:"value"`
 }
 
-type kafkaConfig struct {
+type Config struct {
 	Hosts              []string                  `config:"hosts"               validate:"required"`
 	TLS                *tlscommon.Config         `config:"ssl"`
 	Kerberos           *kerberos.Config          `config:"kerberos"`
 	Timeout            time.Duration             `config:"timeout"             validate:"min=1"`
-	Metadata           metaConfig                `config:"metadata"`
+	Metadata           MetaConfig                `config:"metadata"`
 	Key                *fmtstr.EventFormatString `config:"key"`
 	Partition          map[string]*config.C      `config:"partition"`
 	KeepAlive          time.Duration             `config:"keep_alive"          validate:"min=0"`
@@ -67,8 +67,8 @@ type kafkaConfig struct {
 	BulkMaxSize        int                       `config:"bulk_max_size"`
 	BulkFlushFrequency time.Duration             `config:"bulk_flush_frequency"`
 	MaxRetries         int                       `config:"max_retries"         validate:"min=-1,nonzero"`
-	Headers            []header                  `config:"headers"`
-	Backoff            backoffConfig             `config:"backoff"`
+	Headers            []Header                  `config:"Headers"`
+	Backoff            BackoffConfig             `config:"backoff"`
 	ClientID           string                    `config:"client_id"`
 	ChanBufferSize     int                       `config:"channel_buffer_size" validate:"min=1"`
 	Username           string                    `config:"username"`
@@ -78,13 +78,13 @@ type kafkaConfig struct {
 	EnableFAST         bool                      `config:"enable_krb5_fast"`
 }
 
-type metaConfig struct {
-	Retry       metaRetryConfig `config:"retry"`
+type MetaConfig struct {
+	Retry       MetaRetryConfig `config:"retry"`
 	RefreshFreq time.Duration   `config:"refresh_frequency" validate:"min=0"`
 	Full        bool            `config:"full"`
 }
 
-type metaRetryConfig struct {
+type MetaRetryConfig struct {
 	Max     int           `config:"max"     validate:"min=0"`
 	Backoff time.Duration `config:"backoff" validate:"min=0"`
 }
@@ -107,16 +107,16 @@ const (
 	saslTypeSCRAMSHA512 = sarama.SASLTypeSCRAMSHA512
 )
 
-func defaultConfig() kafkaConfig {
-	return kafkaConfig{
+func DefaultConfig() Config {
+	return Config{
 		Hosts:              nil,
 		TLS:                nil,
 		Kerberos:           nil,
 		Timeout:            30 * time.Second,
 		BulkMaxSize:        2048,
 		BulkFlushFrequency: 0,
-		Metadata: metaConfig{
-			Retry: metaRetryConfig{
+		Metadata: MetaConfig{
+			Retry: MetaRetryConfig{
 				Max:     3,
 				Backoff: 250 * time.Millisecond,
 			},
@@ -132,7 +132,7 @@ func defaultConfig() kafkaConfig {
 		Version:          kafka.Version("1.0.0"),
 		MaxRetries:       3,
 		Headers:          nil,
-		Backoff: backoffConfig{
+		Backoff: BackoffConfig{
 			Init: 1 * time.Second,
 			Max:  60 * time.Second,
 		},
@@ -143,15 +143,15 @@ func defaultConfig() kafkaConfig {
 	}
 }
 
-func readConfig(cfg *config.C) (*kafkaConfig, error) {
-	c := defaultConfig()
+func readConfig(cfg *config.C) (*Config, error) {
+	c := DefaultConfig()
 	if err := cfg.Unpack(&c); err != nil {
 		return nil, err
 	}
 	return &c, nil
 }
 
-func (c *kafkaConfig) Validate() error {
+func (c *Config) Validate() error {
 	if len(c.Hosts) == 0 {
 		return errors.New("no hosts configured")
 	}
@@ -177,7 +177,7 @@ func (c *kafkaConfig) Validate() error {
 	return nil
 }
 
-func newSaramaConfig(log *logp.Logger, config *kafkaConfig) (*sarama.Config, error) {
+func newSaramaConfig(log *logp.Logger, config *Config) (*sarama.Config, error) {
 	partitioner, err := makePartitioner(log, config.Partition)
 	if err != nil {
 		return nil, err
@@ -302,7 +302,7 @@ func newSaramaConfig(log *logp.Logger, config *kafkaConfig) (*sarama.Config, err
 
 // makeBackoffFunc returns a stateless implementation of exponential-backoff-with-jitter. It is conceptually
 // equivalent to the stateful implementation used by other outputs, EqualJitterBackoff.
-func makeBackoffFunc(cfg backoffConfig) func(retries, maxRetries int) time.Duration {
+func makeBackoffFunc(cfg BackoffConfig) func(retries, maxRetries int) time.Duration {
 	maxBackoffRetries := int(math.Ceil(math.Log2(float64(cfg.Max) / float64(cfg.Init))))
 
 	return func(retries, _ int) time.Duration {

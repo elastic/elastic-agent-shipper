@@ -20,11 +20,11 @@ package kafka
 import (
 	"github.com/Shopify/sarama"
 
-	"github.com/elastic/beats/v7/libbeat/beat"
-	"github.com/elastic/beats/v7/libbeat/outputs"
-	"github.com/elastic/beats/v7/libbeat/outputs/codec"
-	"github.com/elastic/beats/v7/libbeat/outputs/outil"
-	"github.com/elastic/elastic-agent-libs/config"
+	//"github.com/elastic/beats/v7/libbeat/beat"
+	//"github.com/elastic/beats/v7/libbeat/outputs"
+	//"github.com/elastic/beats/v7/libbeat/outputs/codec"
+	//"github.com/elastic/beats/v7/libbeat/outputs/outil"
+	//"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 )
 
@@ -35,61 +35,61 @@ const (
 func init() {
 	sarama.Logger = kafkaLogger{log: logp.NewLogger(logSelector)}
 
-	outputs.RegisterType("kafka", makeKafka)
+	//outputs.RegisterType("kafka", makeKafka)
 }
 
-func makeKafka(
-	_ outputs.IndexManager,
-	beat beat.Info,
-	observer outputs.Observer,
-	cfg *config.C,
-) (outputs.Group, error) {
-	log := logp.NewLogger(logSelector)
-	log.Debug("initialize kafka output")
-
-	config, err := readConfig(cfg)
-	if err != nil {
-		return outputs.Fail(err)
-	}
-
-	topic, err := buildTopicSelector(cfg)
-	if err != nil {
-		return outputs.Fail(err)
-	}
-
-	libCfg, err := newSaramaConfig(log, config)
-	if err != nil {
-		return outputs.Fail(err)
-	}
-
-	hosts, err := outputs.ReadHostList(cfg)
-	if err != nil {
-		return outputs.Fail(err)
-	}
-
-	codec, err := codec.CreateEncoder(beat, config.Codec)
-	if err != nil {
-		return outputs.Fail(err)
-	}
-
-	client, err := newKafkaClient(observer, hosts, beat.IndexPrefix, config.Key, topic, config.Headers, codec, libCfg)
-	if err != nil {
-		return outputs.Fail(err)
-	}
-
-	retry := 0
-	if config.MaxRetries < 0 {
-		retry = -1
-	}
-	return outputs.Success(config.BulkMaxSize, retry, client)
-}
-
-func buildTopicSelector(cfg *config.C) (outil.Selector, error) {
-	return outil.BuildSelectorFromConfig(cfg, outil.Settings{
-		Key:              "topic",
-		MultiKey:         "topics",
-		EnableSingleOnly: true,
-		FailEmpty:        true,
-		Case:             outil.SelectorKeepCase,
-	})
-}
+//func makeKafka(
+//	_ outputs.IndexManager,
+//	beat beat.Info,
+//	observer outputs.Observer,
+//	cfg *config.C,
+//) (outputs.Group, error) {
+//	log := logp.NewLogger(logSelector)
+//	log.Debug("initialize kafka output")
+//
+//	config, err := readConfig(cfg)
+//	if err != nil {
+//		return outputs.Fail(err)
+//	}
+//
+//	topic, err := buildTopicSelector(cfg)
+//	if err != nil {
+//		return outputs.Fail(err)
+//	}
+//
+//	libCfg, err := newSaramaConfig(log, config)
+//	if err != nil {
+//		return outputs.Fail(err)
+//	}
+//
+//	hosts, err := outputs.ReadHostList(cfg)
+//	if err != nil {
+//		return outputs.Fail(err)
+//	}
+//
+//	codec, err := codec.CreateEncoder(beat, config.Codec)
+//	if err != nil {
+//		return outputs.Fail(err)
+//	}
+//
+//	client, err := newKafkaClient(observer, hosts, beat.IndexPrefix, config.Key, topic, config.Headers, codec, libCfg)
+//	if err != nil {
+//		return outputs.Fail(err)
+//	}
+//
+//	retry := 0
+//	if config.MaxRetries < 0 {
+//		retry = -1
+//	}
+//	return outputs.Success(config.BulkMaxSize, retry, client)
+//}
+//
+//func buildTopicSelector(cfg *config.C) (outil.Selector, error) {
+//	return outil.BuildSelectorFromConfig(cfg, outil.Settings{
+//		Key:              "topic",
+//		MultiKey:         "topics",
+//		EnableSingleOnly: true,
+//		FailEmpty:        true,
+//		Case:             outil.SelectorKeepCase,
+//	})
+//}

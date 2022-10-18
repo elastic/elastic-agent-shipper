@@ -21,28 +21,28 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
-
-	"github.com/elastic/beats/v7/libbeat/publisher"
+	//"github.com/elastic/beats/v7/libbeat/publisher"
+	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 )
 
-type message struct {
+type Message struct {
 	msg sarama.ProducerMessage
 
 	topic string
 	key   []byte
 	value []byte
-	ref   *msgRef
+	ref   *MsgRef
 	ts    time.Time
 
 	hash      uint32
 	partition int32
 
-	data publisher.Event
+	data messages.Event
 }
 
 var kafkaMessageKey interface{} = int(0)
 
-func (m *message) initProducerMessage() {
+func (m *Message) initProducerMessage() {
 	m.msg = sarama.ProducerMessage{
 		Metadata:  m,
 		Topic:     m.topic,

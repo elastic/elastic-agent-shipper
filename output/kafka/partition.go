@@ -35,11 +35,11 @@ import (
 
 type partitionBuilder func(*logp.Logger, *config.C) (func() partitioner, error)
 
-type partitioner func(*message, int32) (int32, error)
+type partitioner func(*Message, int32) (int32, error)
 
 // stablePartitioner re-uses last configured partition in case of event being
 // repartitioned (on retry from libbeat).
-type messagePartitioner struct {
+type MessagePartitioner struct {
 	p          partitioner
 	reachable  bool
 	partitions int32 // number of partitions seen last
@@ -55,7 +55,7 @@ func makePartitioner(
 	}
 
 	return func(topic string) sarama.Partitioner {
-		return &messagePartitioner{
+		return &MessagePartitioner{
 			p:         mkStrategy(),
 			reachable: reachable,
 		}
@@ -112,12 +112,12 @@ func initPartitionStrategy(
 	return constr, cfg.Reachable, nil
 }
 
-func (p *messagePartitioner) RequiresConsistency() bool { return !p.reachable }
-func (p *messagePartitioner) Partition(
+func (p *MessagePartitioner) RequiresConsistency() bool { return !p.reachable }
+func (p *MessagePartitioner) Partition(
 	libMsg *sarama.ProducerMessage,
 	numPartitions int32,
 ) (int32, error) {
-	msg := libMsg.Metadata.(*message)
+	msg := libMsg.Metadata.(*Message)
 	if numPartitions == p.partitions { // if reachable is false, this is always true
 		if 0 <= msg.partition && msg.partition < numPartitions {
 			return msg.partition, nil
@@ -131,9 +131,11 @@ func (p *messagePartitioner) Partition(
 
 	msg.partition = partition
 
-	if _, err := msg.data.Cache.Put("partition", partition); err != nil {
-		return 0, fmt.Errorf("setting kafka partition in publisher event failed: %v", err)
-	}
+	// RWB need to figure out where to put the partition...
+
+	//if _, err := msg.data.Cache.Put("partition", partition); err != nil {
+	//	return 0, fmt.Errorf("setting kafka partition in publisher event failed: %v", err)
+	//}
 
 	p.partitions = numPartitions
 	return msg.partition, nil
@@ -155,7 +157,7 @@ func cfgRandomPartitioner(_ *logp.Logger, config *config.C) (func() partitioner,
 		count := cfg.GroupEvents
 		partition := int32(0)
 
-		return func(_ *message, numPartitions int32) (int32, error) {
+		return func(_ *Message, numPartitions int32) (int32, error) {
 			if N == count {
 				count = 0
 				partition = int32(generator.Intn(int(numPartitions)))
@@ -181,7 +183,7 @@ func cfgRoundRobinPartitioner(_ *logp.Logger, config *config.C) (func() partitio
 		count := N
 		partition := rand.Int31()
 
-		return func(_ *message, numPartitions int32) (int32, error) {
+		return func(_ *Message, numPartitions int32) (int32, error) {
 			if N == count {
 				count = 0
 				if partition++; partition >= numPartitions {
@@ -218,7 +220,7 @@ func makeHashPartitioner() partitioner {
 	generator := rand.New(rand.NewSource(rand.Int63()))
 	hasher := fnv.New32a()
 
-	return func(msg *message, numPartitions int32) (int32, error) {
+	return func(msg *Message, numPartitions int32) (int32, error) {
 		if msg.key == nil {
 			return int32(generator.Intn(int(numPartitions))), nil
 		}
@@ -242,18 +244,20 @@ func makeFieldsHashPartitioner(log *logp.Logger, fields []string, dropFail bool)
 	generator := rand.New(rand.NewSource(rand.Int63()))
 	hasher := fnv.New32a()
 
-	return func(msg *message, numPartitions int32) (int32, error) {
+	return func(msg *Message, numPartitions int32) (int32, error) {
 		hash := msg.hash
 		if hash == 0 {
 			hasher.Reset()
 
+			// RWB nope
 			var err error
-			for _, field := range fields {
-				err = hashFieldValue(hasher, msg.data.Content.Fields, field)
-				if err != nil {
-					break
-				}
-			}
+
+			//for _, field := range fields {
+			//	err = hashFieldValue(hasher, msg.data.Content.Fields, field)
+			//	if err != nil {
+			//		break
+			//	}
+			//}
 
 			if err != nil {
 				if dropFail {
