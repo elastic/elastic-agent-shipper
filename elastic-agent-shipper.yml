@@ -109,3 +109,6 @@ monitoring:
     # error. If the queue encounters repeated errors, it will double the
     # length of its retry interval each time, up to this maximum.
     #max_retry_interval: 30s
+
+
+output.console: true
