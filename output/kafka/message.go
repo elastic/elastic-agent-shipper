@@ -19,9 +19,8 @@ package kafka
 
 import (
 	"time"
-
+	"fmt"
 	"github.com/Shopify/sarama"
-	//"github.com/elastic/beats/v7/libbeat/publisher"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 )
 
@@ -43,6 +42,7 @@ type Message struct {
 var kafkaMessageKey interface{} = int(0)
 
 func (m *Message) initProducerMessage() {
+	//fmt.Println("Sending metadata %s to topic %s", m, m.topic)
 	m.msg = sarama.ProducerMessage{
 		Metadata:  m,
 		Topic:     m.topic,

@@ -1,5 +1,8 @@
 # ========================= Shipper Configuration File ========================
-
+hosts: ["blah:4000"]
+kafka.hosts: ["localhost:9092"]
+kafka.max_retries: 44
+kafka.topic: shippy
 # ================================== General ==================================
 
 server:
@@ -54,24 +57,25 @@ monitoring:
 # ================================== Queue ====================================
 
 # Internal queue configuration for buffering events to be published.
-#queue:
+queue:
   # Queue type by name (default 'mem')
   # The memory queue will present all available events to the output, the moment the output is ready
   # to serve another batch of events.
-  #mem:
+  mem:
     # Max number of events the queue can buffer.
-    #events: 4096
+    events: 1
 
     # Hints the minimum number of events stored in the queue,
     # before providing a batch of events to the outputs.
     # The default value is set to 2048.
     # A value of 0 ensures events are immediately available
     # to be sent to the outputs.
-    #flush.min_events: 256
+    flush_min_events: 0
+    flush.min_events: 0
 
     # Maximum duration after which events are available to the outputs,
     # if the number of events stored in the queue is < `flush.min_events`.
-    #flush.timeout: 5ms
+    flush.timeout: 9ms
 
   # The disk queue stores incoming events on disk until the output is
   # ready for them. This allows a higher event limit than the memory-only
@@ -111,5 +115,10 @@ monitoring:
     #max_retry_interval: 30s
 
 #=====
+
 output:
-  kafka.enabled: true
+  hosts: ["localhost:42"]
+  kafka:
+#  enabled: true
+    max_retries: 43
+    hosts: ['localhost:9092']

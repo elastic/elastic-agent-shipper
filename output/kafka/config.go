@@ -50,6 +50,7 @@ type Header struct {
 }
 
 type Config struct {
+	Topic              string                    `config:"topic"               validate:"required"`
 	Hosts              []string                  `config:"hosts"               validate:"required"`
 	TLS                *tlscommon.Config         `config:"ssl"`
 	Kerberos           *kerberos.Config          `config:"kerberos"`
@@ -136,7 +137,7 @@ func DefaultConfig() Config {
 			Init: 1 * time.Second,
 			Max:  60 * time.Second,
 		},
-		ClientID:       "beats",
+		ClientID:       "elastic-agent",
 		ChanBufferSize: 256,
 		Username:       "",
 		Password:       "",
@@ -152,6 +153,8 @@ func readConfig(cfg *config.C) (*Config, error) {
 }
 
 func (c *Config) Validate() error {
+	fmt.Printf("I'm in the kafka validator %s", c)
+	fmt.Printf("I'm in the kafka validator retries %s", c.MaxRetries)
 	if len(c.Hosts) == 0 {
 		return errors.New("no hosts configured")
 	}
@@ -177,7 +180,7 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-func newSaramaConfig(log *logp.Logger, config *Config) (*sarama.Config, error) {
+func newSaramaConfig(log *logp.Logger, config Config) (*sarama.Config, error) {
 	partitioner, err := makePartitioner(log, config.Partition)
 	if err != nil {
 		return nil, err
@@ -299,6 +302,8 @@ func newSaramaConfig(log *logp.Logger, config *Config) (*sarama.Config, error) {
 	}
 	return k, nil
 }
+
+// TODO: Do we still need this?
 
 // makeBackoffFunc returns a stateless implementation of exponential-backoff-with-jitter. It is conceptually
 // equivalent to the stateful implementation used by other outputs, EqualJitterBackoff.

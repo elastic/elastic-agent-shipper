@@ -18,6 +18,7 @@ import (
 
 	"github.com/elastic/elastic-agent-shipper/monitoring"
 	"github.com/elastic/elastic-agent-shipper/output"
+	"github.com/elastic/elastic-agent-shipper/output/kafka"
 	"github.com/elastic/elastic-agent-shipper/queue"
 	"github.com/elastic/elastic-agent-shipper/server"
 )
@@ -39,6 +40,7 @@ type ShipperConfig struct {
 	Monitor monitoring.Config `config:"monitoring"` //Queue monitoring settings
 	Queue   queue.Config      `config:"queue"`      //Queue settings
 	Server  server.Config     `config:"server"`     //gRPC Server settings
+	Kafka   kafka.Config      `config:"kafka"`      //Kafka output settings
 	Output  output.Config     `config:"output"`     //Output settings
 }
 
@@ -103,6 +105,7 @@ func readConfig(unpacker rawUnpacker) (config ShipperConfig, err error) {
 		Monitor: monitoring.DefaultConfig(),
 		Queue:   queue.DefaultConfig(),
 		Server:  server.DefaultConfig(),
+		Kafka:   kafka.DefaultConfig(),
 	}
 
 	err = unpacker(&config)

@@ -27,7 +27,6 @@ import (
 	//"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 )
-
 const (
 	logSelector = "kafka"
 )
@@ -37,6 +36,8 @@ func init() {
 
 	//outputs.RegisterType("kafka", makeKafka)
 }
+
+// TODO: Figure out best place for this method, maybe bring over the one from client
 
 //func makeKafka(
 //	_ outputs.IndexManager,

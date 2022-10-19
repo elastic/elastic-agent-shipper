@@ -15,6 +15,7 @@ import (
 	"github.com/elastic/elastic-agent-shipper/config"
 	"github.com/elastic/elastic-agent-shipper/monitoring"
 	"github.com/elastic/elastic-agent-shipper/output"
+	"github.com/elastic/elastic-agent-shipper/output/kafka"
 	"github.com/elastic/elastic-agent-shipper/queue"
 	"github.com/elastic/elastic-agent-shipper/server"
 
@@ -44,8 +45,8 @@ type ServerRunner struct {
 	shipper    server.ShipperServer
 	queue      *queue.Queue
 	monitoring *monitoring.QueueMonitor
-	console        Output
-	//output	*output.Output
+	console    Output
+	kafka	   *kafka.Output
 }
 
 // NewServerRunner creates a new runner that starts and stops the server.
@@ -82,8 +83,14 @@ func NewServerRunner(cfg config.ShipperConfig) (r *ServerRunner, err error) {
 	r.log.Debug("initializing the output...")
 	// TODO replace with the real output based on the config, Console is hard-coded for now
 	r.console = output.NewConsole(r.queue)
-	r.console.Start()
-	r.log.Debug("output was initialized.")
+
+	//r.console.Start()
+	//r.log.Debug("output was initialized.")
+
+	// TODO: This needs to be converted into real output options
+	r.kafka = kafka.NewKafka(cfg.Kafka, r.queue)
+	r.kafka.Start()
+	r.log.Debug("Kafka started")
 
 	r.log.Debug("initializing the gRPC server...")
 	var opts []grpc.ServerOption
@@ -185,6 +192,7 @@ func (r *ServerRunner) Close() (err error) {
 			r.queue = nil
 			r.log.Debugf("queue is stopped.")
 		}
+		// TODO: Replace this with real output
 		if r.console != nil {
 			// The output will shut down once the queue is closed.
 			// We call Wait to give it a chance to finish with events
@@ -192,6 +200,15 @@ func (r *ServerRunner) Close() (err error) {
 			r.log.Debugf("waiting for pending events in the output...")
 			r.console.Wait()
 			r.console = nil
+			r.log.Debugf("all pending events are flushed")
+		}
+		if r.kafka != nil{
+			// The output will shut down once the queue is closed.
+			// We call Wait to give it a chance to finish with events
+			// it has already read.
+			r.log.Debugf("waiting for pending events in the output...")
+			r.kafka.Wait()
+			r.kafka = nil
 			r.log.Debugf("all pending events are flushed")
 		}
 	})

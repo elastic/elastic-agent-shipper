@@ -27,10 +27,10 @@ import (
 	"strconv"
 
 	"github.com/Shopify/sarama"
-
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
+	//"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 )
 
 type partitionBuilder func(*logp.Logger, *config.C) (func() partitioner, error)
@@ -131,7 +131,7 @@ func (p *MessagePartitioner) Partition(
 
 	msg.partition = partition
 
-	// RWB need to figure out where to put the partition...
+	// TODO: Where can we store partition data for the message?
 
 	//if _, err := msg.data.Cache.Put("partition", partition); err != nil {
 	//	return 0, fmt.Errorf("setting kafka partition in publisher event failed: %v", err)
@@ -249,11 +249,11 @@ func makeFieldsHashPartitioner(log *logp.Logger, fields []string, dropFail bool)
 		if hash == 0 {
 			hasher.Reset()
 
-			// RWB nope
 			var err error
 
 			//for _, field := range fields {
-			//	err = hashFieldValue(hasher, msg.data.Content.Fields, field)
+			//	// TODO: What to do with field hash partitioner?
+			//	err = hashFieldValue(hasher, msg.data.content.Fields, field)
 			//	if err != nil {
 			//		break
 			//	}

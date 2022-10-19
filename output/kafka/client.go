@@ -20,36 +20,38 @@ package kafka
 import (
 	"context"
 	"errors"
-	//"fmt"
+	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+	//"encoding/json"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/Shopify/sarama"
 	"github.com/eapache/go-resiliency/breaker"
 
 	"github.com/elastic/beats/v7/libbeat/common/fmtstr"
-	"github.com/elastic/beats/v7/libbeat/outputs"
-	"github.com/elastic/beats/v7/libbeat/outputs/codec"
-	"github.com/elastic/beats/v7/libbeat/outputs/outil"
+	//"github.com/elastic/beats/v7/libbeat/outputs"
+	//"github.com/elastic/beats/v7/libbeat/outputs/codec"
+	//"github.com/elastic/beats/v7/libbeat/outputs/outil"
 	//"github.com/elastic/beats/v7/libbeat/publisher"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/testing"
 	"github.com/elastic/elastic-agent-libs/transport"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
-	"go.elastic.co/apm"
+	//"go.elastic.co/apm"
 
 )
 
 type Client struct {
 	log      *logp.Logger
-	observer outputs.Observer
+	//observer outputs.Observer         TODO: Figure out how to deal with
 	hosts    []string
-	topic    outil.Selector
-	key      *fmtstr.EventFormatString
-	index    string
-	codec    codec.Codec
+	topic    string            //       TODO: Figure out how to do event interpolation to determine topic per event
+	key      *fmtstr.EventFormatString//TODO: Figure out what this means too
+//index    string                       TODO: This looks like it is used to populate metadata?
+	//codec    codec.Codec RWB what do we do with codecs
 	config   sarama.Config
 	mux      sync.Mutex
 	done     chan struct{}
@@ -66,7 +68,7 @@ type MsgRef struct {
 	count  int32
 	total  int
 	failed []messages.Event
-	//batch  publisher.Batch
+	//batch  publisher.Batch            // TODO: Let's figure out what this means
 
 	err error
 }
@@ -76,23 +78,23 @@ var (
 )
 
 func newKafkaClient(
-	observer outputs.Observer,
+	//observer outputs.Observer,            TODO: No need for observer, AFAICT
 	hosts []string,
-	index string,
+	//index string,                         TODO: As above, let's figure out if we still need this
 	key *fmtstr.EventFormatString,
-	topic outil.Selector,
+	topic string, //                        TODO: Create dynamic topics
 	headers []Header,
-	writer codec.Codec,
+	//writer codec.Codec,                   TODO: Figure out what to do with event serialization
 	cfg *sarama.Config,
 ) (*Client, error) {
 	c := &Client{
 		log:      logp.NewLogger(logSelector),
-		observer: observer,
+		//observer: observer,               TODO: Observer removal
 		hosts:    hosts,
 		topic:    topic,
 		key:      key,
-		index:    strings.ToLower(index),
-		codec:    writer,
+		//index:    strings.ToLower(index), TODO: Figure out what to do with index
+		//codec:    writer,                 TODO: Figure out what to do with event serialization
 		config:   *cfg,
 		done:     make(chan struct{}),
 	}
@@ -117,6 +119,7 @@ func newKafkaClient(
 }
 
 func (c *Client) Connect() error {
+	fmt.Println("Creating producer! %s\n", c.hosts)
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
@@ -128,7 +131,7 @@ func (c *Client) Connect() error {
 		c.log.Errorf("Kafka connect fails with: %+v", err)
 		return err
 	}
-
+	fmt.Println("Created producer! %s\n", producer)
 	c.producer = producer
 
 	c.wg.Add(2)
@@ -160,92 +163,69 @@ func (c *Client) Close() error {
 // returned. The input slice backing memory will be reused by return the value.
 func (client *Client) publishEvents(ctx context.Context, data []*messages.Event) ([]*messages.Event, error) {
 
-	span, ctx := apm.StartSpan(ctx, "publishEvents", "output")
-	defer span.End()
-	//RB APM resinstate
+	// TODO: APM integration
+	//span, ctx := apm.StartSpan(ctx, "publishEvents", "output")
+	//defer span.End()
 	//begin := time.Now()
+	fmt.Printf("working with client %s", client)
+	//st := client.observer
 
-	st := client.observer
 
-
-	//ref := &MsgRef{
-	//	//client: c,
-	//	count:  int32(len(data)),
-	//	total:  len(data),
-	//	failed: nil,
-	//	//batch:  batch,
-	//}
-
-	if st != nil {
-		st.NewBatch(len(data))
+	ref := &MsgRef{
+		client: client,
+		count:  int32(len(data)),
+		total:  len(data),
+		failed: nil,
+		//batch:  batch,
 	}
+
+	// TODO: Deal with observer tracking
+	//if st != nil {
+	//	st.NewBatch(len(data))
+	//}
 
 	if len(data) == 0 {
 		return nil, nil
 	}
 
-	origCount := len(data)
-	span.Context.SetLabel("events_original", origCount)
+	//origCount := len(data)
+	//span.Context.SetLabel("events_original", origCount)
 
+	ch := client.producer.Input()
+	for i := range data {
+		d := data[i]
+		fmt.Println("Creating event message\n")
+		msg, err := client.getEventMessage(d)
+		//fmt.Println("Created event message %s", msg)
+		if err != nil {
+			client.log.Errorf("Dropping event: %+v", err)
+			ref.done()
+			// TODO: Metrics
+			//client.observer.Dropped(1)
+			continue
+		}
 
-	//ch := client.producer.Input()
-	//for i := range data {
-	//	d := &data[i]
-	//	msg, err := client.getEventMessage(d)
-	//	if err != nil {
-	//		client.log.Errorf("Dropping event: %+v", err)
-	//		//ref.done()
-	//		client.observer.Dropped(1)
-	//		continue
-	//	}
-	//
-	//	msg.ref = ref
-	//	msg.initProducerMessage()
-	//	ch <- &msg.msg
-	//}
+		msg.ref = ref
+		msg.initProducerMessage()
+		fmt.Println("Sending message to producer")
+		ch <- &msg.msg
+	}
 
+	// TODO: Return properly
 	return nil, nil
 }
 
-//func (c *Client) Publish(_ context.Context, batch publisher.Batch) error {
-//	events := batch.Events()
-//	c.observer.NewBatch(len(events))
-//
-//	ref := &MsgRef{
-//		client: c,
-//		count:  int32(len(events)),
-//		total:  len(events),
-//		failed: nil,
-//		batch:  batch,
-//	}
-//
-//	ch := c.producer.Input()
-//	for i := range events {
-//		d := &events[i]
-//		msg, err := c.getEventMessage(d)
-//		if err != nil {
-//			c.log.Errorf("Dropping event: %+v", err)
-//			ref.done()
-//			c.observer.Dropped(1)
-//			continue
-//		}
-//
-//		msg.ref = ref
-//		msg.initProducerMessage()
-//		ch <- &msg.msg
-//	}
-//
-//	return nil
-//}
 
 func (c *Client) String() string {
 	return "kafka(" + strings.Join(c.hosts, ",") + ")"
 }
 
 func (c *Client) getEventMessage(data *messages.Event) (*Message, error) {
-	//event := &data.Content
-	//event := data
 	msg := &Message{partition: -1, data: *data}
+
+	// TODO: We no longer have access to the Cache property of the Data - need to figure out how to handle this
+	// particular WRT to partitions and topic assignment.
+	// TODO: Partition assignment
 
 	// RWB partition, topic and value are set on the event cache...
 	//value, err := data.Cache.GetValue("partition")
@@ -258,6 +238,7 @@ func (c *Client) getEventMessage(data *messages.Event) (*Message, error) {
 	//	}
 	//}
 	//
+	// TODO: Topic Caching
 	//value, err = data.Cache.GetValue("topic")
 	//if err == nil {
 	//	if c.log.IsDebug() {
@@ -269,6 +250,7 @@ func (c *Client) getEventMessage(data *messages.Event) (*Message, error) {
 	//}
 	//
 
+	// TODO: Topic creation based on event interpolation
 	//if msg.topic == "" {
 	//	topic, err := c.topic.Select(*event)
 	//
@@ -284,28 +266,36 @@ func (c *Client) getEventMessage(data *messages.Event) (*Message, error) {
 	////	}
 	//}
 
-	msg.topic = "ship"
+	msg.topic = c.topic
 
-	// We need to figure out how to switch between beat.event and event.
-	//serializedEvent, err := c.codec.Encode(c.index, event)
-	//if err != nil {
-	//	if c.log.IsDebug() {
-	//		c.log.Debugf("failed event: %v", event)
-	//	}
-	//	return nil, err
-	//}
+	// TODO: This is some homemade serialization which is missing a bunch of features from where we want to be,
+	// and serializes in a pretty ugly format, which exposes the protobuf internal structure.
+	// We need to translate this more effectively, and commonly between outputs.
+	serializedEvent, err := protojson.Marshal(data)
+
+	//fmt.Println("original data %s\n", data)
+	//fmt.Println("Sending event %s\n", string(serializedEvent))
+
+	//c.codec.Encode("c.index", event)
+	if err != nil {
+		fmt.Println("Unable to send event")
+		if c.log.IsDebug() {
+			c.log.Debugf("failed event: %v", data)
+		}
+		return nil, err
+	}
 	//
 	//buf := make([]byte, len(serializedEvent))
 	//copy(buf, serializedEvent)
-	//msg.value = buf
+	msg.value = serializedEvent
 
 	// message timestamps have been added to kafka with version 0.10.0.0
-    // RWB skip timestamps
+    // TODO: Figure out timestamp conversion
 	//if c.config.Version.IsAtLeast(sarama.V0_10_0_0) {
-	//	msg.ts = event.Timestamp
+	//	msg.ts = data.Timestamp
 	//}
 
-	// RWB figure out what runbytes are
+	// TODO: Figure out keys.
 	//if c.key != nil {
 	//	if key, err := c.key.RunBytes(event); err == nil {
 	//		msg.key = key
@@ -334,6 +324,7 @@ func (c *Client) errorWorker(ch <-chan *sarama.ProducerError) {
 		msg := errMsg.Msg.Metadata.(*Message)
 		msg.ref.fail(msg, errMsg.Err)
 
+		// TODO: Understand the error breaker, and how it maps to the new model.
 		if errMsg.Err == breaker.ErrBreakerOpen {
 			// ErrBreakerOpen is a very special case in Sarama. It happens only when
 			// there have been repeated critical (broker / topic-level) errors, and it
@@ -423,13 +414,14 @@ func (r *MsgRef) fail(msg *Message, err error) {
 	switch err {
 	case sarama.ErrInvalidMessage:
 		r.client.log.Errorf("Kafka (topic=%v): dropping invalid message", msg.topic)
-		r.client.observer.Dropped(1)
+		// TODO: Metrics, and how to represent.
+		//r.client.observer.Dropped(1)
 
 	case sarama.ErrMessageSizeTooLarge, sarama.ErrInvalidMessageSize:
 		r.client.log.Errorf("Kafka (topic=%v): dropping too large message of size %v.",
 			msg.topic,
 			len(msg.key)+len(msg.value))
-		r.client.observer.Dropped(1)
+		//r.client.observer.Dropped(1)
 
 	case breaker.ErrBreakerOpen:
 		// Add this message to the failed list, but don't overwrite r.err since
@@ -454,26 +446,30 @@ func (r *MsgRef) dec() {
 	}
 
 	r.client.log.Debug("finished kafka batch")
-	stats := r.client.observer
+	// TODO: Metrics and how to deal with observer
+	//stats := r.client.observer
 
 	err := r.err
 	if err != nil {
 		failed := len(r.failed)
-// RWB need to figure out what to bo with retries from restuls
-		success := r.total
-//		success := r.total - failed
+		fmt.Println("Failed to send %s", r.failed)
+		total := r.total
+		success := total - failed
+        fmt.Println("Successfully sent %s", success)
+		// TODO: Do we rely on kafka for retries now?
 //		r.batch.RetryEvents(r.failed)
 
-		stats.Failed(failed)
-		if success > 0 {
-			stats.Acked(success)
-		}
+		//stats.Failed(failed)
+		//if success > 0 {
+		//	stats.Acked(success)
+		//}
 
 		r.client.log.Debugf("Kafka publish failed with: %+v", err)
 	} else {
-		// RWB I don't believe this is necessary.
+		// TODO: Make sure we have a solid story for acking and nacking
 		//r.batch.ACK()
-		stats.Acked(r.total)
+		//stats.Acked(r.total)
+		fmt.Println("Acked %s", r.total)
 	}
 }
 
