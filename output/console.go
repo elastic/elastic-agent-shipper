@@ -22,7 +22,7 @@ func NewConsole(queue *queue.Queue) *ConsoleOutput {
 	return &ConsoleOutput{queue: queue}
 }
 
-func (out *ConsoleOutput) Start() {
+func (out *ConsoleOutput) Start() error {
 	out.wg.Add(1)
 	go func() {
 		defer out.wg.Done()
@@ -51,6 +51,7 @@ func (out *ConsoleOutput) Start() {
 			batch.Done()
 		}
 	}()
+	return nil
 }
 
 func (*ConsoleOutput) send(event *messages.Event) {

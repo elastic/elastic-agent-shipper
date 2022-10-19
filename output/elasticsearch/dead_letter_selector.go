@@ -17,6 +17,7 @@
 
 package elasticsearch
 
+/*
 import (
 	"github.com/elastic/beats/v7/libbeat/beat"
 	"github.com/elastic/beats/v7/libbeat/outputs"
@@ -34,3 +35,4 @@ func (d DeadLetterSelector) Select(event *beat.Event) (string, error) {
 	}
 	return d.Selector.Select(event)
 }
+*/

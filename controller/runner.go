@@ -15,6 +15,7 @@ import (
 	"github.com/elastic/elastic-agent-shipper/config"
 	"github.com/elastic/elastic-agent-shipper/monitoring"
 	"github.com/elastic/elastic-agent-shipper/output"
+	"github.com/elastic/elastic-agent-shipper/output/elasticsearch"
 	"github.com/elastic/elastic-agent-shipper/queue"
 	"github.com/elastic/elastic-agent-shipper/server"
 
@@ -25,7 +26,7 @@ import (
 
 // Output describes a typical output implementation used for running the server.
 type Output interface {
-	Start()
+	Start() error
 	Wait()
 }
 
@@ -80,7 +81,7 @@ func NewServerRunner(cfg config.ShipperConfig) (r *ServerRunner, err error) {
 
 	r.log.Debug("initializing the output...")
 	// TODO replace with the real output based on the config, Console is hard-coded for now
-	r.out = output.NewConsole(r.queue)
+	r.out = outputFromConfig(cfg.Output, r.queue)
 	r.out.Start()
 	r.log.Debug("output was initialized.")
 
@@ -195,5 +196,15 @@ func (r *ServerRunner) Close() (err error) {
 		}
 	})
 
+	return nil
+}
+
+func outputFromConfig(config output.Config, queue *queue.Queue) Output {
+	if config.Console != nil && config.Console.Enabled {
+		return output.NewConsole(queue)
+	}
+	if config.Elasticsearch != nil {
+		return elasticsearch.NewElasticSearch(config.Elasticsearch, queue)
+	}
 	return nil
 }
