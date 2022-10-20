@@ -43,6 +43,8 @@ var kafkaMessageKey interface{} = int(0)
 
 func (m *Message) initProducerMessage() {
 	//fmt.Println("Sending metadata %s to topic %s", m, m.topic)
+	fmt.Println("Sending key %s to topic %s", m.key, m.topic)
+	fmt.Println("Sending timestamp %s to topic %s", m.ts, m.topic)
 	m.msg = sarama.ProducerMessage{
 		Metadata:  m,
 		Topic:     m.topic,

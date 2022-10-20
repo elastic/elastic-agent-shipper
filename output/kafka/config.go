@@ -27,11 +27,12 @@ import (
 
 	"github.com/Shopify/sarama"
 
-	"github.com/elastic/beats/v7/libbeat/common/cfgwarn"
-	"github.com/elastic/beats/v7/libbeat/common/fmtstr"
+	//"github.com/elastic/beats/v7/libbeat/common/cfgwarn"
+	//"github.com/elastic/beats/v7/libbeat/common/fmtstr"
 	"github.com/elastic/beats/v7/libbeat/common/kafka"
+	// TODO: Move to elastic-agent-libs?
 	"github.com/elastic/beats/v7/libbeat/common/transport/kerberos"
-	"github.com/elastic/beats/v7/libbeat/outputs/codec"
+	//"github.com/elastic/sbeats/v7/libbeat/outputs/codec"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/monitoring"
@@ -56,7 +57,8 @@ type Config struct {
 	Kerberos           *kerberos.Config          `config:"kerberos"`
 	Timeout            time.Duration             `config:"timeout"             validate:"min=1"`
 	Metadata           MetaConfig                `config:"metadata"`
-	Key                *fmtstr.EventFormatString `config:"key"`
+	//Key                *fmtstr.EventFormatString `config:"key"`
+	Key                string                    `config:"key"`
 	Partition          map[string]*config.C      `config:"partition"`
 	KeepAlive          time.Duration             `config:"keep_alive"          validate:"min=0"`
 	MaxMessageBytes    *int                      `config:"max_message_bytes"   validate:"min=1"`
@@ -74,7 +76,8 @@ type Config struct {
 	ChanBufferSize     int                       `config:"channel_buffer_size" validate:"min=1"`
 	Username           string                    `config:"username"`
 	Password           string                    `config:"password"`
-	Codec              codec.Config              `config:"codec"`
+	// TODO: Figure out codecs
+	//Codec              codec.Config              `config:"codec"`
 	Sasl               kafka.SaslConfig          `config:"sasl"`
 	EnableFAST         bool                      `config:"enable_krb5_fast"`
 }
@@ -208,8 +211,9 @@ func newSaramaConfig(log *logp.Logger, config Config) (*sarama.Config, error) {
 	}
 
 	switch {
+	// TODO: Are we still planning on Kerberos to be beta?
 	case config.Kerberos.IsEnabled():
-		cfgwarn.Beta("Kerberos authentication for Kafka is beta.")
+		//cfgwarn.Beta("Kerberos authentication for Kafka is beta.")
 
 		// Due to a regrettable past decision, the flag controlling Kerberos
 		// FAST authentication was initially added to the output configuration

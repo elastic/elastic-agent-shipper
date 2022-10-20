@@ -31,7 +31,7 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/eapache/go-resiliency/breaker"
 
-	"github.com/elastic/beats/v7/libbeat/common/fmtstr"
+	//"github.com/elastic/beats/v7/libbeat/common/fmtstr"
 	//"github.com/elastic/beats/v7/libbeat/outputs"
 	//"github.com/elastic/beats/v7/libbeat/outputs/codec"
 	//"github.com/elastic/beats/v7/libbeat/outputs/outil"
@@ -48,8 +48,8 @@ type Client struct {
 	log      *logp.Logger
 	//observer outputs.Observer         TODO: Figure out how to deal with
 	hosts    []string
-	topic    string            //       TODO: Figure out how to do event interpolation to determine topic per event
-	key      *fmtstr.EventFormatString//TODO: Figure out what this means too
+	topic    string            //       TODO: Figure out how to do event interpolation to determine topic from event contents
+	key      string            //       TODO: Figure out how to do event interpolation to determine key from event contents
 //index    string                       TODO: This looks like it is used to populate metadata?
 	//codec    codec.Codec RWB what do we do with codecs
 	config   sarama.Config
@@ -57,9 +57,7 @@ type Client struct {
 	done     chan struct{}
 
 	producer sarama.AsyncProducer
-
 	recordHeaders []sarama.RecordHeader
-
 	wg sync.WaitGroup
 }
 
@@ -81,8 +79,8 @@ func newKafkaClient(
 	//observer outputs.Observer,            TODO: No need for observer, AFAICT
 	hosts []string,
 	//index string,                         TODO: As above, let's figure out if we still need this
-	key *fmtstr.EventFormatString,
-	topic string, //                        TODO: Create dynamic topics
+	key string,    //                        TODO: generate key name from event contents
+	topic string, //                        TODO: generate topic name from event contents
 	headers []Header,
 	//writer codec.Codec,                   TODO: Figure out what to do with event serialization
 	cfg *sarama.Config,
@@ -135,6 +133,7 @@ func (c *Client) Connect() error {
 	c.producer = producer
 
 	c.wg.Add(2)
+	// TODO: Figure out how to indicate success and failure so we can ack and retry.
 	go c.successWorker(producer.Successes())
 	go c.errorWorker(producer.Errors())
 
@@ -271,6 +270,7 @@ func (c *Client) getEventMessage(data *messages.Event) (*Message, error) {
 	// TODO: This is some homemade serialization which is missing a bunch of features from where we want to be,
 	// and serializes in a pretty ugly format, which exposes the protobuf internal structure.
 	// We need to translate this more effectively, and commonly between outputs.
+
 	serializedEvent, err := protojson.Marshal(data)
 
 	//fmt.Println("original data %s\n", data)
@@ -289,17 +289,18 @@ func (c *Client) getEventMessage(data *messages.Event) (*Message, error) {
 	//copy(buf, serializedEvent)
 	msg.value = serializedEvent
 
+	fmt.Println("The fields are %s\n", data.Fields)
 	// message timestamps have been added to kafka with version 0.10.0.0
     // TODO: Figure out timestamp conversion
-	//if c.config.Version.IsAtLeast(sarama.V0_10_0_0) {
-	//	msg.ts = data.Timestamp
-	//}
-
-	// TODO: Figure out keys.
+	if c.config.Version.IsAtLeast(sarama.V0_10_0_0) {
+		msg.ts = data.Timestamp.AsTime()
+	}
+	// TODO: Figure out keys from event contents.
+	msg.key = []byte(c.key)
 	//if c.key != nil {
-	//	if key, err := c.key.RunBytes(event); err == nil {
-	//		msg.key = key
-	//	}
+	//	//if key, err := c.key.RunBytes(serializedEvent); err == nil {
+	//	//	msg.key = key
+	//	//}
 	//}
 
 	return msg, nil

@@ -3,6 +3,7 @@ hosts: ["blah:4000"]
 kafka.hosts: ["localhost:9092"]
 kafka.max_retries: 44
 kafka.topic: shippy
+kafka.key: blah
 # ================================== General ==================================
 
 server:
