@@ -33,7 +33,6 @@ func NewElasticSearch(config *Config, queue *queue.Queue) *ElasticSearchOutput {
 }
 
 func (out *ElasticSearchOutput) Start() error {
-	fmt.Printf("\033[0;32mElasticSearchOutput.Start\033[0m\n")
 	client, err := makeES(*out.config)
 	if err != nil {
 		return err

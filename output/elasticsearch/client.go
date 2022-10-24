@@ -24,11 +24,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/elastic/beats/v7/libbeat/beat"
 	"github.com/elastic/beats/v7/libbeat/beat/events"
 	"github.com/elastic/beats/v7/libbeat/esleg/eslegclient"
 	"github.com/elastic/beats/v7/libbeat/outputs"
 	"github.com/elastic/beats/v7/libbeat/outputs/outil"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing"
 	"github.com/elastic/elastic-agent-libs/version"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
@@ -169,11 +171,60 @@ func (client *Client) Publish(ctx context.Context, batch queue.Batch) error {
 	return err
 }*/
 
+func mapstrForValue(v *messages.Value) interface{} {
+	if boolVal, ok := v.GetKind().(*messages.Value_BoolValue); ok {
+		return boolVal.BoolValue
+	}
+	if listVal, ok := v.GetKind().(*messages.Value_ListValue); ok {
+		return mapstrForList(listVal.ListValue)
+	}
+	if nullVal, ok := v.GetKind().(*messages.Value_NullValue); ok {
+		return nullVal.NullValue
+	}
+	if intVal, ok := v.GetKind().(*messages.Value_NumberValue); ok {
+		return intVal.NumberValue
+	}
+	if strVal, ok := v.GetKind().(*messages.Value_StringValue); ok {
+		return strVal.StringValue
+	}
+	if structVal, ok := v.GetKind().(*messages.Value_StructValue); ok {
+		return mapstrForStruct(structVal.StructValue)
+	}
+	if tsVal, ok := v.GetKind().(*messages.Value_TimestampValue); ok {
+		return tsVal.TimestampValue.AsTime()
+	}
+	return nil
+}
+
+func mapstrForList(list *messages.ListValue) []interface{} {
+	results := []interface{}{}
+	for _, val := range list.Values {
+		results = append(results, mapstrForValue(val))
+	}
+	return results
+}
+
+func mapstrForStruct(proto *messages.Struct) mapstr.M {
+	data := proto.GetData()
+	result := mapstr.M{}
+	for key, value := range data {
+		result[key] = mapstrForValue(value)
+	}
+	return result
+}
+
+func beatsEventForProto(e *messages.Event) *beat.Event {
+	return &beat.Event{
+		Timestamp: e.GetTimestamp().AsTime(),
+		Meta:      mapstrForStruct(e.GetMetadata()),
+		Fields:    mapstrForStruct(e.GetFields()),
+	}
+}
+
 // PublishEvents sends all events to elasticsearch. On error a slice with all
 // events not published or confirmed to be processed by elasticsearch will be
 // returned. The input slice backing memory will be reused by return the value.
 func (client *Client) publishEvents(ctx context.Context, data []*messages.Event) ([]*messages.Event, error) {
-	fmt.Printf("\033[94mClient.publishEvents %d events\033[0m\n", len(data))
 	span, ctx := apm.StartSpan(ctx, "publishEvents", "output")
 	defer span.End()
 	begin := time.Now()
@@ -192,8 +243,10 @@ func (client *Client) publishEvents(ctx context.Context, data []*messages.Event)
 	// events slice
 	origCount := len(data)
 	span.Context.SetLabel("events_original", origCount)
+
 	data, bulkItems := client.bulkEncodePublishRequest(client.conn.GetVersion(), data)
 	newCount := len(data)
+
 	span.Context.SetLabel("events_encoded", newCount)
 	/*if st != nil && origCount > newCount {
 		st.Dropped(origCount - newCount)
@@ -264,24 +317,10 @@ func (client *Client) bulkEncodePublishRequest(version version.V, data []*messag
 			client.log.Errorf("Failed to encode event meta data: %+v", err)
 			continue
 		}
-		bulkItems = append(bulkItems, meta, event)
+		bulkItems = append(bulkItems, meta, beatsEventForProto(event))
 		okEvents = append(okEvents, event)
 	}
 	return okEvents, bulkItems
-}
-
-func getMetadataField(e *messages.Event, key string) (interface{}, error) {
-	//eMap := e.GetMetadata().AsMap()
-
-	/*_, _, v, found, err := mapFind(key, m, false)
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, ErrKeyNotFound
-	}
-	return v, nil*/
-	return nil, nil
 }
 
 func GetOpType(e *messages.Event) events.OpType {
@@ -332,13 +371,10 @@ func (client *Client) createEventBulkMeta(version version.V, event *messages.Eve
 		ID:       id,
 	}
 
-	if id != "" || version.Major > 7 || (version.Major == 7 && version.Minor >= 5) {
-		if opType == events.OpTypeIndex {
-			return eslegclient.BulkIndexAction{Index: meta}, nil
-		}
-		return eslegclient.BulkCreateAction{Create: meta}, nil
+	if opType == events.OpTypeIndex {
+		return eslegclient.BulkIndexAction{Index: meta}, nil
 	}
-	return eslegclient.BulkIndexAction{Index: meta}, nil
+	return eslegclient.BulkCreateAction{Create: meta}, nil
 }
 
 func (client *Client) getPipeline(event *messages.Event) (string, error) {
