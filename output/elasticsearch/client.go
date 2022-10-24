@@ -33,13 +33,15 @@ import (
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing"
 	"github.com/elastic/elastic-agent-libs/version"
-	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 	"go.elastic.co/apm"
+
+	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 )
 
 var (
 	errPayloadTooLarge = errors.New("the bulk payload is too large for the server. Consider to adjust `http.max_content_length` parameter in Elasticsearch or `bulk_max_size` in the beat. The batch has been dropped")
 
+	//nolint: go-staticcheck // Elasticsearch should be capitalized
 	ErrTooOld = errors.New("Elasticsearch is too old. Please upgrade the instance. If you would like to connect to older instances set output.elasticsearch.allow_older_versions to true.")
 )
 
@@ -73,19 +75,19 @@ type bulkResultStats struct {
 	tooMany      int // number of events receiving HTTP 429 Too Many Requests
 }
 
-const (
+/*const (
 	defaultEventType = "doc"
-)
+)*/
 
 // NewClient instantiates a new client.
 func NewClient(
 	s ClientSettings,
 	onConnect *callbacksRegistry,
 ) (*Client, error) {
-	pipeline := s.Pipeline
+	/*pipeline := s.Pipeline
 	if pipeline != nil && pipeline.IsEmpty() {
 		pipeline = nil
-	}
+	}*/
 
 	conn, err := eslegclient.NewConnection(eslegclient.ConnectionSettings{
 		URL:              s.URL,
@@ -271,7 +273,7 @@ func (client *Client) publishEvents(ctx context.Context, data []*messages.Event)
 
 	client.log.Debugf("PublishEvents: %d events have been published to elasticsearch in %v.",
 		pubCount,
-		time.Now().Sub(begin))
+		time.Since(begin))
 
 	// check response for transient errors
 	var failedEvents []*messages.Event
@@ -280,7 +282,7 @@ func (client *Client) publishEvents(ctx context.Context, data []*messages.Event)
 		failedEvents = data
 		stats.fails = len(failedEvents)
 	} else {
-		failedEvents, stats = client.bulkCollectPublishFails(result, data)
+		failedEvents, _ = client.bulkCollectPublishFails(result, data)
 	}
 
 	failed := len(failedEvents)
@@ -377,8 +379,8 @@ func (client *Client) createEventBulkMeta(version version.V, event *messages.Eve
 	return eslegclient.BulkCreateAction{Create: meta}, nil
 }
 
-func (client *Client) getPipeline(event *messages.Event) (string, error) {
-	/*if event.GetMetadata() != nil {
+/*func (client *Client) getPipeline(event *messages.Event) (string, error) {
+	if event.GetMetadata() != nil {
 		pipeline, err := getMetaStringValue(event, events.FieldMetaPipeline)
 		if err == mapstr.ErrKeyNotFound {
 			return "", nil
@@ -388,13 +390,13 @@ func (client *Client) getPipeline(event *messages.Event) (string, error) {
 		}
 
 		return strings.ToLower(pipeline), nil
-	}*/
+	}
 
-	/*if client.pipeline != nil {
+	if client.pipeline != nil {
 		return client.pipeline.Select(event)
-	}*/
+	}
 	return "", nil
-}
+}*/
 
 // bulkCollectPublishFails checks per item errors returning all events
 // to be tried again due to error code returned for that items. If indexing an
