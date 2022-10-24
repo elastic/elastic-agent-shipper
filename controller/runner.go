@@ -82,7 +82,10 @@ func NewServerRunner(cfg config.ShipperConfig) (r *ServerRunner, err error) {
 	r.log.Debug("initializing the output...")
 	// TODO replace with the real output based on the config, Console is hard-coded for now
 	r.out = outputFromConfig(cfg.Output, r.queue)
-	r.out.Start()
+	err = r.out.Start()
+	if err != nil {
+		return nil, fmt.Errorf("couldn't start output: %w", err)
+	}
 	r.log.Debug("output was initialized.")
 
 	r.log.Debug("initializing the gRPC server...")

@@ -7,7 +7,6 @@ import (
 
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/libbeat/esleg/eslegclient"
-	"github.com/elastic/beats/v7/libbeat/publisher"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 	"github.com/elastic/elastic-agent-shipper/queue"
@@ -195,36 +194,4 @@ func makeES(
 	return outputs.SuccessNet(config.LoadBalance, config.BulkMaxSize, config.MaxRetries, clients)*/
 
 	//return nil, nil
-}
-
-// Client provides the minimal interface an output must implement to be usable
-// with the publisher pipeline.
-type OldClientInterface interface {
-	Close() error
-
-	// Publish sends events to the clients sink. A client must synchronously or
-	// asynchronously ACK the given batch, once all events have been processed.
-	// Using Retry/Cancelled a client can return a batch of unprocessed events to
-	// the publisher pipeline. The publisher pipeline (if configured by the output
-	// factory) will take care of retrying/dropping events.
-	// Context is intended for carrying request-scoped values, not for cancellation.
-	Publish(context.Context, publisher.Batch) error
-
-	// String identifies the client type and endpoint.
-	String() string
-
-	// Connect establishes a connection to the clients sink.
-	// The connection attempt shall report an error if no connection could been
-	// established within the given time interval. A timeout value of 0 == wait
-	// forever.
-	Connect() error
-}
-
-// NewClientInterface is a placeholder specifying the API I expect to implement while
-// translating it from the Beats version
-type NewClientInterface interface {
-	Connect() error
-	Close() error
-
-	publishEvents(ctx context.Context, events []*messages.Event) ([]*messages.Event, error)
 }

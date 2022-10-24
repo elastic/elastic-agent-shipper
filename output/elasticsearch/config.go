@@ -60,7 +60,7 @@ type Backoff struct {
 	defaultBulkSize = 50
 )*/
 
-var (
+/*var (
 	defaultConfig = Config{
 		Protocol:         "",
 		Path:             "",
@@ -79,7 +79,7 @@ var (
 		},
 		Transport: httpcommon.DefaultHTTPTransportSettings(),
 	}
-)
+)*/
 
 func (c *Config) Validate() error {
 	if c.APIKey != "" && (c.Username != "" || c.Password != "") {
