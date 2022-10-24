@@ -60,7 +60,7 @@ func (out *ElasticSearchOutput) Start() error {
 
 			for len(events) > 0 {
 				events, _ = client.publishEvents(context.TODO(), events)
-				// TODO: error handling / retry backoff?
+				// TODO: error handling / retry backoff
 			}
 			// This tells the queue that we're done with these events
 			// and they can be safely discarded. The Beats queue interface

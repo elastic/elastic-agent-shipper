@@ -22,16 +22,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
-	"github.com/elastic/beats/v7/libbeat/beat"
 	"github.com/elastic/beats/v7/libbeat/beat/events"
 	"github.com/elastic/beats/v7/libbeat/esleg/eslegclient"
 	"github.com/elastic/beats/v7/libbeat/outputs"
 	"github.com/elastic/beats/v7/libbeat/outputs/outil"
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing"
 	"github.com/elastic/elastic-agent-libs/version"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
@@ -48,11 +45,11 @@ var (
 type Client struct {
 	conn eslegclient.Connection
 
-	index    outputs.IndexSelector
-	pipeline *outil.Selector
+	//index outputs.IndexSelector
+	//pipeline *outil.Selector
 
-	observer           outputs.Observer
-	NonIndexableAction string
+	//observer           outputs.Observer
+	//NonIndexableAction string
 
 	log *logp.Logger
 }
@@ -132,58 +129,17 @@ func NewClient(
 	}
 
 	client := &Client{
-		conn:               *conn,
-		index:              s.Index,
-		pipeline:           pipeline,
-		observer:           s.Observer,
-		NonIndexableAction: s.NonIndexableAction,
+		conn: *conn,
+		//index:    s.Index,
+		//pipeline: pipeline,
+		//observer:           s.Observer,
+		//NonIndexableAction: s.NonIndexableAction,
 
 		log: logp.NewLogger("elasticsearch"),
 	}
 
 	return client, nil
 }
-
-/*
-// Clone clones a client.
-func (client *Client) Clone() *Client {
-	// when cloning the connection callback and params are not copied. A
-	// client's close is for example generated for topology-map support. With params
-	// most likely containing the ingest node pipeline and default callback trying to
-	// create install a template, we don't want these to be included in the clone.
-	connection := eslegclient.ConnectionSettings{
-		URL:               client.conn.URL,
-		Beatname:          client.conn.Beatname,
-		Kerberos:          client.conn.Kerberos,
-		Username:          client.conn.Username,
-		Password:          client.conn.Password,
-		APIKey:            client.conn.APIKey,
-		Parameters:        nil, // XXX: do not pass params?
-		Headers:           client.conn.Headers,
-		CompressionLevel:  client.conn.CompressionLevel,
-		OnConnectCallback: nil,
-		Observer:          nil,
-		EscapeHTML:        false,
-		Transport:         client.conn.Transport,
-	}
-
-	// Without the following nil check on proxyURL, a nil Proxy field will try
-	// reloading proxy settings from the environment instead of leaving them
-	// empty.
-	client.conn.Transport.Proxy.Disable = client.conn.Transport.Proxy.URL == nil
-
-	c, _ := NewClient(
-		ClientSettings{
-			ConnectionSettings: connection,
-			Index:              client.index,
-			Pipeline:           client.pipeline,
-			NonIndexableAction: client.NonIndexableAction,
-		},
-		nil, // XXX: do not pass connection callback?
-	)
-	return c
-}
-*/
 
 /*type PublishResult struct {
 	retry []*messages.Event
@@ -217,14 +173,16 @@ func (client *Client) Publish(ctx context.Context, batch queue.Batch) error {
 // events not published or confirmed to be processed by elasticsearch will be
 // returned. The input slice backing memory will be reused by return the value.
 func (client *Client) publishEvents(ctx context.Context, data []*messages.Event) ([]*messages.Event, error) {
+	fmt.Printf("\033[94mClient.publishEvents %d events\033[0m\n", len(data))
 	span, ctx := apm.StartSpan(ctx, "publishEvents", "output")
 	defer span.End()
 	begin := time.Now()
-	st := client.observer
+
+	/*st := client.observer
 
 	if st != nil {
 		st.NewBatch(len(data))
-	}
+	}*/
 
 	if len(data) == 0 {
 		return nil, nil
@@ -237,9 +195,9 @@ func (client *Client) publishEvents(ctx context.Context, data []*messages.Event)
 	data, bulkItems := client.bulkEncodePublishRequest(client.conn.GetVersion(), data)
 	newCount := len(data)
 	span.Context.SetLabel("events_encoded", newCount)
-	if st != nil && origCount > newCount {
+	/*if st != nil && origCount > newCount {
 		st.Dropped(origCount - newCount)
-	}
+	}*/
 	if newCount == 0 {
 		return nil, nil
 	}
@@ -274,7 +232,7 @@ func (client *Client) publishEvents(ctx context.Context, data []*messages.Event)
 
 	failed := len(failedEvents)
 	span.Context.SetLabel("events_failed", failed)
-	if st := client.observer; st != nil {
+	/*if st := client.observer; st != nil {
 		dropped := stats.nonIndexable
 		duplicates := stats.duplicates
 		acked := len(data) - failed - dropped - duplicates
@@ -284,7 +242,7 @@ func (client *Client) publishEvents(ctx context.Context, data []*messages.Event)
 		st.Dropped(dropped)
 		st.Duplicate(duplicates)
 		st.ErrTooMany(stats.tooMany)
-	}
+	}*/
 
 	if failed > 0 {
 		if sendErr == nil {
@@ -298,48 +256,74 @@ func (client *Client) publishEvents(ctx context.Context, data []*messages.Event)
 // bulkEncodePublishRequest encodes all bulk requests and returns slice of events
 // successfully added to the list of bulk items and the list of bulk items.
 func (client *Client) bulkEncodePublishRequest(version version.V, data []*messages.Event) ([]*messages.Event, []interface{}) {
-	// TODO fix me
-	/*okEvents := data[:0]
+	okEvents := data[:0]
 	bulkItems := []interface{}{}
-	for i := range data {
-		event := &data[i].Content
+	for _, event := range data {
 		meta, err := client.createEventBulkMeta(version, event)
 		if err != nil {
 			client.log.Errorf("Failed to encode event meta data: %+v", err)
 			continue
 		}
-		if opType := events.GetOpType(*event); opType == events.OpTypeDelete {
-			// We don't include the event source in a bulk DELETE
-			bulkItems = append(bulkItems, meta)
-		} else {
-			bulkItems = append(bulkItems, meta, event)
-		}
-		okEvents = append(okEvents, data[i])
+		bulkItems = append(bulkItems, meta, event)
+		okEvents = append(okEvents, event)
 	}
-	return okEvents, bulkItems*/
+	return okEvents, bulkItems
+}
+
+func getMetadataField(e *messages.Event, key string) (interface{}, error) {
+	//eMap := e.GetMetadata().AsMap()
+
+	/*_, _, v, found, err := mapFind(key, m, false)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, ErrKeyNotFound
+	}
+	return v, nil*/
 	return nil, nil
 }
 
-func (client *Client) createEventBulkMeta(version version.V, event *beat.Event) (interface{}, error) {
-	eventType := ""
-	if version.Major < 7 {
-		eventType = defaultEventType
+func GetOpType(e *messages.Event) events.OpType {
+	opStr, err := getMetaStringValue(e, events.FieldMetaOpType)
+	if err != nil {
+		return events.OpTypeDefault
 	}
 
-	pipeline, err := client.getPipeline(event)
+	switch opStr {
+	case "create":
+		return events.OpTypeCreate
+	case "index":
+		return events.OpTypeIndex
+	case "delete":
+		return events.OpTypeDelete
+	}
+
+	return events.OpTypeDefault
+}
+
+func (client *Client) createEventBulkMeta(version version.V, event *messages.Event) (interface{}, error) {
+	eventType := ""
+	/*if version.Major < 7 {
+		eventType = defaultEventType
+	}*/
+
+	pipeline := ""
+	/*pipeline, err := client.getPipeline(event)
 	if err != nil {
 		err := fmt.Errorf("failed to select pipeline: %v", err)
 		return nil, err
-	}
+	}*/
 
-	index, err := client.index.Select(event)
+	index := "elastic-agent-shipper"
+	/*index, err := client.index.Select(event)
 	if err != nil {
 		err := fmt.Errorf("failed to select event index: %v", err)
 		return nil, err
-	}
+	}*/
 
-	id, _ := events.GetMetaStringValue(*event, events.FieldMetaID)
-	opType := events.GetOpType(*event)
+	id, _ := getMetaStringValue(event, events.FieldMetaID)
+	opType := GetOpType(event)
 
 	meta := eslegclient.BulkMeta{
 		Index:    index,
@@ -348,13 +332,6 @@ func (client *Client) createEventBulkMeta(version version.V, event *beat.Event) 
 		ID:       id,
 	}
 
-	if opType == events.OpTypeDelete {
-		if id != "" {
-			return eslegclient.BulkDeleteAction{Delete: meta}, nil
-		} else {
-			return nil, fmt.Errorf("%s %s requires _id", events.FieldMetaOpType, events.OpTypeDelete)
-		}
-	}
 	if id != "" || version.Major > 7 || (version.Major == 7 && version.Minor >= 5) {
 		if opType == events.OpTypeIndex {
 			return eslegclient.BulkIndexAction{Index: meta}, nil
@@ -364,9 +341,9 @@ func (client *Client) createEventBulkMeta(version version.V, event *beat.Event) 
 	return eslegclient.BulkIndexAction{Index: meta}, nil
 }
 
-func (client *Client) getPipeline(event *beat.Event) (string, error) {
-	if event.Meta != nil {
-		pipeline, err := events.GetMetaStringValue(*event, events.FieldMetaPipeline)
+func (client *Client) getPipeline(event *messages.Event) (string, error) {
+	/*if event.GetMetadata() != nil {
+		pipeline, err := getMetaStringValue(event, events.FieldMetaPipeline)
 		if err == mapstr.ErrKeyNotFound {
 			return "", nil
 		}
@@ -375,11 +352,11 @@ func (client *Client) getPipeline(event *beat.Event) (string, error) {
 		}
 
 		return strings.ToLower(pipeline), nil
-	}
+	}*/
 
-	if client.pipeline != nil {
+	/*if client.pipeline != nil {
 		return client.pipeline.Select(event)
-	}
+	}*/
 	return "", nil
 }
 
