@@ -26,14 +26,17 @@ import (
 	"sync/atomic"
 	"time"
 	//"encoding/json"
-	"google.golang.org/protobuf/encoding/protojson"
+	//"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/Shopify/sarama"
 	"github.com/eapache/go-resiliency/breaker"
+	"github.com/elastic/beats/v7/libbeat/beat"
+	//"github.com/elastic/beats/v7/libbeat/beat/events"
 
-	//"github.com/elastic/beats/v7/libbeat/common/fmtstr"
+
+	"github.com/elastic/beats/v7/libbeat/common/fmtstr"
 	//"github.com/elastic/beats/v7/libbeat/outputs"
-	//"github.com/elastic/beats/v7/libbeat/outputs/codec"
+	"github.com/elastic/beats/v7/libbeat/outputs/codec"
 	//"github.com/elastic/beats/v7/libbeat/outputs/outil"
 	//"github.com/elastic/beats/v7/libbeat/publisher"
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -48,9 +51,15 @@ type Client struct {
 	log      *logp.Logger
 	//observer outputs.Observer         TODO: Figure out how to deal with
 	hosts    []string
-	topic    string            //       TODO: Figure out how to do event interpolation to determine topic from event contents
-	key      string            //       TODO: Figure out how to do event interpolation to determine key from event contents
-//index    string                       TODO: This looks like it is used to populate metadata?
+	//topic    outil.Selector
+	topic string
+	key      *fmtstr.EventFormatString
+	index    string
+	codec    codec.Codec
+
+	//topics    outil.Selector            //       TODO: Figure out how to do event interpolation to determine topic from event contents
+	//key      string            //       TODO: Figure out how to do event interpolation to determine key from event contents
+	//index    string                       TODO: This looks like it is used to populate metadata?
 	//codec    codec.Codec RWB what do we do with codecs
 	config   sarama.Config
 	mux      sync.Mutex
@@ -65,7 +74,7 @@ type MsgRef struct {
 	client *Client
 	count  int32
 	total  int
-	failed []messages.Event
+	failed []beat.Event
 	//batch  publisher.Batch            // TODO: Let's figure out what this means
 
 	err error
@@ -78,11 +87,15 @@ var (
 func newKafkaClient(
 	//observer outputs.Observer,            TODO: No need for observer, AFAICT
 	hosts []string,
-	//index string,                         TODO: As above, let's figure out if we still need this. Maybe used for  event metadata?
-	key string,    //                        TODO: generate key name from event contents
+	index string,            //             TODO: As above, let's figure out if we still need this. Maybe used for  event metadata?
+	key      *fmtstr.EventFormatString,
+	//key string,    //                        TODO: generate key name from event contents
 	topic string, //                        TODO: generate topic name from event contents
+	//topic    outil.Selector,
+
+	//index string,       //                  TODO: As above, let's figure out if we still need this. Maybe used for  event metadata?
 	headers []Header,
-	//writer codec.Codec,                   TODO: Figure out what to do with event serialization
+	writer codec.Codec,      //             TODO: Figure out what to do with event serialization
 	cfg *sarama.Config,
 ) (*Client, error) {
 	c := &Client{
@@ -91,8 +104,8 @@ func newKafkaClient(
 		hosts:    hosts,
 		topic:    topic,
 		key:      key,
-		//index:    strings.ToLower(index), TODO: Figure out what to do with index
-		//codec:    writer,                 TODO: Figure out what to do with event serialization
+		index:    strings.ToLower(index), //TODO: Figure out what to do with index
+		codec:    writer,    //             TODO: Figure out what to do with event serialization
 		config:   *cfg,
 		done:     make(chan struct{}),
 	}
@@ -192,7 +205,8 @@ func (client *Client) publishEvents(ctx context.Context, data []*messages.Event)
 
 	ch := client.producer.Input()
 	for i := range data {
-		d := data[i]
+		//d := data[i]
+		d := beatsEventForProto(data[i])
 		fmt.Println("Creating event message\n")
 		msg, err := client.getEventMessage(d)
 		//fmt.Println("Created event message %s", msg)
@@ -223,7 +237,8 @@ func (c *Client) String() string {
 	return "kafka(" + strings.Join(c.hosts, ",") + ")"
 }
 
-func (c *Client) getEventMessage(data *messages.Event) (*Message, error) {
+//func (c *Client) getEventMessage(data *messages.Event) (*Message, error) {
+func (c *Client) getEventMessage(data *beat.Event) (*Message, error) {
 	msg := &Message{partition: -1, data: *data}
 
 	// TODO: As fas as I can tell, this snippet of code is required to mark the topic and partition
@@ -240,7 +255,7 @@ func (c *Client) getEventMessage(data *messages.Event) (*Message, error) {
 	//		msg.partition = partition
 	//	}
 	//}
-	//
+
 	//value, err = data.Cache.GetValue("topic")
 	//if err == nil {
 	//	if c.log.IsDebug() {
@@ -250,11 +265,11 @@ func (c *Client) getEventMessage(data *messages.Event) (*Message, error) {
 	//		msg.topic = topic
 	//	}
 	//}
-	//
 
-	// TODO: Topic creation based on event interpolation
+
+	//TODO: Topic creation based on event interpolation
 	//if msg.topic == "" {
-	//	topic, err := c.topic.Select(*event)
+	//	topic, err := c.topic.Select(data)
 	//
 	//	if err != nil {
 	//		return nil, fmt.Errorf("setting kafka topic failed with %v", err)
@@ -263,48 +278,60 @@ func (c *Client) getEventMessage(data *messages.Event) (*Message, error) {
 	//		return nil, errNoTopicsSelected
 	//	}
 	//	msg.topic = topic
-	////	if _, err := data.Cache.Put("topic", topic); err != nil {
-	////		return nil, fmt.Errorf("setting kafka topic in publisher event failed: %v", err)
-	////	}
+	//	//if _, err := data.Cache.Put("topic", topic); err != nil {
+	//	//	return nil, fmt.Errorf("setting kafka topic in publisher event failed: %v", err)
+	//	//}
 	//}
 
 	msg.topic = c.topic
 
-	// TODO: This is some homemade serialization which is missing a bunch of features from where we want to be,
-	// and serializes in a pretty ugly format, which exposes the protobuf internal structure.
-	// We need to translate this more effectively, and commonly between outputs.
-
-	serializedEvent, err := protojson.Marshal(data)
+	//// TODO: This is some homemade serialization which is missing a bunch of features from where we want to be,
+	//// and serializes in a pretty ugly format, which exposes the protobuf internal structure.
+	//// We need to translate this more effectively, and commonly between outputs.
+	//
+	//serializedEvent, err := protojson.Marshal(data)
 
 	//fmt.Println("original data %s\n", data)
 	//fmt.Println("Sending event %s\n", string(serializedEvent))
 
 	//c.codec.Encode("c.index", event)
+	//if err != nil {
+	//	fmt.Println("Unable to send event")
+	//	if c.log.IsDebug() {
+	//		c.log.Debugf("failed event: %v", data)
+	//	}
+	//	return nil, err
+	//}
+	//
+
+	serializedEvent, err := c.codec.Encode(c.index, data)
 	if err != nil {
-		fmt.Println("Unable to send event")
 		if c.log.IsDebug() {
 			c.log.Debugf("failed event: %v", data)
 		}
 		return nil, err
 	}
-	//
-	//buf := make([]byte, len(serializedEvent))
-	//copy(buf, serializedEvent)
-	msg.value = serializedEvent
+
+	buf := make([]byte, len(serializedEvent))
+	copy(buf, serializedEvent)
+	msg.value = buf
+
+	//msg.value = serializedEvent
 
 	//fmt.Println("The fields are %s\n", data.Fields)
 	// message timestamps have been added to kafka with version 0.10.0.0
     // TODO: Figure out timestamp conversion
 	if c.config.Version.IsAtLeast(sarama.V0_10_0_0) {
-		msg.ts = data.Timestamp.AsTime()
+		//msg.ts = data.Timestamp.AsTime()
+		msg.ts = data.Timestamp
 	}
 	// TODO: Figure out keys from event contents.
-	msg.key = []byte(c.key)
-	//if c.key != nil {
-	//	//if key, err := c.key.RunBytes(serializedEvent); err == nil {
-	//	//	msg.key = key
-	//	//}
-	//}
+	//msg.key = []byte(c.key)
+	if c.key != nil {
+		if key, err := c.key.RunBytes(data); err == nil {
+			msg.key = key
+		}
+	}
 
 	return msg, nil
 }

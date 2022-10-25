@@ -28,11 +28,11 @@ import (
 	"github.com/Shopify/sarama"
 
 	//"github.com/elastic/beats/v7/libbeat/common/cfgwarn"
-	//"github.com/elastic/beats/v7/libbeat/common/fmtstr"
+	"github.com/elastic/beats/v7/libbeat/common/fmtstr"
 	"github.com/elastic/beats/v7/libbeat/common/kafka"
 	// TODO: Move to elastic-agent-libs?
 	"github.com/elastic/beats/v7/libbeat/common/transport/kerberos"
-	//"github.com/elastic/sbeats/v7/libbeat/outputs/codec"
+	"github.com/elastic/beats/v7/libbeat/outputs/codec"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/monitoring"
@@ -57,8 +57,8 @@ type Config struct {
 	Kerberos           *kerberos.Config          `config:"kerberos"`
 	Timeout            time.Duration             `config:"timeout"             validate:"min=1"`
 	Metadata           MetaConfig                `config:"metadata"`
-	//Key                *fmtstr.EventFormatString `config:"key"`
-	Key                string                    `config:"key"`
+	Key                *fmtstr.EventFormatString `config:"key"`
+	//Key                string                    `config:"key"`
 	Partition          map[string]*config.C      `config:"partition"`
 	KeepAlive          time.Duration             `config:"keep_alive"          validate:"min=0"`
 	MaxMessageBytes    *int                      `config:"max_message_bytes"   validate:"min=1"`
@@ -77,7 +77,7 @@ type Config struct {
 	Username           string                    `config:"username"`
 	Password           string                    `config:"password"`
 	// TODO: Figure out codecs
-	//Codec              codec.Config              `config:"codec"`
+	Codec              codec.Config              `config:"codec"`
 	Sasl               kafka.SaslConfig          `config:"sasl"`
 	EnableFAST         bool                      `config:"enable_krb5_fast"`
 }

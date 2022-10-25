@@ -9,8 +9,12 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/elastic/beats/v7/libbeat/beat"
 	//"github.com/elastic/beats/v7/libbeat/common"
 	//"github.com/elastic/beats/v7/libbeat/publisher"
+	//"github.com/elastic/elastic-agent-libs/config"
+	//"github.com/elastic/beats/v7/libbeat/outputs/codec"
+	"github.com/elastic/beats/v7/libbeat/outputs/codec/json"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 	"github.com/elastic/elastic-agent-shipper/queue"
@@ -94,21 +98,22 @@ func (out *Output) Wait() {
 	out.wg.Wait()
 }
 
+// TODO: This contains a *lot* of hacks,
 func makeKafka(
 	config Config,
 ) (*Client, error) {
-	fmt.Printf("config read %s\n", config)
 
 	log := logp.NewLogger("kafka-output")
-	fmt.Printf("creating log %s", log)
 
 	log.Info("initialize kafka output")
 
-	//topic, err := buildTopicSelector(config)
+	// TODO: Use the topic selector
+	topic := config.Topic
+	//topic, err := buildTopicSelector(&config)
 	//if err != nil {
-	//	return outputs.Fail(err)
+	//	return nil,nil
+	//	//return outputs.Fail(err)
 	//}
-	//
 
 	libCfg, err := newSaramaConfig(log, config)
 	if err != nil {
@@ -118,21 +123,38 @@ func makeKafka(
 
 	hosts := config.Hosts
 
-	// TODO: Figure out what to do with codec
-	//
-	//hosts, err := outputs.ReadHostList(config)
-	//if err != nil {
-	//	return outputs.Fail(err)
-	//}
-	//
+	beat := beat.Info{
+		Beat:            "kafka-output",
+		IndexPrefix:     "ship",
+		Version:         "1",
+		ElasticLicensed: true,
+		Name:            "kafka-output-name",
+		Hostname:        "localhost",
+		//ID:              nil,
+		//EphemeralID:     nil,
+		//FirstStart:      time.Now(),
+		//StartTime:       time.Now(),
+		Monitoring: struct {
+			DefaultUsername string
+		}{
+			DefaultUsername: "test",
+		},
+	}
+
+	codec := json.New(beat.Version, json.Config{
+		Pretty:     true,
+		EscapeHTML: true,
+	})
+
 	//codec, err := codec.CreateEncoder(beat, config.Codec)
 	//if err != nil {
-	//	return outputs.Fail(err)
+	//	fmt.Println("failed %v", err)
+	//	return nil, nil
+	//	//return outputs.Fail(err)
 	//}
 
-	topic := config.Topic
-
-	client, err := newKafkaClient(/*observer, */hosts, /*beat.IndexPrefix, */config.Key, topic, config.Headers, /*codec, */libCfg)
+	//client, err :=
+	return newKafkaClient( /*observer, */ hosts, beat.IndexPrefix, config.Key, topic, config.Headers, codec, libCfg)
 
 	// TODO: Make sure this is what we want to do with our return values, or whether we need to utilize the Success object
 	//if err != nil {
@@ -144,17 +166,16 @@ func makeKafka(
 	//	retry = -1
 	//}
 	//return outputs.Success(config.BulkMaxSize, retry, client)
-	return client, nil
 }
 
-// TODO: Topic interpolation...
-//func buildTopicSelector(cfg *Config) (outil.Selector, error) {
-//	//return outil.BuildSelectorFromConfig(cfg, outil.Settings{
-//	//	Key:              "topic",
-//	//	MultiKey:         "topics",
-//	//	EnableSingleOnly: true,
-//	//	FailEmpty:        true,
-//	//	Case:             outil.SelectorKeepCase,
-//	//})
-//	return nil, nil
+//// TODO: Topic interpolation...
+//func buildTopicSelector(cfg *config.C) (outil.Selector, error) {
+//	return outil.BuildSelectorFromConfig(cfg, outil.Settings{
+//		Key:              "topic",
+//		MultiKey:         "topics",
+//		EnableSingleOnly: true,
+//		FailEmpty:        true,
+//		Case:             outil.SelectorKeepCase,
+//	})
+//	//return nil, nil
 //}

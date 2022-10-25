@@ -21,7 +21,9 @@ import (
 	"time"
 	"fmt"
 	"github.com/Shopify/sarama"
-	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
+	"github.com/elastic/beats/v7/libbeat/beat"
+	//"github.com/elastic/beats/v7/libbeat/beat/events"
+	//"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 )
 
 type Message struct {
@@ -36,7 +38,8 @@ type Message struct {
 	hash      uint32
 	partition int32
 
-	data messages.Event
+	//data messages.Event
+	data beat.Event
 }
 
 var kafkaMessageKey interface{} = int(0)
