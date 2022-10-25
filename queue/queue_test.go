@@ -78,7 +78,6 @@ func TestQueueTypes(t *testing.T) {
 		"disk_encryption": {
 			diskConfig: &DiskConfig{
 				MaxSize:            10 * 1024 * 1024,
-				UseEncryption:      true,
 				EncryptionPassword: "testtesttesttest",
 			},
 		},
@@ -92,7 +91,6 @@ func TestQueueTypes(t *testing.T) {
 			diskConfig: &DiskConfig{
 				MaxSize:            10 * 1024 * 1024,
 				UseCompression:     true,
-				UseEncryption:      true,
 				EncryptionPassword: "testtesttesttest",
 			},
 		},

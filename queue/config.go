@@ -54,7 +54,6 @@ type DiskConfig struct {
 	RetryInterval      *time.Duration    `config:"retry_interval" validate:"positive"`
 	MaxRetryInterval   *time.Duration    `config:"max_retry_interval" validate:"positive"`
 	EncryptionPassword string            `config:"encryption_password"`
-	UseEncryption      bool              `config:"use_encryption"`
 	UseCompression     bool              `config:"use_compression"`
 }
 
@@ -87,10 +86,6 @@ func (c *DiskConfig) Validate() error {
 			*c.MaxRetryInterval, *c.RetryInterval)
 	}
 
-	if c.UseEncryption && c.EncryptionPassword == "" {
-		return fmt.Errorf("fetching encryption key is currently unsupported, set `encryption_password`")
-	}
-
 	return nil
 }
 
@@ -121,17 +116,13 @@ func DiskSettingsFromConfig(diskConfig *DiskConfig) (diskqueue.Settings, error) 
 		settings.MaxRetryInterval = *diskConfig.RetryInterval
 	}
 
-	if diskConfig.UseEncryption && diskConfig.EncryptionPassword != "" {
+	if diskConfig.EncryptionPassword != "" {
 		// Use pbkdf2 to convert the string to a key of correct size
 		settings.EncryptionKey = pbkdf2.Key([]byte(diskConfig.EncryptionPassword),
 			[]byte(diskConfig.EncryptionPassword),
 			4096,
 			diskqueue.KeySize,
 			sha1.New)
-	}
-
-	if diskConfig.UseEncryption && diskConfig.EncryptionPassword == "" { //nolint:staticcheck // TODO
-		// TODO fetch key from elastic-agent
 	}
 
 	settings.UseCompression = diskConfig.UseCompression
