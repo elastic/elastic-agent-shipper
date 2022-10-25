@@ -294,7 +294,7 @@ func newSaramaConfig(log *logp.Logger, config Config) (*sarama.Config, error) {
 	k.Producer.Partitioner = partitioner
 	k.MetricRegistry = adapter.GetGoMetrics(
 		monitoring.Default,
-		"libbeat.outputs.kafka",
+		"libbeat.outputs.kafka", // TODO: Come up with a new name here
 		adapter.Rename("incoming-byte-rate", "bytes_read"),
 		adapter.Rename("outgoing-byte-rate", "bytes_write"),
 		adapter.GoMetricsNilify,

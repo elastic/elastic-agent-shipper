@@ -78,7 +78,7 @@ var (
 func newKafkaClient(
 	//observer outputs.Observer,            TODO: No need for observer, AFAICT
 	hosts []string,
-	//index string,                         TODO: As above, let's figure out if we still need this
+	//index string,                         TODO: As above, let's figure out if we still need this. Maybe used for  event metadata?
 	key string,    //                        TODO: generate key name from event contents
 	topic string, //                        TODO: generate topic name from event contents
 	headers []Header,
@@ -157,8 +157,8 @@ func (c *Client) Close() error {
 	return nil
 }
 
-// PublishEvents sends all events to elasticsearch. On error a slice with all
-// events not published or confirmed to be processed by elasticsearch will be
+// PublishEvents sends all events to kafka. On error a slice with all
+// events not published or confirmed to be processed by kafka will be
 // returned. The input slice backing memory will be reused by return the value.
 func (client *Client) publishEvents(ctx context.Context, data []*messages.Event) ([]*messages.Event, error) {
 
@@ -210,7 +210,11 @@ func (client *Client) publishEvents(ctx context.Context, data []*messages.Event)
 		ch <- &msg.msg
 	}
 
+
 	// TODO: Return properly
+	// Need to figure out a way to track the completion status of events and return these to the shipper, handling
+	// retries, etc
+
 	return nil, nil
 }
 
@@ -222,9 +226,9 @@ func (c *Client) String() string {
 func (c *Client) getEventMessage(data *messages.Event) (*Message, error) {
 	msg := &Message{partition: -1, data: *data}
 
-	// TODO: We no longer have access to the Cache property of the Data - need to figure out how to handle this
-	// particular WRT to partitions and topic assignment.
-	// TODO: Partition assignment
+	// TODO: As fas as I can tell, this snippet of code is required to mark the topic and partition
+	// on an event, so that in the event of a retry, the partition and topic is no longer required to be re-calculated
+	// as stability is expected over retry.
 
 	// RWB partition, topic and value are set on the event cache...
 	//value, err := data.Cache.GetValue("partition")
@@ -237,7 +241,6 @@ func (c *Client) getEventMessage(data *messages.Event) (*Message, error) {
 	//	}
 	//}
 	//
-	// TODO: Topic Caching
 	//value, err = data.Cache.GetValue("topic")
 	//if err == nil {
 	//	if c.log.IsDebug() {
@@ -289,7 +292,7 @@ func (c *Client) getEventMessage(data *messages.Event) (*Message, error) {
 	//copy(buf, serializedEvent)
 	msg.value = serializedEvent
 
-	fmt.Println("The fields are %s\n", data.Fields)
+	//fmt.Println("The fields are %s\n", data.Fields)
 	// message timestamps have been added to kafka with version 0.10.0.0
     // TODO: Figure out timestamp conversion
 	if c.config.Version.IsAtLeast(sarama.V0_10_0_0) {
@@ -390,6 +393,7 @@ func (c *Client) errorWorker(ch <-chan *sarama.ProducerError) {
 				// Immediately log the error that presumably caused this state,
 				// since the error reporting on this batch will be delayed.
 				if msg.ref.err != nil {
+					fmt.Println("Kafka (topic=%v): %v", msg.topic, msg.ref.err)
 					c.log.Errorf("Kafka (topic=%v): %v", msg.topic, msg.ref.err)
 				}
 				select {
@@ -412,6 +416,8 @@ func (r *MsgRef) done() {
 }
 
 func (r *MsgRef) fail(msg *Message, err error) {
+	fmt.Println("Sending message FAILED!!! %v", err)
+
 	switch err {
 	case sarama.ErrInvalidMessage:
 		r.client.log.Errorf("Kafka (topic=%v): dropping invalid message", msg.topic)
@@ -465,7 +471,7 @@ func (r *MsgRef) dec() {
 		//	stats.Acked(success)
 		//}
 
-		r.client.log.Debugf("Kafka publish failed with: %+v", err)
+		r.client.log.Debugf("Kafka publish s with: %+v", err)
 	} else {
 		// TODO: Make sure we have a solid story for acking and nacking
 		//r.batch.ACK()

@@ -45,6 +45,7 @@ func (m *Message) initProducerMessage() {
 	//fmt.Println("Sending metadata %s to topic %s", m, m.topic)
 	fmt.Println("Sending key %s to topic %s", m.key, m.topic)
 	fmt.Println("Sending timestamp %s to topic %s", m.ts, m.topic)
+	fmt.Println("Sending msg to topic %s on partition %s", m.topic, m.partition)
 	m.msg = sarama.ProducerMessage{
 		Metadata:  m,
 		Topic:     m.topic,

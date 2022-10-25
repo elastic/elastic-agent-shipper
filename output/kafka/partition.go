@@ -132,7 +132,7 @@ func (p *MessagePartitioner) Partition(
 	msg.partition = partition
 
 	// TODO: Where can we store partition data for the message?
-
+	fmt.Println("Setting partition to %s\n", partition)
 	//if _, err := msg.data.Cache.Put("partition", partition); err != nil {
 	//	return 0, fmt.Errorf("setting kafka partition in publisher event failed: %v", err)
 	//}

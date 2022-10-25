@@ -3,6 +3,8 @@ hosts: ["blah:4000"]
 kafka.hosts: ["localhost:9092"]
 kafka.max_retries: 44
 kafka.topic: shippy
+kafka.partition.round_robin:
+  reachable_only: true
 kafka.key: blah
 # ================================== General ==================================
 
