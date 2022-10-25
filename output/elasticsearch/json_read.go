@@ -148,7 +148,7 @@ func (r *jsonReader) init(in []byte) {
 var whitespace = []byte(" \t\r\n")
 
 func (r *jsonReader) skipWS() {
-	r.IgnoreSymbols(whitespace)
+	_ = r.IgnoreSymbols(whitespace)
 }
 
 func (r *jsonReader) pushState(next state) {
@@ -327,7 +327,7 @@ func (r *jsonReader) stepArrayNext() (entity, []byte, error) {
 	case ']':
 		return r.endArray()
 	case ',':
-		r.Advance(1)
+		_ = r.Advance(1)
 		r.skipWS()
 		r.currentState = arrState
 		return r.doStepArray(false)
@@ -397,7 +397,7 @@ func (r *jsonReader) stepDictValueEnd() (entity, []byte, error) {
 	case '}':
 		return r.endDict()
 	case ',':
-		r.Advance(1)
+		_ = r.Advance(1)
 		r.skipWS()
 		r.currentState = dictState
 		return r.doStepDict(false)
@@ -455,7 +455,7 @@ func stepSymbol(r *jsonReader, e entity, symb []byte, fail error) (entity, []byt
 		return failEntity, nil, fail
 	}
 
-	r.Advance(len(symb))
+	_ = r.Advance(len(symb))
 	return e, nil, nil
 }
 
@@ -502,25 +502,25 @@ func (r *jsonReader) stepString() (entity, []byte, error) {
 }
 
 func (r *jsonReader) startDict() (entity, []byte, error) {
-	r.Advance(1)
+	_ = r.Advance(1)
 	r.pushState(dictState)
 	return dictStart, nil, nil
 }
 
 func (r *jsonReader) endDict() (entity, []byte, error) {
-	r.Advance(1)
+	_ = r.Advance(1)
 	r.popState()
 	return dictEnd, nil, nil
 }
 
 func (r *jsonReader) startArray() (entity, []byte, error) {
-	r.Advance(1)
+	_ = r.Advance(1)
 	r.pushState(arrState)
 	return arrStart, nil, nil
 }
 
 func (r *jsonReader) endArray() (entity, []byte, error) {
-	r.Advance(1)
+	_ = r.Advance(1)
 	r.popState()
 	return arrEnd, nil, nil
 }
