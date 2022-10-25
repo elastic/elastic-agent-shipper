@@ -24,6 +24,8 @@ import (
 	"net/http"
 	"time"
 
+	"go.elastic.co/apm"
+
 	"github.com/elastic/beats/v7/libbeat/beat"
 	"github.com/elastic/beats/v7/libbeat/beat/events"
 	"github.com/elastic/beats/v7/libbeat/esleg/eslegclient"
@@ -33,7 +35,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing"
 	"github.com/elastic/elastic-agent-libs/version"
-	"go.elastic.co/apm"
 
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 )
