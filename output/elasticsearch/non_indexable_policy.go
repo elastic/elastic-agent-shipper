@@ -17,17 +17,11 @@
 
 package elasticsearch
 
-import (
-	"fmt"
-
-	"github.com/elastic/beats/v7/libbeat/common/cfgwarn"
-	"github.com/elastic/elastic-agent-libs/config"
-)
-
+/*
 const (
 	dead_letter_marker_field = "deadlettered"
-	drop                     = "drop"
-	dead_letter_index        = "dead_letter_index"
+	drop            = "drop"
+	deadLetterIndex = "dead_letter_index"
 )
 
 type DropPolicy struct{}
@@ -45,7 +39,7 @@ type DeadLetterIndexPolicy struct {
 }
 
 func (d DeadLetterIndexPolicy) action() string {
-	return dead_letter_index
+	return deadLetterIndex
 }
 
 func (d DeadLetterIndexPolicy) index() string {
@@ -59,8 +53,8 @@ type nonIndexablePolicy interface {
 
 var (
 	policyFactories = map[string]policyFactory{
-		drop:              newDropPolicy,
-		dead_letter_index: newDeadLetterIndexPolicy,
+		drop:            newDropPolicy,
+		deadLetterIndex: newDeadLetterIndexPolicy,
 	}
 )
 
@@ -69,7 +63,7 @@ func newDeadLetterIndexPolicy(config *config.C) (nonIndexablePolicy, error) {
 	policy := DeadLetterIndexPolicy{}
 	err := config.Unpack(&policy)
 	if policy.index() == "" {
-		return nil, fmt.Errorf("%s policy requires an `index` to be specified specified", dead_letter_index)
+		return nil, fmt.Errorf("%s policy requires an `index` to be specified specified", deadLetterIndex)
 	}
 	return policy, err
 }
@@ -101,3 +95,4 @@ func newNonIndexablePolicy(configNamespace *config.Namespace) (nonIndexablePolic
 
 	return factory(configNamespace.Config())
 }
+*/

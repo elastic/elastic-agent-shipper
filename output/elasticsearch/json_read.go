@@ -541,10 +541,10 @@ func (r *jsonReader) stepNumber() (entity, []byte, error) {
 
 	// parse '+', '-' or '.'
 	if b, _ := r.PeekByte(); b == '-' || b == '+' {
-		r.Advance(1)
+		_ = r.Advance(1)
 	}
 	if b, _ := r.PeekByte(); b == '.' {
-		r.Advance(1)
+		_ = r.Advance(1)
 		isDouble = true
 	}
 
@@ -557,11 +557,11 @@ func (r *jsonReader) stepNumber() (entity, []byte, error) {
 	if !isDouble {
 		// parse optional '.'
 		if b, _ := r.PeekByte(); b == '.' {
-			r.Advance(1)
+			_ = r.Advance(1)
 			isDouble = true
 
 			// parse optional digits
-			r.CollectWhile(isDigit)
+			_, _ = r.CollectWhile(isDigit)
 		}
 	}
 
