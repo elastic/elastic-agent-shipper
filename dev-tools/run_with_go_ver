@@ -9,8 +9,8 @@ set -e
 
 # Script directory:
 SDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-
 source "${SDIR}/common.bash"
+
 
 get_go_version
 setup_go_root ${GO_VERSION}
