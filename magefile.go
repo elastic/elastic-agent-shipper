@@ -25,12 +25,9 @@ import (
 	"strings"
 
 	"github.com/elastic/elastic-agent-libs/dev-tools/mage"
+	"github.com/elastic/elastic-agent-libs/dev-tools/mage/gotool"
 	devtools "github.com/elastic/elastic-agent-shipper/dev-tools/common"
 	"github.com/elastic/elastic-agent-shipper/tools"
-
-	//mage:import
-
-	"github.com/elastic/elastic-agent-libs/dev-tools/mage/gotool"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 )
@@ -170,6 +167,11 @@ func (Test) Unit(ctx context.Context) error {
 }
 
 //CHECKS
+
+// Lint runs the linter, equivalent running to 'golangci-lint run ./...'
+func Lint() error {
+	return mage.Linter{}.All()
+}
 
 // Check runs all the checks including licence, notice, gomod, git changes
 func Check() {
