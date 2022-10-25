@@ -54,10 +54,10 @@ func TestAgentControl(t *testing.T) {
 									Source: MustNewStruct(t, map[string]interface{}{
 										"logging": map[string]interface{}{
 											"level": "debug",
-											"output": map[string]interface{}{
-												"console": map[string]interface{}{
-													"enabled": "true",
-												},
+										},
+										"output": map[string]interface{}{
+											"console": map[string]interface{}{
+												"enabled": "true",
 											},
 										},
 									}),
