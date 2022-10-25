@@ -18,6 +18,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -44,10 +45,13 @@ const (
 // Aliases are shortcuts to long target names.
 // nolint: deadcode // it's used by `mage`.
 var Aliases = map[string]interface{}{
-	"build":           Build.Binary,
-	"package":         Package.Artifacts,
-	"unitTest":        Test.Unit,
-	"integrationTest": Test.Integration,
+	"build":                                 Build.Binary,
+	"package":                               Package.Artifacts,
+	"unitTest":                              Test.Unit,
+	"integrationTest":                       Test.Integration,
+	"release-manager-dependencies":          Dependencies.Generate,
+	"release-manager-dependencies-snapshot": Dependencies.Snapshot,
+	"release-manager-dependencies-release":  Dependencies.Release,
 }
 
 // BUILD
@@ -229,6 +233,57 @@ func Notice() error {
 	// "go mod download all" isn't smart enough to know the minimum set of deps needed.
 	// See https://github.com/golang/go/issues/43994#issuecomment-770053099
 	return gotool.Mod.Tidy()
+}
+
+// DEPENDENCIES
+
+// Dependencies contains targets related to generating dependencies csv file
+type Dependencies mg.Namespace
+
+// Generate creates a list of dependencies in a form of csv file.
+func (Dependencies) Generate() {
+
+	// release-manager-dependencies: ## - Prepares the dependencies file.
+	// @mkdir -p build/distributions/reports
+	// ./dev-tools/run_with_go_ver dev-tools/dependencies-report --csv build/distributions/reports/dependencies-$(VERSION).csv
+	// @cd build/distributions/reports && shasum -a 512 dependencies-$(VERSION).csv > dependencies-$(VERSION).csv.sha512
+	dependenciesDir := filepath.Join("build", "distributions", "reports")
+	err := os.MkdirAll(dependenciesDir, 0755)
+	if err != nil {
+		panic(err)
+	}
+
+	runWithGoPath := filepath.Join("dev-tools", "run_with_go_ver")
+	runWithGoPath, err = filepath.Abs(runWithGoPath)
+	if err != nil {
+		panic(err)
+	}
+	dependenciesReportPath := filepath.Join("dev-tools", "dependencies")
+
+	version, err := fullVersion()
+	if err != nil {
+		panic(err)
+	}
+	csvPath := filepath.Join("build", "distributions", "reports", "dependencies-"+version+".csv")
+
+	cmd := exec.Command(runWithGoPath, dependenciesReportPath, "--csv", csvPath)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		panic(err)
+	}
+}
+
+// Snapshot prepares the dependencies file for a snapshot
+func (Dependencies) Snapshot() {
+	os.Setenv("SNAPSHOT", "true")
+	mg.Deps(Dependencies.Generate)
+}
+
+// Release prepares the dependencies file for a release
+func (Dependencies) Release() {
+	mg.Deps(Dependencies.Generate)
 }
 
 // PACKAGE
