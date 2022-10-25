@@ -109,3 +109,11 @@ monitoring:
     # error. If the queue encounters repeated errors, it will double the
     # length of its retry interval each time, up to this maximum.
     #max_retry_interval: 30s
+
+output:
+  elasticsearch:
+    hosts: ["https://localhost:9200"]
+    username: "elastic"
+    password: "pp3OwQRxejj_yt=fs*U-"
+    allow_older_versions: true
+    ssl.verification_mode: none
