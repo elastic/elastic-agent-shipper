@@ -41,7 +41,6 @@ type Client struct {
 	//pipeline *outil.Selector
 
 	//observer           outputs.Observer
-	//NonIndexableAction string
 
 	log *logp.Logger
 }
@@ -125,7 +124,6 @@ func NewClient(
 		//index:    s.Index,
 		//pipeline: pipeline,
 		//observer:           s.Observer,
-		//NonIndexableAction: s.NonIndexableAction,
 
 		log: logp.NewLogger("elasticsearch"),
 	}
@@ -423,31 +421,9 @@ func (client *Client) bulkCollectPublishFails(result eslegclient.BulkResult, dat
 			if status == http.StatusTooManyRequests {
 				stats.tooMany++
 			} else {
-				// hard failure, apply policy action
-				/*result, _ := data[i].Content.Meta.HasKey(dead_letter_marker_field)
-				if result {
-					stats.nonIndexable++
-					client.log.Errorf("Can't deliver to dead letter index event %#v (status=%v): %s", data[i], status, msg)
-					// poison pill - this will clog the pipeline if the underlying failure is non transient.
-				} else if client.NonIndexableAction == dead_letter_index {
-					client.log.Warnf("Cannot index event %#v (status=%v): %s, trying dead letter index", data[i], status, msg)
-					if data[i].Content.Meta == nil {
-						data[i].Content.Meta = mapstr.M{
-							dead_letter_marker_field: true,
-						}
-					} else {
-						data[i].Content.Meta.Put(dead_letter_marker_field, true)
-					}
-					data[i].Content.Fields = mapstr.M{
-						"message":       data[i].Content.Fields.String(),
-						"error.type":    status,
-						"error.message": string(msg),
-					}
-				} else { // drop*/
 				stats.nonIndexable++
 				client.log.Warnf("Cannot index event %#v (status=%v): %s, dropping event!", data[i], status, msg)
 				continue
-				//}
 			}
 		}
 

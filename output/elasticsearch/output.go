@@ -186,7 +186,6 @@ func makeES(
 			Index:              index,
 			Pipeline:           pipeline,
 			Observer:           observer,
-			NonIndexableAction: policy.action(),
 		}, &connectCallbackRegistry)
 		if err != nil {
 			return nil, err
