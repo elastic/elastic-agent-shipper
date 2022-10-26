@@ -244,11 +244,6 @@ type Dependencies mg.Namespace
 
 // Generate creates a list of dependencies in a form of csv file.
 func (Dependencies) Generate() {
-
-	// release-manager-dependencies: ## - Prepares the dependencies file.
-	// @mkdir -p build/distributions/reports
-	// ./dev-tools/run_with_go_ver dev-tools/dependencies-report --csv build/distributions/reports/dependencies-$(VERSION).csv
-	// @cd build/distributions/reports && shasum -a 512 dependencies-$(VERSION).csv > dependencies-$(VERSION).csv.sha512
 	dependenciesDir := filepath.Join("build", "distributions", "reports")
 	err := os.MkdirAll(dependenciesDir, 0755)
 	if err != nil {
