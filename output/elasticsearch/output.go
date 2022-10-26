@@ -90,26 +90,10 @@ func makeES(
 	observer outputs.Observer,*/
 	config Config,
 ) (*Client, error) {
-	log := logp.NewLogger(logSelector)
+	log := logp.NewLogger("elasticsearch")
 	/*if !cfg.HasField("bulk_max_size") {
 		cfg.SetInt("bulk_max_size", -1, defaultBulkSize)
 	}*/
-
-	/*index, pipeline, err := buildSelectors(im, beat, cfg)
-	if err != nil {
-		return nil, err
-	}*/
-	/*
-		config := defaultConfig
-		if err := cfg.Unpack(&config); err != nil {
-			return outputs.Fail(err)
-		}
-
-		policy, err := newNonIndexablePolicy(config.NonIndexablePolicy)
-		if err != nil {
-			log.Errorf("error while creating file identifier: %v", err)
-			return outputs.Fail(err)
-		}*/
 
 	/*hosts, err := outputs.ReadHostList(cfg)
 	if err != nil {
@@ -125,13 +109,6 @@ func makeES(
 	if len(params) == 0 {
 		params = nil
 	}
-
-	/*if policy.action() == dead_letter_index {
-		index = DeadLetterSelector{
-			Selector:        index,
-			DeadLetterIndex: policy.index(),
-		}
-	}*/
 
 	if len(config.Hosts) == 0 {
 		return nil, fmt.Errorf("hosts list cannot be empty")
@@ -195,6 +172,4 @@ func makeES(
 	}
 
 	return outputs.SuccessNet(config.LoadBalance, config.BulkMaxSize, config.MaxRetries, clients)*/
-
-	//return nil, nil
 }
