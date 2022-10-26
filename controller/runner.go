@@ -214,7 +214,6 @@ func (r *ServerRunner) Close() (err error) {
 	return nil
 }
 
-
 func outputFromConfig(config output.Config, queue *queue.Queue) (Output, error) {
 	if config.Kafka != nil {
 		return kafka.NewKafka(config.Kafka, queue), nil
