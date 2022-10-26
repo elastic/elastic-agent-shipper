@@ -1,25 +1,11 @@
 package kafka
 
 import (
-    //"context"
-    //"errors"
-    //"fmt"
-    //"net/http"
-    //"time"
-
-"github.com/elastic/beats/v7/libbeat/beat"
-//"github.com/elastic/beats/v7/libbeat/beat/events"
-//"github.com/elastic/beats/v7/libbeat/esleg/eslegclient"
-//"github.com/elastic/beats/v7/libbeat/outputs"
-//"github.com/elastic/beats/v7/libbeat/outputs/outil"
-//"github.com/elastic/elastic-agent-libs/logp"
-"github.com/elastic/elastic-agent-libs/mapstr"
-//"github.com/elastic/elastic-agent-libs/testing"
-//"github.com/elastic/elastic-agent-libs/version"
-//"go.elastic.co/apm"
-
-"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
+    "github.com/elastic/beats/v7/libbeat/beat"
+    "github.com/elastic/elastic-agent-libs/mapstr"
+    "github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 )
+
 func mapstrForValue(v *messages.Value) interface{} {
     if boolVal, ok := v.GetKind().(*messages.Value_BoolValue); ok {
         return boolVal.BoolValue

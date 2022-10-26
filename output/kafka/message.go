@@ -21,9 +21,8 @@ import (
 	"time"
 	"fmt"
 	"github.com/Shopify/sarama"
+
 	"github.com/elastic/beats/v7/libbeat/beat"
-	//"github.com/elastic/beats/v7/libbeat/beat/events"
-	//"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 )
 
 type Message struct {
@@ -46,9 +45,8 @@ var kafkaMessageKey interface{} = int(0)
 
 func (m *Message) initProducerMessage() {
 	//fmt.Println("Sending metadata %s to topic %s", m, m.topic)
-	fmt.Println("Sending key %s to topic %s", m.key, m.topic)
-	fmt.Println("Sending timestamp %s to topic %s", m.ts, m.topic)
-	fmt.Println("Sending msg to topic %s on partition %s", m.topic, m.partition)
+	fmt.Printf("Sending key %s to topic %s on partition %s\n", m.key, m.topic, m.partition)
+
 	m.msg = sarama.ProducerMessage{
 		Metadata:  m,
 		Topic:     m.topic,

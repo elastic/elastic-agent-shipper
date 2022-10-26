@@ -1,11 +1,10 @@
 # ========================= Shipper Configuration File ========================
-hosts: ["blah:4000"]
-kafka.hosts: ["localhost:9092"]
+kafka.hosts: ["localhost:9092", "localhost:9093"]
 kafka.max_retries: 44
-kafka.topic: shippy
+kafka.topic: '%{[agent][name]}'
 kafka.partition.round_robin:
   reachable_only: true
-kafka.key: blah
+kafka.key: '%{[agent][name]}'
 # ================================== General ==================================
 
 server:

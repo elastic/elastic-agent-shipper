@@ -19,12 +19,10 @@ package kafka
 
 import (
 	"github.com/Shopify/sarama"
+	"fmt"
 
-	//"github.com/elastic/beats/v7/libbeat/beat"
-	//"github.com/elastic/beats/v7/libbeat/outputs"
-	//"github.com/elastic/beats/v7/libbeat/outputs/codec"
-	//"github.com/elastic/beats/v7/libbeat/outputs/outil"
-	//"github.com/elastic/elastic-agent-libs/config"
+	"github.com/elastic/beats/v7/libbeat/outputs/codec/json"
+
 	"github.com/elastic/elastic-agent-libs/logp"
 )
 const (
@@ -33,58 +31,61 @@ const (
 
 func init() {
 	sarama.Logger = kafkaLogger{log: logp.NewLogger(logSelector)}
-
-	//outputs.RegisterType("kafka", makeKafka)
 }
 
-// TODO: Figure out best place for this method, maybe bring over the one from client
+// TODO: This contains a *lot* of hacks,
+func makeKafka(
+	config Config,
+) (*Client, error) {
 
-//func makeKafka(
-//	_ outputs.IndexManager,
-//	beat beat.Info,
-//	observer outputs.Observer,
-//	cfg *config.C,
-//) (outputs.Group, error) {
-//	log := logp.NewLogger(logSelector)
-//	log.Debug("initialize kafka output")
-//
-//	config, err := readConfig(cfg)
-//	if err != nil {
-//		return outputs.Fail(err)
-//	}
-//
-//	topic, err := buildTopicSelector(cfg)
-//	if err != nil {
-//		return outputs.Fail(err)
-//	}
-//
-//	libCfg, err := newSaramaConfig(log, config)
-//	if err != nil {
-//		return outputs.Fail(err)
-//	}
-//
-//	hosts, err := outputs.ReadHostList(cfg)
-//	if err != nil {
-//		return outputs.Fail(err)
-//	}
-//
-//	codec, err := codec.CreateEncoder(beat, config.Codec)
-//	if err != nil {
-//		return outputs.Fail(err)
-//	}
-//
-//	client, err := newKafkaClient(observer, hosts, beat.IndexPrefix, config.Key, topic, config.Headers, codec, libCfg)
-//	if err != nil {
-//		return outputs.Fail(err)
-//	}
-//
-//	retry := 0
-//	if config.MaxRetries < 0 {
-//		retry = -1
-//	}
-//	return outputs.Success(config.BulkMaxSize, retry, client)
-//}
-//
+	log := logp.NewLogger("kafka-output")
+
+	log.Info("initialize kafka output")
+
+	// TODO: Use the topic selector
+	topic := config.Topic
+	//topic, err := buildTopicSelector(&config)
+	//if err != nil {
+	//	return nil,nil
+	//	//return outputs.Fail(err)
+	//}
+
+	libCfg, err := newSaramaConfig(log, config)
+	if err != nil {
+		fmt.Println("Sarama error %s\n", err)
+		return nil, nil
+	}
+
+	hosts := config.Hosts
+
+
+	codec := json.New("1", json.Config{
+		Pretty:     true,
+		EscapeHTML: true,
+	})
+
+	//codec, err := codec.CreateEncoder(beat, config.Codec)
+	//if err != nil {
+	//	fmt.Println("failed %v", err)
+	//	return nil, nil
+	//	//return outputs.Fail(err)
+	//}
+
+	return newKafkaClient( /*observer, */ hosts, "kafka", config.Key, topic, config.Headers, codec, libCfg)
+
+	// TODO: Make sure this is what we want to do with our return values, or whether we need to utilize the Success object
+	//if err != nil {
+	//	return outputs.Fail(err)
+	//}
+	//
+	//retry := 0
+	//if config.MaxRetries < 0 {
+	//	retry = -1
+	//}
+	//return outputs.Success(config.BulkMaxSize, retry, client)
+}
+
+//// TODO: Topic interpolation...
 //func buildTopicSelector(cfg *config.C) (outil.Selector, error) {
 //	return outil.BuildSelectorFromConfig(cfg, outil.Settings{
 //		Key:              "topic",
@@ -93,4 +94,5 @@ func init() {
 //		FailEmpty:        true,
 //		Case:             outil.SelectorKeepCase,
 //	})
+//	//return nil, nil
 //}

@@ -131,8 +131,8 @@ func (p *MessagePartitioner) Partition(
 
 	msg.partition = partition
 
-	// TODO: Where can we store partition data for the message?
-	fmt.Println("Setting partition to %s\n", partition)
+	// TODO: Do we need to cache the partition?
+	fmt.Printf("Setting partition to %s\n", partition)
 	//if _, err := msg.data.Cache.Put("partition", partition); err != nil {
 	//	return 0, fmt.Errorf("setting kafka partition in publisher event failed: %v", err)
 	//}
@@ -251,13 +251,13 @@ func makeFieldsHashPartitioner(log *logp.Logger, fields []string, dropFail bool)
 
 			var err error
 
-			//for _, field := range fields {
-			//	// TODO: What to do with field hash partitioner?
-			//	err = hashFieldValue(hasher, msg.data.content.Fields, field)
-			//	if err != nil {
-			//		break
-			//	}
-			//}
+			for _, field := range fields {
+				// TODO: What to do with field hash partitioner?
+				err = hashFieldValue(hasher, msg.data.Fields, field)
+				if err != nil {
+					break
+				}
+			}
 
 			if err != nil {
 				if dropFail {
