@@ -5,6 +5,7 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -26,7 +27,7 @@ import (
 
 // Output describes a typical output implementation used for running the server.
 type Output interface {
-	Start()
+	Start() error
 	Wait()
 }
 
@@ -46,7 +47,7 @@ type ServerRunner struct {
 	queue      *queue.Queue
 	monitoring *monitoring.QueueMonitor
 	console    Output
-	kafka	   *kafka.Output
+	out        Output
 }
 
 // NewServerRunner creates a new runner that starts and stops the server.
@@ -81,16 +82,23 @@ func NewServerRunner(cfg config.ShipperConfig) (r *ServerRunner, err error) {
 	r.log.Debug("monitoring is ready.")
 
 	r.log.Debug("initializing the output...")
-	// TODO replace with the real output based on the config, Console is hard-coded for now
-	r.console = output.NewConsole(r.queue)
 
-	//r.console.Start()
-	//r.log.Debug("output was initialized.")
-
-	// TODO: This needs to be converted into real output options
-	r.kafka = kafka.NewKafka(cfg.Kafka, r.queue)
-	r.kafka.Start()
-	r.log.Debug("Kafka started")
+	r.out, err = outputFromConfig(cfg.Output, r.queue)
+	if err != nil {
+		return nil, err
+	}
+	err = r.out.Start()
+	if err != nil {
+		return nil, fmt.Errorf("couldn't start output: %w", err)
+	}
+	r.log.Debug("output was initialized.")
+	// in case of an initialization error we must clean up all created resources
+	defer func() {
+		if err != nil {
+			// this will account for partial initialization in case of an error, so there are no leaks
+			r.Close()
+		}
+	}()
 
 	r.log.Debug("initializing the gRPC server...")
 	var opts []grpc.ServerOption
@@ -192,26 +200,27 @@ func (r *ServerRunner) Close() (err error) {
 			r.queue = nil
 			r.log.Debugf("queue is stopped.")
 		}
-		// TODO: Replace this with real output
-		if r.console != nil {
+		if r.out != nil {
 			// The output will shut down once the queue is closed.
 			// We call Wait to give it a chance to finish with events
 			// it has already read.
 			r.log.Debugf("waiting for pending events in the output...")
-			r.console.Wait()
-			r.console = nil
-			r.log.Debugf("all pending events are flushed")
-		}
-		if r.kafka != nil{
-			// The output will shut down once the queue is closed.
-			// We call Wait to give it a chance to finish with events
-			// it has already read.
-			r.log.Debugf("waiting for pending events in the output...")
-			r.kafka.Wait()
-			r.kafka = nil
+			r.out.Wait()
+			r.out = nil
 			r.log.Debugf("all pending events are flushed")
 		}
 	})
 
 	return nil
+}
+
+
+func outputFromConfig(config output.Config, queue *queue.Queue) (Output, error) {
+	if config.Kafka != nil {
+		return kafka.NewKafka(config.Kafka, queue), nil
+	}
+	if config.Console != nil && config.Console.Enabled {
+		return output.NewConsole(queue), nil
+	}
+	return nil, errors.New("no active output configuration")
 }

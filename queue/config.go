@@ -31,7 +31,6 @@ func DefaultConfig() Config {
 }
 
 func (c *Config) Validate() error {
-	fmt.Printf("I'm in the queue validator %s", c)
 	if c.MemSettings == nil && c.DiskSettings == nil {
 		return fmt.Errorf("memory or disk queue settings must be supplied")
 	}

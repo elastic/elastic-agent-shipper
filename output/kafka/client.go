@@ -88,7 +88,7 @@ func newKafkaClient(
 		hosts:    hosts,
 		topic:    topic,
 		key:      key,
-		//index:    strings.ToLower(index),
+		index:    strings.ToLower(index),
 		codec:    writer,
 		config:   *cfg,
 		done:     make(chan struct{}),

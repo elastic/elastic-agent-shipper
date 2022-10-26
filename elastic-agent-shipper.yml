@@ -1,10 +1,14 @@
 # ========================= Shipper Configuration File ========================
-kafka.hosts: ["localhost:9092", "localhost:9093"]
-kafka.max_retries: 44
-kafka.topic: '%{[agent][name]}'
-kafka.partition.round_robin:
+output.kafka.enabled: false
+output.kafka.hosts: ["localhost:9092", "localhost:9093"]
+output.kafka.version: 1
+output.kafka.max_retries: 44
+output.kafka.topic: '%{[agent][name]}'
+output.kafka.timeout: 30
+output.kafka.broker_timeout: 30
+output.kafka.partition.round_robin:
   reachable_only: true
-kafka.key: '%{[agent][name]}'
+output.kafka.key: '%{[agent][name]}'
 # ================================== General ==================================
 
 server:
@@ -118,9 +122,9 @@ queue:
 
 #=====
 
-output:
-  hosts: ["localhost:42"]
-  kafka:
+#output:i
+#  hosts: ["localhost:42"]
+#  kafka:
 #  enabled: true
-    max_retries: 43
-    hosts: ['localhost:9092']
+#    max_retries: 43
+#    hosts: ['localhost:9092']

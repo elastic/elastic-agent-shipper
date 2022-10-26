@@ -14,9 +14,9 @@ import (
 	"github.com/elastic/elastic-agent-shipper/queue"
 )
 
-type Output struct {
+type KafkaOutput struct {
 	logger *logp.Logger
-	config Config
+	config *Config
 
 	queue *queue.Queue
 
@@ -24,8 +24,8 @@ type Output struct {
 }
 
 
-func NewKafka(config Config, queue *queue.Queue) *Output {
-	out := &Output{
+func NewKafka(config *Config, queue *queue.Queue) *KafkaOutput {
+	out := &KafkaOutput{
 		logger: logp.NewLogger("kafka-output"),
 		config: config,
 		queue:  queue,
@@ -35,9 +35,9 @@ func NewKafka(config Config, queue *queue.Queue) *Output {
 }
 
 
-func (out *Output) Start() error {
+func (out *KafkaOutput) Start() error {
 	fmt.Printf("Making kafka\n")
-	client, err := makeKafka(out.config)
+	client, err := makeKafka(*out.config)
 	if err != nil {
 		fmt.Printf("Making error with %s", err)
 		return err
@@ -87,6 +87,6 @@ func (out *Output) Start() error {
 // Wait until the output loop has finished. This doesn't stop the
 // loop by itself, so make sure you only call it when you close
 // the queue.
-func (out *Output) Wait() {
+func (out *KafkaOutput) Wait() {
 	out.wg.Wait()
 }

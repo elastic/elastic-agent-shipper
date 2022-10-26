@@ -28,8 +28,7 @@ import (
 	"github.com/Shopify/sarama"
 
 	"github.com/elastic/beats/v7/libbeat/common/fmtstr"
-	"github.com/elastic/beats/v7/libbeat/common/kafka"
-	// TODO: Move to elastic-agent-libs?
+	libkafka "github.com/elastic/beats/v7/libbeat/common/kafka"
 	"github.com/elastic/beats/v7/libbeat/common/transport/kerberos"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -63,7 +62,7 @@ type Config struct {
 	BrokerTimeout      time.Duration             `config:"broker_timeout"      validate:"min=1"`
 	Compression        string                    `config:"compression"`
 	CompressionLevel   int                       `config:"compression_level"`
-	Version            kafka.Version             `config:"version"`
+	Version            libkafka.Version             `config:"version"`
 	BulkMaxSize        int                       `config:"bulk_max_size"`
 	BulkFlushFrequency time.Duration             `config:"bulk_flush_frequency"`
 	MaxRetries         int                       `config:"max_retries"         validate:"min=-1,nonzero"`
@@ -75,7 +74,7 @@ type Config struct {
 	Password           string                    `config:"password"`
 	// TODO: Figure out codecs
 	//Codec              codec.Config              `config:"codec"`
-	Sasl               kafka.SaslConfig          `config:"sasl"`
+	Sasl               libkafka.SaslConfig          `config:"sasl"`
 	EnableFAST         bool                      `config:"enable_krb5_fast"`
 }
 
@@ -130,7 +129,7 @@ func DefaultConfig() Config {
 		BrokerTimeout:    10 * time.Second,
 		Compression:      "gzip",
 		CompressionLevel: 4,
-		Version:          kafka.Version("1.0.0"),
+		Version:          libkafka.Version("1.0.0"),
 		MaxRetries:       3,
 		Headers:          nil,
 		Backoff: BackoffConfig{
@@ -144,17 +143,7 @@ func DefaultConfig() Config {
 	}
 }
 
-func readConfig(cfg *config.C) (*Config, error) {
-	c := DefaultConfig()
-	if err := cfg.Unpack(&c); err != nil {
-		return nil, err
-	}
-	return &c, nil
-}
-
 func (c *Config) Validate() error {
-	fmt.Printf("I'm in the kafka validator %s", c)
-	fmt.Printf("I'm in the kafka validator retries %s", c.MaxRetries)
 	if len(c.Hosts) == 0 {
 		return errors.New("no hosts configured")
 	}
