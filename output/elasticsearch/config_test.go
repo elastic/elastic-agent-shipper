@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/elastic/elastic-agent-libs/config"
-	conf "github.com/elastic/elastic-agent-libs/config"
 )
 
 func TestValidConfig(t *testing.T) {
@@ -32,7 +31,7 @@ username: "user"`)
 	}
 }
 
-func readConfig(cfg *conf.C) (*Config, error) {
+func readConfig(cfg *config.C) (*Config, error) {
 	c := Config{}
 	if err := cfg.Unpack(&c); err != nil {
 		return nil, err
