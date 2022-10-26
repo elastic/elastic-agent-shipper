@@ -297,7 +297,7 @@ func (client *Client) publishEvents(ctx context.Context, data []*messages.Event)
 // bulkEncodePublishRequest encodes all bulk requests and returns slice of events
 // successfully added to the list of bulk items and the list of bulk items.
 func (client *Client) bulkEncodePublishRequest(version version.V, data []*messages.Event) ([]*messages.Event, []interface{}) {
-	okEvents := data[:0]
+	okEvents := make([]*messages.Event, len(data))
 	bulkItems := []interface{}{}
 	for _, event := range data {
 		meta, err := client.createEventBulkMeta(version, event)
