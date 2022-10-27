@@ -16,6 +16,7 @@ import (
 	"github.com/elastic/elastic-agent-shipper/config"
 	"github.com/elastic/elastic-agent-shipper/monitoring"
 	"github.com/elastic/elastic-agent-shipper/output"
+	"github.com/elastic/elastic-agent-shipper/output/elasticsearch"
 	"github.com/elastic/elastic-agent-shipper/output/kafka"
 	"github.com/elastic/elastic-agent-shipper/queue"
 	"github.com/elastic/elastic-agent-shipper/server"
@@ -46,7 +47,6 @@ type ServerRunner struct {
 	shipper    server.ShipperServer
 	queue      *queue.Queue
 	monitoring *monitoring.QueueMonitor
-	console    Output
 	out        Output
 }
 
@@ -58,13 +58,6 @@ func NewServerRunner(cfg config.ShipperConfig) (r *ServerRunner, err error) {
 		log: logp.L(),
 		cfg: cfg,
 	}
-	// in case of an initialization error we must clean up all created resources
-	defer func() {
-		if err != nil {
-			// this will account for partial initialization in case of an error, so there are no leaks
-			r.Close()
-		}
-	}()
 
 	r.log.Debug("initializing the queue...")
 	r.queue, err = queue.New(cfg.Queue)
@@ -82,7 +75,6 @@ func NewServerRunner(cfg config.ShipperConfig) (r *ServerRunner, err error) {
 	r.log.Debug("monitoring is ready.")
 
 	r.log.Debug("initializing the output...")
-
 	r.out, err = outputFromConfig(cfg.Output, r.queue)
 	if err != nil {
 		return nil, err
@@ -215,6 +207,9 @@ func (r *ServerRunner) Close() (err error) {
 }
 
 func outputFromConfig(config output.Config, queue *queue.Queue) (Output, error) {
+	if config.Elasticsearch != nil {
+		return elasticsearch.NewElasticSearch(config.Elasticsearch, queue), nil
+	}
 	if config.Kafka != nil {
 		return kafka.NewKafka(config.Kafka, queue), nil
 	}
