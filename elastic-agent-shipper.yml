@@ -110,6 +110,14 @@ monitoring:
     # length of its retry interval each time, up to this maximum.
     #max_retry_interval: 30s
 
+    # The password used to encrypt the diskque with.  Default is "" which
+    # means no encryption.
+    #encryption_password: ""
+
+    # Whether or not to compress the diskqueue with LZ4 compression.
+    # Default is false which means no compression.
+    #use_compression: false
+
 output:
   console:
     enabled: true
