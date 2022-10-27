@@ -39,7 +39,13 @@ func (out *KafkaOutput) Start() error {
 		client.log.Errorf("Unable to make kafka output %v", err)
 		return err
 	}
-    client.Connect()
+
+	err = client.Connect()
+	if err != nil {
+		client.log.Errorf("Unable to connect to client %v", err)
+		return err
+	}
+
 
 	out.wg.Add(1)
 	go func() {

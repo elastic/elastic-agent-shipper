@@ -5,7 +5,7 @@
 package kafka
 
 import (
-	"errors"
+	//"errors"
 	"strings"
 	"sync"
 
@@ -57,9 +57,9 @@ type MsgRef struct {
 //
 }
 
-var (
-	errNoTopicsSelected = errors.New("no topic could be selected")
-)
+//var (
+//	errNoTopicsSelected = errors.New("no topic could be selected")
+//)
 
 func newKafkaClient(
 	//observer outputs.Observer,

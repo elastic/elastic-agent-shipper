@@ -89,11 +89,11 @@ var compressionModes = map[string]sarama.CompressionCodec{
 	"snappy": sarama.CompressionSnappy,
 }
 
-const (
-	saslTypePlaintext   = sarama.SASLTypePlaintext
-	saslTypeSCRAMSHA256 = sarama.SASLTypeSCRAMSHA256
-	saslTypeSCRAMSHA512 = sarama.SASLTypeSCRAMSHA512
-)
+//const (
+//	saslTypePlaintext   = sarama.SASLTypePlaintext
+//	saslTypeSCRAMSHA256 = sarama.SASLTypeSCRAMSHA256
+//	saslTypeSCRAMSHA512 = sarama.SASLTypeSCRAMSHA512
+//)
 
 func DefaultConfig() Config {
 	return Config{

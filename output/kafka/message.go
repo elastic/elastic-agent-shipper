@@ -26,7 +26,7 @@ type Message struct {
 	data beat.Event
 }
 
-var kafkaMessageKey interface{} = int(0)
+//var kafkaMessageKey interface{} = int(0)
 
 func (m *Message) initProducerMessage() {
 	m.msg = sarama.ProducerMessage{
