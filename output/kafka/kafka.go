@@ -19,7 +19,7 @@ func init() {
 	sarama.Logger = kafkaLogger{log: logp.NewLogger(logSelector)}
 }
 
-// TODO: This contains a *lot* of hacks,
+// TODO: Fix up topic and codec creation
 func makeKafka(
 	config Config,
 ) (*Client, error) {

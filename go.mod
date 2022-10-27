@@ -50,7 +50,6 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-uuid v1.0.2 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
-	github.com/jcmturner/gofork v1.0.0 // indirect
 	github.com/jcchavezs/porto v0.4.0 // indirect
 	github.com/jcmturner/gofork v1.0.0 // indirect
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
@@ -67,11 +66,11 @@ require (
 	github.com/santhosh-tekuri/jsonschema v1.2.4 // indirect
 	github.com/sergi/go-diff v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/xdg/scram v1.0.3 // indirect
+	github.com/xdg/stringprep v1.0.3 // indirect
 	go.elastic.co/apm/module/apmelasticsearch/v2 v2.0.0 // indirect
 	go.elastic.co/apm/module/apmhttp/v2 v2.0.0 // indirect
 	go.elastic.co/apm/v2 v2.1.0 // indirect
-	github.com/xdg/scram v1.0.3 // indirect
-	github.com/xdg/stringprep v1.0.3 // indirect
 	go.elastic.co/ecszap v1.0.1 // indirect
 	go.elastic.co/fastjson v1.1.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
@@ -95,11 +94,7 @@ require (
 require (
 	github.com/Shopify/sarama v1.27.0
 	github.com/elastic/go-licenser v0.4.1 // indirect
-	github.com/jcchavezs/porto v0.4.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
-	go.elastic.co/apm/v2 v2.1.0 // indirect
-	go.uber.org/zap v1.22.0 // indirect
-	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa // indirect
 	golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab // indirect
 	golang.org/x/tools v0.1.12 // indirect
 )

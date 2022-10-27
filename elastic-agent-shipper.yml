@@ -123,7 +123,7 @@ output:
     enabled: true
 
   elasticsearch:
-    # To use the elasticsearch output, disable the console output and
+    # To use the elasticsearch output, disable the other outputs and
     # set elasticsearch.enabled to true.
     enabled: false
     hosts: ["https://localhost:9200"]
@@ -134,15 +134,12 @@ output:
     #allow_older_versions: true
     #ssl.verification_mode: none
 
-#=====
   kafka:
+    # To use the kafka output, disable the other outputs and
+    # set kafka.enabled to true.
     enabled: false
     hosts: ["localhost:9092", "localhost:9093"]
-    version: 1
-    max_retries: 5
     topic: '%{[metricset][name]}'
-    timeout: 30
-    broker_timeout: 30
     partition.round_robin:
       reachable_only: true
-    #key: '%{[metricset][name]}'
+    key: '%{[metricset][name]}'

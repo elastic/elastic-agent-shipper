@@ -210,7 +210,7 @@ func outputFromConfig(config output.Config, queue *queue.Queue) (Output, error) 
 	if config.Elasticsearch != nil {
 		return elasticsearch.NewElasticSearch(config.Elasticsearch, queue), nil
 	}
-	if config.Kafka != nil {
+	if config.Kafka != nil && config.Kafka.Enabled {
 		return kafka.NewKafka(config.Kafka, queue), nil
 	}
 	if config.Console != nil && config.Console.Enabled {

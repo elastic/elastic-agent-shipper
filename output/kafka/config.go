@@ -35,6 +35,7 @@ type Header struct {
 }
 
 type Config struct {
+	Enabled            bool                      `config:"enabled"`
 	Topic              *fmtstr.EventFormatString `config:"topic"               validate:"required"`
 	Hosts              []string                  `config:"hosts"               validate:"required"`
 	TLS                *tlscommon.Config         `config:"ssl"`
@@ -131,27 +132,23 @@ func DefaultConfig() Config {
 }
 
 func (c *Config) Validate() error {
-	if len(c.Hosts) == 0 {
-		return errors.New("no hosts configured")
-	}
-
-	if _, ok := compressionModes[strings.ToLower(c.Compression)]; !ok {
-		return fmt.Errorf("compression mode '%v' unknown", c.Compression)
-	}
-
-	if err := c.Version.Validate(); err != nil {
-		return err
-	}
-
-	if c.Username != "" && c.Password == "" {
-		return fmt.Errorf("password must be set when username is configured")
-	}
-
-	if c.Compression == "gzip" {
-		lvl := c.CompressionLevel
-		if lvl != sarama.CompressionLevelDefault && !(0 <= lvl && lvl <= 9) {
-			return fmt.Errorf("compression_level must be between 0 and 9")
+	if c.Enabled {
+		if len(c.Hosts) == 0 {
+			return errors.New("no hosts configured")
 		}
+
+		if _, ok := compressionModes[strings.ToLower(c.Compression)]; !ok {
+			return fmt.Errorf("compression mode '%v' unknown", c.Compression)
+		}
+
+		if err := c.Version.Validate(); err != nil {
+			return err
+		}
+
+		if c.Username != "" && c.Password == "" {
+			return fmt.Errorf("password must be set when username is configured")
+		}
+
 	}
 	return nil
 }
@@ -280,7 +277,7 @@ func newSaramaConfig(log *logp.Logger, config Config) (*sarama.Config, error) {
 	return k, nil
 }
 
-// TODO: Do we still need this?
+// TODO: Incorporate this
 
 // makeBackoffFunc returns a stateless implementation of exponential-backoff-with-jitter. It is conceptually
 // equivalent to the stateful implementation used by other outputs, EqualJitterBackoff.
