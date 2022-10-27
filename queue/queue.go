@@ -55,7 +55,11 @@ func New(c Config) (*Queue, error) {
 	// If both Disk & Mem settings exist, go with Disk
 	if c.useDiskQueue() {
 		var err error
-		eventQueue, err = diskqueue.NewQueue(logp.L(), *c.DiskSettings)
+		diskSettings, err := DiskSettingsFromConfig(c.DiskConfig)
+		if err != nil {
+			return nil, fmt.Errorf("error creating diskqueue settings: %w", err)
+		}
+		eventQueue, err = diskqueue.NewQueue(logp.L(), diskSettings)
 		if err != nil {
 			return nil, fmt.Errorf("error creating diskqueue: %w", err)
 		}
