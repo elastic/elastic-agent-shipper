@@ -52,7 +52,14 @@ func TestAgentControl(t *testing.T) {
 								ConfigStateIdx: 1,
 								Config: &proto.UnitExpectedConfig{
 									Source: MustNewStruct(t, map[string]interface{}{
-										"logging": map[string]interface{}{"level": "debug"},
+										"logging": map[string]interface{}{
+											"level": "debug",
+										},
+										"output": map[string]interface{}{
+											"console": map[string]interface{}{
+												"enabled": "true",
+											},
+										},
 									}),
 								},
 								State: proto.State_HEALTHY,

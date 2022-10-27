@@ -5,6 +5,7 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -15,6 +16,7 @@ import (
 	"github.com/elastic/elastic-agent-shipper/config"
 	"github.com/elastic/elastic-agent-shipper/monitoring"
 	"github.com/elastic/elastic-agent-shipper/output"
+	"github.com/elastic/elastic-agent-shipper/output/elasticsearch"
 	"github.com/elastic/elastic-agent-shipper/queue"
 	"github.com/elastic/elastic-agent-shipper/server"
 
@@ -25,7 +27,7 @@ import (
 
 // Output describes a typical output implementation used for running the server.
 type Output interface {
-	Start()
+	Start() error
 	Wait()
 }
 
@@ -55,13 +57,6 @@ func NewServerRunner(cfg config.ShipperConfig) (r *ServerRunner, err error) {
 		log: logp.L(),
 		cfg: cfg,
 	}
-	// in case of an initialization error we must clean up all created resources
-	defer func() {
-		if err != nil {
-			// this will account for partial initialization in case of an error, so there are no leaks
-			r.Close()
-		}
-	}()
 
 	r.log.Debug("initializing the queue...")
 	r.queue, err = queue.New(cfg.Queue)
@@ -79,10 +74,22 @@ func NewServerRunner(cfg config.ShipperConfig) (r *ServerRunner, err error) {
 	r.log.Debug("monitoring is ready.")
 
 	r.log.Debug("initializing the output...")
-	// TODO replace with the real output based on the config, Console is hard-coded for now
-	r.out = output.NewConsole(r.queue)
-	r.out.Start()
+	r.out, err = outputFromConfig(cfg.Output, r.queue)
+	if err != nil {
+		return nil, err
+	}
+	err = r.out.Start()
+	if err != nil {
+		return nil, fmt.Errorf("couldn't start output: %w", err)
+	}
 	r.log.Debug("output was initialized.")
+	// in case of an initialization error we must clean up all created resources
+	defer func() {
+		if err != nil {
+			// this will account for partial initialization in case of an error, so there are no leaks
+			r.Close()
+		}
+	}()
 
 	r.log.Debug("initializing the gRPC server...")
 	var opts []grpc.ServerOption
@@ -196,4 +203,14 @@ func (r *ServerRunner) Close() (err error) {
 	})
 
 	return nil
+}
+
+func outputFromConfig(config output.Config, queue *queue.Queue) (Output, error) {
+	if config.Elasticsearch != nil {
+		return elasticsearch.NewElasticSearch(config.Elasticsearch, queue), nil
+	}
+	if config.Console != nil && config.Console.Enabled {
+		return output.NewConsole(queue), nil
+	}
+	return nil, errors.New("no active output configuration")
 }
