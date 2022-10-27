@@ -1,14 +1,4 @@
 # ========================= Shipper Configuration File ========================
-output.kafka.enabled: false
-output.kafka.hosts: ["localhost:9092", "localhost:9093"]
-output.kafka.version: 1
-output.kafka.max_retries: 44
-output.kafka.topic: '%{[agent][name]}'
-output.kafka.timeout: 30
-output.kafka.broker_timeout: 30
-output.kafka.partition.round_robin:
-  reachable_only: true
-output.kafka.key: '%{[agent][name]}'
 # ================================== General ==================================
 
 server:
@@ -69,7 +59,7 @@ queue:
   # to serve another batch of events.
   mem:
     # Max number of events the queue can buffer.
-    events: 1
+    events: 100
 
     # Hints the minimum number of events stored in the queue,
     # before providing a batch of events to the outputs.
@@ -121,10 +111,14 @@ queue:
     #max_retry_interval: 30s
 
 #=====
-
-#output:i
-#  hosts: ["localhost:42"]
-#  kafka:
-#  enabled: true
-#    max_retries: 43
-#    hosts: ['localhost:9092']
+output:
+  kafka:
+    hosts: ["localhost:9092", "localhost:9093"]
+    version: 1
+    max_retries: 5
+    topic: '%{[metricset][name]}'
+    timeout: 30
+    broker_timeout: 30
+    partition.round_robin:
+      reachable_only: true
+    #key: '%{[metricset][name]}'

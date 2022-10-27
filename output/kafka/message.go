@@ -6,7 +6,6 @@ package kafka
 
 import (
 	"time"
-	"fmt"
 	"github.com/Shopify/sarama"
 
 	"github.com/elastic/beats/v7/libbeat/beat"
@@ -24,16 +23,12 @@ type Message struct {
 	hash      uint32
 	partition int32
 
-	//data messages.Event
 	data beat.Event
 }
 
 var kafkaMessageKey interface{} = int(0)
 
 func (m *Message) initProducerMessage() {
-	//fmt.Println("Sending metadata %s to topic %s", m, m.topic)
-	fmt.Printf("Sending key %s to topic %s on partition %s\n", m.key, m.topic, m.partition)
-
 	m.msg = sarama.ProducerMessage{
 		Metadata:  m,
 		Topic:     m.topic,

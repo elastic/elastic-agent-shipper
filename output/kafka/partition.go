@@ -17,7 +17,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
-	//"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 )
 
 type partitionBuilder func(*logp.Logger, *config.C) (func() partitioner, error)
@@ -119,7 +118,6 @@ func (p *MessagePartitioner) Partition(
 	msg.partition = partition
 
 	// TODO: Do we need to cache the partition?
-	fmt.Printf("Setting partition to %s\n", partition)
 	//if _, err := msg.data.Cache.Put("partition", partition); err != nil {
 	//	return 0, fmt.Errorf("setting kafka partition in publisher event failed: %v", err)
 	//}

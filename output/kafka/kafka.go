@@ -6,7 +6,6 @@ package kafka
 
 import (
 	"github.com/Shopify/sarama"
-	"fmt"
 
 	"github.com/elastic/beats/v7/libbeat/outputs/codec/json"
 
@@ -25,7 +24,7 @@ func makeKafka(
 	config Config,
 ) (*Client, error) {
 
-	log := logp.NewLogger("kafka-output")
+	log := logp.NewLogger(logSelector)
 
 	log.Info("initialize kafka output")
 
@@ -39,13 +38,13 @@ func makeKafka(
 
 	libCfg, err := newSaramaConfig(log, config)
 	if err != nil {
-		fmt.Println("Sarama error %s\n", err)
+		log.Errorf("Sarama error %v", err)
 		return nil, nil
 	}
 
 	hosts := config.Hosts
 
-
+	// TODO: Fix encoding
 	codec := json.New("1", json.Config{
 		Pretty:     true,
 		EscapeHTML: true,

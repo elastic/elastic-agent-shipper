@@ -5,8 +5,6 @@
 package kafka
 
 import (
-	"context"
-	"fmt"
 	"sync"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -36,13 +34,11 @@ func NewKafka(config *Config, queue *queue.Queue) *KafkaOutput {
 
 
 func (out *KafkaOutput) Start() error {
-	fmt.Printf("Making kafka\n")
 	client, err := makeKafka(*out.config)
 	if err != nil {
-		fmt.Printf("Making error with %s", err)
+		client.log.Errorf("Unable to make kafka output %v", err)
 		return err
 	}
-	fmt.Printf("Made kafka client with %s", client)
     client.Connect()
 
 	out.wg.Add(1)
@@ -51,13 +47,13 @@ func (out *KafkaOutput) Start() error {
 		for {
 
 			batch, err := out.queue.Get(1000)
-			fmt.Printf("Got a batch of %s", batch)
 			// Once an output receives a batch, it is responsible for
 			// it until all events have been either successfully sent or
 			// discarded after failure.
 			if err != nil {
 				// queue.Get can only fail if the queue was closed,
 				// time for the output to shut down.
+				client.log.Errorf("Shutting output down, queue closed: %v", err)
 				break
 			}
 			count := batch.Count()
@@ -67,9 +63,10 @@ func (out *KafkaOutput) Start() error {
 			}
 
 			for len(events) > 0 {
-				fmt.Println("Trying to publish %s events", len(events))
-				events, _ = client.publishEvents(context.TODO(), events)
+				client.log.Debugf("Sending %d events to client to publish", len(events))
+				events, _ = client.publishEvents(events)
 				// TODO: error handling / retry backoff?
+				client.log.Debugf("Finished sending batch with %v errors", len(events))
 			}
 			// This tells the queue that we're done with these events
 			// and they can be safely discarded. The Beats queue interface
