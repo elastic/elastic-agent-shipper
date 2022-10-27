@@ -111,9 +111,17 @@ monitoring:
     #max_retry_interval: 30s
 
 output:
+  console:
+    enabled: true
+
   elasticsearch:
+    # To use the elasticsearch output, disable the console output and
+    # set elasticsearch.enabled to true.
+    enabled: false
     hosts: ["https://localhost:9200"]
-    username: "elastic"
-    password: "pp3OwQRxejj_yt=fs*U-"
-    allow_older_versions: true
-    ssl.verification_mode: none
+    #username: "elastic"
+    #password: "password"
+
+    # These options may be convenient for local testing:
+    #allow_older_versions: true
+    #ssl.verification_mode: none
