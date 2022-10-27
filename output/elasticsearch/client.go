@@ -62,20 +62,11 @@ type bulkResultStats struct {
 	tooMany      int // number of events receiving HTTP 429 Too Many Requests
 }
 
-/*const (
-	defaultEventType = "doc"
-)*/
-
 // NewClient instantiates a new client.
 func NewClient(
 	s ClientSettings,
 	onConnect *callbacksRegistry,
 ) (*Client, error) {
-	/*pipeline := s.Pipeline
-	if pipeline != nil && pipeline.IsEmpty() {
-		pipeline = nil
-	}*/
-
 	conn, err := eslegclient.NewConnection(eslegclient.ConnectionSettings{
 		URL:              s.URL,
 		Beatname:         s.Beatname,
@@ -136,13 +127,6 @@ func NewClient(
 	drop []*messages.Event
 	err   error
 }
-
-func (client *Client) Publish(ctx context.Context, batch queue.Batch) error {
-	count := batch.Count()
-	events := make([]*messages.Event, count)
-	for i := 0; i < count; i++ {
-		events[i] = batch.Entry(i).(*messages.Event)
-	}
 */
 
 /*func (client *Client) Publish(ctx context.Context, events []*messages.Event) error {
@@ -364,25 +348,6 @@ func (client *Client) createEventBulkMeta(version version.V, event *messages.Eve
 	}
 	return eslegclient.BulkCreateAction{Create: meta}, nil
 }
-
-/*func (client *Client) getPipeline(event *messages.Event) (string, error) {
-	if event.GetMetadata() != nil {
-		pipeline, err := getMetaStringValue(event, events.FieldMetaPipeline)
-		if err == mapstr.ErrKeyNotFound {
-			return "", nil
-		}
-		if err != nil {
-			return "", errors.New("pipeline metadata is no string")
-		}
-
-		return strings.ToLower(pipeline), nil
-	}
-
-	if client.pipeline != nil {
-		return client.pipeline.Select(event)
-	}
-	return "", nil
-}*/
 
 // bulkCollectPublishFails checks per item errors returning all events
 // to be tried again due to error code returned for that items. If indexing an
