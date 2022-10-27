@@ -21,7 +21,6 @@ type KafkaOutput struct {
 	wg sync.WaitGroup
 }
 
-
 func NewKafka(config *Config, queue *queue.Queue) *KafkaOutput {
 	out := &KafkaOutput{
 		logger: logp.NewLogger("kafka-output"),
@@ -31,7 +30,6 @@ func NewKafka(config *Config, queue *queue.Queue) *KafkaOutput {
 
 	return out
 }
-
 
 func (out *KafkaOutput) Start() error {
 	client, err := makeKafka(*out.config)
@@ -45,7 +43,6 @@ func (out *KafkaOutput) Start() error {
 		client.log.Errorf("Unable to connect to client %v", err)
 		return err
 	}
-
 
 	out.wg.Add(1)
 	go func() {

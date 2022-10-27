@@ -6,6 +6,7 @@ package kafka
 
 import (
 	"time"
+
 	"github.com/Shopify/sarama"
 
 	"github.com/elastic/beats/v7/libbeat/beat"

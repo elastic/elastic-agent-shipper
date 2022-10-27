@@ -50,7 +50,7 @@ type Config struct {
 	BrokerTimeout      time.Duration             `config:"broker_timeout"      validate:"min=1"`
 	Compression        string                    `config:"compression"`
 	CompressionLevel   int                       `config:"compression_level"`
-	Version            libkafka.Version             `config:"version"`
+	Version            libkafka.Version          `config:"version"`
 	BulkMaxSize        int                       `config:"bulk_max_size"`
 	BulkFlushFrequency time.Duration             `config:"bulk_flush_frequency"`
 	MaxRetries         int                       `config:"max_retries"         validate:"min=-1,nonzero"`
@@ -62,8 +62,8 @@ type Config struct {
 	Password           string                    `config:"password"`
 	// TODO: Figure out codecs
 	//Codec              codec.Config              `config:"codec"`
-	Sasl               libkafka.SaslConfig          `config:"sasl"`
-	EnableFAST         bool                      `config:"enable_krb5_fast"`
+	Sasl               libkafka.SaslConfig `config:"sasl"`
+	EnableFAST         bool                `config:"enable_krb5_fast"`
 }
 
 type MetaConfig struct {
@@ -131,21 +131,21 @@ func DefaultConfig() Config {
 	}
 }
 
-func (c *Config) Validate() error {
-	if c.Enabled {
-		if len(c.Hosts) == 0 {
+func (client *Config) Validate() error {
+	if client.Enabled {
+		if len(client.Hosts) == 0 {
 			return errors.New("no hosts configured")
 		}
 
-		if _, ok := compressionModes[strings.ToLower(c.Compression)]; !ok {
-			return fmt.Errorf("compression mode '%v' unknown", c.Compression)
+		if _, ok := compressionModes[strings.ToLower(client.Compression)]; !ok {
+			return fmt.Errorf("compression mode '%v' unknown", client.Compression)
 		}
 
-		if err := c.Version.Validate(); err != nil {
+		if err := client.Version.Validate(); err != nil {
 			return err
 		}
 
-		if c.Username != "" && c.Password == "" {
+		if client.Username != "" && client.Password == "" {
 			return fmt.Errorf("password must be set when username is configured")
 		}
 

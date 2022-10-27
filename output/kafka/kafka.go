@@ -11,6 +11,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 )
+
 const (
 	logSelector = "kafka"
 )
