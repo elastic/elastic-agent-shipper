@@ -36,8 +36,8 @@ type Header struct {
 
 type Config struct {
 	Enabled            bool                      `config:"enabled"`
-	Topic              *fmtstr.EventFormatString `config:"topic"               validate:"required"`
-	Hosts              []string                  `config:"hosts"               validate:"required"`
+	Topic              *fmtstr.EventFormatString `config:"topic"`
+	Hosts              []string                  `config:"hosts"`
 	TLS                *tlscommon.Config         `config:"ssl"`
 	Kerberos           *kerberos.Config          `config:"kerberos"`
 	Timeout            time.Duration             `config:"timeout"             validate:"min=1"`
@@ -60,10 +60,11 @@ type Config struct {
 	ChanBufferSize     int                       `config:"channel_buffer_size" validate:"min=1"`
 	Username           string                    `config:"username"`
 	Password           string                    `config:"password"`
+	Sasl               libkafka.SaslConfig       `config:"sasl"`
+	EnableFAST         bool                      `config:"enable_krb5_fast"`
 	// TODO: Figure out codecs
 	//Codec              codec.Config              `config:"codec"`
-	Sasl               libkafka.SaslConfig `config:"sasl"`
-	EnableFAST         bool                `config:"enable_krb5_fast"`
+
 }
 
 type MetaConfig struct {
@@ -228,7 +229,7 @@ func newSaramaConfig(log *logp.Logger, config Config) (*sarama.Config, error) {
 
 	compressionMode, ok := compressionModes[strings.ToLower(config.Compression)]
 	if !ok {
-		return nil, fmt.Errorf("Unknown compression mode: '%v'", config.Compression)
+		return nil, fmt.Errorf("unknown compression mode: '%v'", config.Compression)
 	}
 	k.Producer.Compression = compressionMode
 
@@ -257,7 +258,7 @@ func newSaramaConfig(log *logp.Logger, config Config) (*sarama.Config, error) {
 
 	version, ok := config.Version.Get()
 	if !ok {
-		return nil, fmt.Errorf("Unknown/unsupported kafka version: %v", config.Version)
+		return nil, fmt.Errorf("unknown/unsupported kafka version: %v", config.Version)
 	}
 	k.Version = version
 

@@ -65,7 +65,7 @@ func initPartitionStrategy(
 	}
 
 	if len(partition) > 1 {
-		return nil, false, errors.New("Too many partitioners")
+		return nil, false, errors.New("too many partitioners")
 	}
 
 	// extract partitioner from config
