@@ -72,7 +72,6 @@ func makeKafka(
 	//return outputs.Success(config.BulkMaxSize, retry, client)
 }
 
-
 //// TODO: Topic interpolation...
 //func buildTopicSelector(cfg *config.C) (outil.Selector, error) {
 //	return outil.BuildSelectorFromConfig(cfg, outil.Settings{
