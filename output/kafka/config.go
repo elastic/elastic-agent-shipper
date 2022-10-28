@@ -135,7 +135,11 @@ func DefaultConfig() Config {
 func (client *Config) Validate() error {
 	if client.Enabled {
 		if len(client.Hosts) == 0 {
-			return errors.New("no hosts configured")
+			return errors.New("missing required field 'hosts'")
+		}
+
+		if client.Topic == nil {
+			return errors.New("missing required field 'topic'")
 		}
 
 		if _, ok := compressionModes[strings.ToLower(client.Compression)]; !ok {
