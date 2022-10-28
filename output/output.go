@@ -9,7 +9,6 @@ import (
 	"github.com/elastic/elastic-agent-shipper/output/kafka"
 )
 
-
 type ConsoleConfig struct {
 	Enabled bool `config:"enabled"`
 }

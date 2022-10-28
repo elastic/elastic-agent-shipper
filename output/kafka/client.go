@@ -30,9 +30,7 @@ import (
 
 type Client struct {
 	log           *logp.Logger
-	//observer outputs.Observer             TODO: what to do with observers?
 	hosts         []string
-	//topic    outil.Selector               TODO: Work out how to do selectors in the new world.
 	topic         *fmtstr.EventFormatString
 	key           *fmtstr.EventFormatString
 	index         string
@@ -45,6 +43,10 @@ type Client struct {
 
 	//asyncProducer sarama.AsyncProducer
 	//wg sync.WaitGroup
+
+	//observer outputs.Observer             TODO: what to do with observers?
+	//topic    outil.Selector               TODO: Work out how to do selectors in the new world.
+
 }
 
 type MsgRef struct {
@@ -72,7 +74,6 @@ func newKafkaClient(
 ) (*Client, error) {
 	c := &Client{
 		log:    logp.NewLogger(logSelector),
-		//observer: observer,
 		hosts:  hosts,
 		topic:  topic,
 		key:    key,
@@ -80,6 +81,7 @@ func newKafkaClient(
 		codec:  writer,
 		config: *cfg,
 		done:   make(chan struct{}),
+		//observer: observer,
 	}
 
 	if len(headers) != 0 {
