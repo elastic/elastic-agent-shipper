@@ -104,7 +104,7 @@ func (p *MessagePartitioner) Partition(
 	libMsg *sarama.ProducerMessage,
 	numPartitions int32,
 ) (int32, error) {
-	msg := libMsg.Metadata.(*Message)
+	msg, _ := libMsg.Metadata.(*Message)
 	if numPartitions == p.partitions { // if reachable is false, this is always true
 		if 0 <= msg.partition && msg.partition < numPartitions {
 			return msg.partition, nil
@@ -113,7 +113,7 @@ func (p *MessagePartitioner) Partition(
 
 	partition, err := p.p(msg, numPartitions)
 	if err != nil {
-		return 0, nil
+		return 0, nil //nolint:nilerr // If unable to assign partition set to partition 0
 	}
 
 	msg.partition = partition
@@ -238,7 +238,6 @@ func makeFieldsHashPartitioner(log *logp.Logger, fields []string, dropFail bool)
 			var err error
 
 			for _, field := range fields {
-				// TODO: What to do with field hash partitioner?
 				err = hashFieldValue(hasher, msg.data.Fields, field)
 				if err != nil {
 					break

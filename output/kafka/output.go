@@ -62,7 +62,7 @@ func (out *KafkaOutput) Start() error {
 			count := batch.Count()
 			events := make([]*messages.Event, count)
 			for i := 0; i < batch.Count(); i++ {
-				events[i] = batch.Entry(i).(*messages.Event)
+				events[i], _ = batch.Entry(i).(*messages.Event)
 			}
 
 			for len(events) > 0 {
