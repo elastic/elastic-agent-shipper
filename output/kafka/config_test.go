@@ -180,12 +180,12 @@ func TestKafkaConfig(t *testing.T) {
 		require.NoErrorf(t, err, "%s: error making config from yaml: %s, %s", name, tc.config, err)
 		config := DefaultConfig()
 		err = cfg.Unpack(&config)
-		config.Validate()
+		validErr := config.Validate()
 
-		if !tc.errorCondition && err != nil {
+		if !tc.errorCondition && (err != nil || validErr != nil) {
 			t.Fatalf("%s: unexpected error: %s", name, err)
 		}
-		if tc.errorCondition && err == nil {
+		if tc.errorCondition && err == nil && validErr == nil {
 			t.Fatalf("%s: supposed to have error", name)
 		}
 		if tc.errorCondition {
