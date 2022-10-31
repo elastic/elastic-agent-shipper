@@ -111,7 +111,7 @@ pipeline {
         withGithubNotify(context: "Publish-Snapshot") {
           dir("${BASE_DIR}"){
             withMageEnv(version: "${env.GO_VERSION}"){
-              cmd(label: 'Go build', script: 'mage -v build:all')
+              cmd(label: 'Go package', script: 'mage -v package:all')
             }
           }
           publishArtifacts(type: 'snapshot')
