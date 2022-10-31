@@ -18,18 +18,16 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 
 	"github.com/elastic/elastic-agent-libs/dev-tools/mage"
+	"github.com/elastic/elastic-agent-libs/dev-tools/mage/gotool"
 	devtools "github.com/elastic/elastic-agent-shipper/dev-tools/common"
 	"github.com/elastic/elastic-agent-shipper/tools"
-
-	//mage:import
-
-	"github.com/elastic/elastic-agent-libs/dev-tools/mage/gotool"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 )
@@ -44,9 +42,13 @@ const (
 // Aliases are shortcuts to long target names.
 // nolint: deadcode // it's used by `mage`.
 var Aliases = map[string]interface{}{
-	"build":           Build.Binary,
-	"unitTest":        Test.Unit,
-	"integrationTest": Test.Integration,
+	"build":                                 Build.Binary,
+	"package":                               Package.Artifacts,
+	"unitTest":                              Test.Unit,
+	"integrationTest":                       Test.Integration,
+	"release-manager-dependencies":          Dependencies.Generate,
+	"release-manager-dependencies-snapshot": Dependencies.Snapshot,
+	"release-manager-dependencies-release":  Dependencies.Release,
 }
 
 // BUILD
@@ -145,7 +147,16 @@ func (Test) All() {
 
 // Integration runs all the integration tests (use alias `mage integrationTest`).
 func (Test) Integration(ctx context.Context) error {
-	return nil
+	platform := runtime.GOOS + "/" + runtime.GOARCH
+	version := tools.DefaultBeatVersion
+	os.Setenv("PLATFORMS", platform)
+	mg.Deps(Build.Binary)
+	binary, err := absoluteBinaryPath(version, platform)
+	if err != nil {
+		return fmt.Errorf("error determining native binary: %w", err)
+	}
+	os.Setenv("INTEGRATION_TEST_BINARY", binary)
+	return devtools.GoIntegrationTest(ctx)
 }
 
 // Unit runs all the unit tests (use alias `mage unitTest`).
@@ -156,6 +167,11 @@ func (Test) Unit(ctx context.Context) error {
 }
 
 //CHECKS
+
+// Lint runs the linter, equivalent running to 'golangci-lint run ./...'
+func Lint() error {
+	return mage.Linter{}.All()
+}
 
 // Check runs all the checks including licence, notice, gomod, git changes
 func Check() {
@@ -228,10 +244,65 @@ func Version() {
 	fmt.Println(tools.DefaultBeatVersion)
 }
 
+// DEPENDENCIES
+
+// Dependencies contains targets related to generating dependencies csv file
+type Dependencies mg.Namespace
+
+// Generate creates a list of dependencies in a form of csv file.
+func (Dependencies) Generate() {
+	dependenciesDir := filepath.Join("build", "distributions", "reports")
+	err := os.MkdirAll(dependenciesDir, 0755)
+	if err != nil {
+		panic(err)
+	}
+
+	runWithGoPath := filepath.Join("dev-tools", "run_with_go_ver")
+	runWithGoPath, err = filepath.Abs(runWithGoPath)
+	if err != nil {
+		panic(err)
+	}
+	dependenciesReportPath := filepath.Join("dev-tools", "dependencies")
+
+	version, err := fullVersion()
+	if err != nil {
+		panic(err)
+	}
+	csvPath := filepath.Join("build", "distributions", "reports", "dependencies-"+version+".csv")
+
+	cmd := exec.Command(runWithGoPath, dependenciesReportPath, "--csv", csvPath)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		panic(err)
+	}
+}
+
+// Snapshot prepares the dependencies file for a snapshot
+func (Dependencies) Snapshot() {
+	os.Setenv("SNAPSHOT", "true")
+	mg.Deps(Dependencies.Generate)
+}
+
+// Release prepares the dependencies file for a release
+func (Dependencies) Release() {
+	mg.Deps(Dependencies.Generate)
+}
+
 // PACKAGE
 
+// Package contains targets related to producting project archives
+type Package mg.Namespace
+
+// All builds binaries for the all os/arch and produces resulting archives.
+func (Package) All() {
+	os.Setenv("PLATFORMS", "all")
+	mg.Deps(Package.Artifacts)
+}
+
 // Package runs all the checks including licence, notice, gomod, git changes, followed by binary build.
-func Package() {
+func (Package) Artifacts() {
 	// these are not allowed in parallel
 	mg.SerialDeps(
 		Build.Binary,
@@ -450,4 +521,24 @@ func execName(platform string) string {
 	}
 
 	return execName
+}
+
+func absoluteBinaryPath(version, platform string) (string, error) {
+	binary := ""
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("unable to get current working directory: %w", err)
+	}
+	selectedPlatformFiles := devtools.PlatformFiles[platform]
+	if selectedPlatformFiles == nil {
+		return "", fmt.Errorf("no platform files found for %s", platform)
+	}
+
+	for _, pf := range selectedPlatformFiles {
+		binary = filepath.Join(dir, binaryFilePath(version, pf))
+		if _, err := os.Stat(binary); err != nil {
+			return "", fmt.Errorf("error reading %s: %w", binary, err)
+		}
+	}
+	return binary, nil
 }

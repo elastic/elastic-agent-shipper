@@ -55,6 +55,9 @@ pipeline {
       }
     }
     stage('Test') {
+      environment {
+        SNAPSHOT = 'true'
+      }
       failFast false
       matrix {
         agent {label "${PLATFORM}"}

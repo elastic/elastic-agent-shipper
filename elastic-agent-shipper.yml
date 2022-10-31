@@ -109,3 +109,27 @@ monitoring:
     # error. If the queue encounters repeated errors, it will double the
     # length of its retry interval each time, up to this maximum.
     #max_retry_interval: 30s
+
+    # The password used to encrypt the diskque with.  Default is "" which
+    # means no encryption.
+    #encryption_password: ""
+
+    # Whether or not to compress the diskqueue with LZ4 compression.
+    # Default is false which means no compression.
+    #use_compression: false
+
+output:
+  console:
+    enabled: true
+
+  elasticsearch:
+    # To use the elasticsearch output, disable the console output and
+    # set elasticsearch.enabled to true.
+    enabled: false
+    hosts: ["https://localhost:9200"]
+    #username: "elastic"
+    #password: "password"
+
+    # These options may be convenient for local testing:
+    #allow_older_versions: true
+    #ssl.verification_mode: none

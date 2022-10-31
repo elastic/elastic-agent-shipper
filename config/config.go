@@ -17,6 +17,7 @@ import (
 	"github.com/elastic/go-ucfg/json"
 
 	"github.com/elastic/elastic-agent-shipper/monitoring"
+	"github.com/elastic/elastic-agent-shipper/output"
 	"github.com/elastic/elastic-agent-shipper/queue"
 	"github.com/elastic/elastic-agent-shipper/server"
 )
@@ -32,12 +33,13 @@ func init() {
 	fs.StringVar(&configFilePath, "c", "", "Run the shipper in the unmanaged mode and use the given configuration file instead")
 }
 
-//ShipperConfig defines the options present in the config file
+// ShipperConfig defines the options present in the config file
 type ShipperConfig struct {
 	Log     logp.Config       `config:"logging"`
 	Monitor monitoring.Config `config:"monitoring"` //Queue monitoring settings
 	Queue   queue.Config      `config:"queue"`      //Queue settings
 	Server  server.Config     `config:"server"`     //gRPC Server settings
+	Output  output.Config     `config:"output"`     //Output settings
 }
 
 // ReadConfigFromFile returns the populated config from the specified path
