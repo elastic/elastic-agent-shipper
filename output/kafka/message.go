@@ -9,7 +9,7 @@ import (
 
 	"github.com/Shopify/sarama"
 
-	"github.com/elastic/beats/v7/libbeat/beat"
+	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 )
 
 type Message struct {
@@ -24,7 +24,7 @@ type Message struct {
 	hash      uint32
 	partition int32
 
-	data beat.Event
+	data *messages.Event
 }
 
 //var kafkaMessageKey interface{} = int(0)
