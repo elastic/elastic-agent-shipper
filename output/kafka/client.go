@@ -284,7 +284,7 @@ func (client *Client) successWorker(ch <-chan *sarama.ProducerMessage) {
 	defer client.log.Debug("Stop kafka ack worker")
 
 	for libMsg := range ch {
-		msg := libMsg.Metadata.(*Message)
+		msg, _ := libMsg.Metadata.(*Message)
 		msg.ref.done()
 	}
 }
@@ -295,7 +295,7 @@ func (client *Client) errorWorker(ch <-chan *sarama.ProducerError) {
 	defer client.log.Debug("Stop kafka error handler")
 
 	for errMsg := range ch {
-		msg := errMsg.Msg.Metadata.(*Message)
+		msg, _ := errMsg.Msg.Metadata.(*Message)
 		msg.ref.fail(msg, errMsg.Err)
 
 		// TODO: Understand the error breaker, and how it maps to the new model.
