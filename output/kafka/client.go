@@ -5,9 +5,9 @@
 package kafka
 
 import (
+	"errors"
 	"strings"
 	"sync"
-
 	"time"
 
 	"github.com/Shopify/sarama"
@@ -299,7 +299,7 @@ func (client *Client) errorWorker(ch <-chan *sarama.ProducerError) {
 		msg.ref.fail(msg, errMsg.Err)
 
 		// TODO: Understand the error breaker, and how it maps to the new model.
-		if errMsg.Err == breaker.ErrBreakerOpen {
+		if errors.Is(errMsg.Err, breaker.ErrBreakerOpen) {
 			// ErrBreakerOpen is a very special case in Sarama. It happens only when
 			// there have been repeated critical (broker / topic-level) errors, and it
 			// puts Sarama into a state where it immediately rejects all input
@@ -386,18 +386,18 @@ func (r *MsgRef) done() {
 
 func (r *MsgRef) fail(msg *Message, err error) {
 
-	switch err {
-	case sarama.ErrInvalidMessage:
+	switch {
+	case errors.Is(err, sarama.ErrInvalidMessage):
 		r.client.log.Errorf("Kafka (topic=%v): dropping invalid message", msg.topic)
 		// TODO: Metrics, and how to represent.
 		//r.client.observer.Dropped(1)
 
-	case sarama.ErrMessageSizeTooLarge, sarama.ErrInvalidMessageSize:
+	case errors.Is(err, sarama.ErrMessageSizeTooLarge), errors.Is(err, sarama.ErrInvalidMessageSize):
 		r.client.log.Errorf("Kafka (topic=%v): dropping too large message of size %v.",
 			msg.topic,
 			len(msg.key)+len(msg.value))
 
-	case breaker.ErrBreakerOpen:
+	case errors.Is(err, breaker.ErrBreakerOpen):
 		r.client.log.Errorf("Kafka (topic=%v): Circuit breaker open", msg.topic)
 
 		// Add this message to the failed list, but don't overwrite r.err since
