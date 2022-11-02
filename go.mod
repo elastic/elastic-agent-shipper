@@ -12,11 +12,11 @@ require (
 
 require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220810153818-dd118efed5a5
-	github.com/elastic/elastic-agent-client/v7 v7.0.0-20220804181728-b0328d2fe484
+	github.com/elastic/elastic-agent-client/v7 v7.0.0-20221102171927-bc376a4e0f9f
 	github.com/elastic/elastic-agent-shipper-client v0.4.0
 	github.com/elastic/go-ucfg v0.8.6
 	github.com/gofrs/uuid v4.2.0+incompatible
-	github.com/magefile/mage v1.13.0
+	github.com/magefile/mage v1.14.0
 	github.com/stretchr/testify v1.7.1
 	go.elastic.co/apm v1.15.0
 	go.elastic.co/go-licence-detector v0.5.0
