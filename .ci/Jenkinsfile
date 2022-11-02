@@ -249,6 +249,7 @@ def runReleaseManager(def args = [:]) {
     dockerLogin(secret: "${DOCKER_ELASTIC_SECRET}", registry: "${DOCKER_REGISTRY}")
     releaseManager(project: 'elastic-agent-shipper',
                    version: env.VERSION,
+                   branch: 'main',
                    type: args.type,
                    artifactsFolder: 'build/distributions',
                    outputFile: args.outputFile)
