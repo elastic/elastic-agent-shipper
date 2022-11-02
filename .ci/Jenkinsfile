@@ -154,6 +154,9 @@ pipeline {
       when {
         expression { return env.IS_BRANCH_AVAILABLE == "true" }
       }
+      environment {
+        HOME = "${env.WORKSPACE}"
+      }
       steps {
         runReleaseManager(type: 'snapshot', outputFile: env.DRA_OUTPUT)
       }
@@ -176,6 +179,9 @@ pipeline {
           expression { return env.IS_BRANCH_AVAILABLE == "true" }
           not { branch 'main' }
         }
+      }
+      environment {
+        HOME = "${env.WORKSPACE}"
       }
       steps {
         runReleaseManager(type: 'staging', outputFile: env.DRA_OUTPUT)
