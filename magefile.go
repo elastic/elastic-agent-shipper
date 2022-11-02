@@ -262,7 +262,7 @@ func (Dependencies) Generate() {
 	if err != nil {
 		panic(err)
 	}
-	dependenciesReportPath := filepath.Join("dev-tools", "dependencies")
+	dependenciesReportPath := filepath.Join("dev-tools", "dependencies-report")
 
 	version, err := fullVersion()
 	if err != nil {
