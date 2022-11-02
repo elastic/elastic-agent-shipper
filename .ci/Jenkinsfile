@@ -14,6 +14,8 @@ pipeline {
     NOTIFY_TO = 'victor.martinez@elastic.co'
     JOB_GCS_BUCKET = credentials('gcs-bucket')
     JOB_GCS_CREDENTIALS = 'fleet-ci-gcs-plugin'
+    DOCKER_ELASTIC_SECRET = 'secret/observability-team/ci/docker-registry/prod'
+    DOCKER_REGISTRY = 'docker.elastic.co'
   }
   options {
     timeout(time: 1, unit: 'HOURS')
@@ -243,6 +245,8 @@ def runReleaseManager(def args = [:]) {
     withMageEnv() {
       sh(label: 'create dependencies file', script: "mage ${mageGoal}")
     }
+    // help to download the latest release-manager docker image
+    dockerLogin(secret: "${DOCKER_ELASTIC_SECRET}", registry: "${DOCKER_REGISTRY}")
     releaseManager(project: 'elastic-agent-shipper',
                    version: env.VERSION,
                    type: args.type,
