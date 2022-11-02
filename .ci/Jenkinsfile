@@ -10,8 +10,8 @@ pipeline {
     JOB_GIT_CREDENTIALS = "f6c7695a-671e-4f4f-a331-acdce44ff9ba"
     PIPELINE_LOG_LEVEL = 'INFO'
     DRA_OUTPUT = 'release-manager.out'
-    SLACK_CHANNEL = '#ingest-notifications'
-    NOTIFY_TO = 'elastic-agent+build-package@elastic.co'
+    SLACK_CHANNEL = '#observablt-bots'
+    NOTIFY_TO = 'victor.martinez@elastic.co'
     JOB_GCS_BUCKET = credentials('gcs-bucket')
     JOB_GCS_CREDENTIALS = 'fleet-ci-gcs-plugin'
   }
@@ -38,7 +38,7 @@ pipeline {
         dir("${BASE_DIR}"){
           setEnvVar('GO_VERSION', readFile(".go-version").trim())
         }
-        setEnvVar('IS_BRANCH_AVAILABLE', isBranchUnifiedReleaseAvailable(env.BRANCH_NAME))
+        setEnvVar('IS_BRANCH_AVAILABLE', 'true')
       }
     }
     stage('Check'){
