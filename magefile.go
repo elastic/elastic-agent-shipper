@@ -237,6 +237,13 @@ func Notice() error {
 	return gotool.Mod.Tidy()
 }
 
+// RELEASE HELPERS
+
+// Version returns current stack version, used for the release process
+func Version() {
+	fmt.Println(tools.DefaultBeatVersion)
+}
+
 // DEPENDENCIES
 
 // Dependencies contains targets related to generating dependencies csv file
@@ -255,7 +262,7 @@ func (Dependencies) Generate() {
 	if err != nil {
 		panic(err)
 	}
-	dependenciesReportPath := filepath.Join("dev-tools", "dependencies")
+	dependenciesReportPath := filepath.Join("dev-tools", "dependencies-report")
 
 	version, err := fullVersion()
 	if err != nil {
