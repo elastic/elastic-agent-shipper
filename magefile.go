@@ -335,7 +335,7 @@ func (Package) Artifacts() {
 		var archiveFileName string
 		targetDir := fmt.Sprintf("%s-%s", devtools.ProjectName, platform)
 		if isWindows {
-			archiveFileName = fmt.Sprintf("%s-%s.zip", devtools.ProjectName, platform)
+			archiveFileName = fmt.Sprintf("%s-%s-%s.zip", devtools.ProjectName, version, platform)
 			err = prepareZipArchive(
 				archivePath,
 				targetDir,
@@ -347,7 +347,7 @@ func (Package) Artifacts() {
 				},
 			)
 		} else {
-			archiveFileName = fmt.Sprintf("%s-%s.tar.gz", devtools.ProjectName, platform)
+			archiveFileName = fmt.Sprintf("%s-%s-%s.tar.gz", devtools.ProjectName, version, platform)
 			err = prepareTarArchive(
 				archivePath,
 				targetDir,
