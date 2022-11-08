@@ -6,6 +6,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/elastic/elastic-agent-shipper/tools"
 	"github.com/spf13/cobra"
@@ -17,8 +18,8 @@ func newVersionCommand() *cobra.Command {
 		Short: "Version returns version and build information.",
 		Long:  `Version returns version and build information.`,
 		Run: func(c *cobra.Command, args []string) {
-			fmt.Printf("elastic-agent-shipper\tversion: %s\n", tools.GetDefaultVersion())
-			fmt.Printf("\tbuild_commit: %s\tbuild_time: %s\tsnapshot_build: %v\n", tools.Commit(), tools.BuildTime(), tools.Snapshot())
+			fmt.Fprintf(os.Stdout, "elastic-agent-shipper\tversion: %s\n", tools.GetDefaultVersion())
+			fmt.Fprintf(os.Stdout, "\tbuild_commit: %s\tbuild_time: %s\tsnapshot_build: %v\n", tools.Commit(), tools.BuildTime(), tools.Snapshot())
 		},
 	}
 
