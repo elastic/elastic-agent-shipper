@@ -42,13 +42,11 @@ type Client struct {
 }
 
 type MsgRef struct {
-	client *Client
-	count  int32
-	total  int
-	failed []*messages.Event // TODO: Need to know how to deal with failed events
-	//batch         publisher.Batch            //       and how to retry after a batch is complete.
+	client      *Client
 	batchWaiter sync.WaitGroup
 	err         error
+	failed      []*messages.Event // TODO: Need to know how to deal with failed events
+	// batch         publisher.Batch            //       and how to retry after a batch is complete.
 }
 
 //var (
@@ -147,8 +145,6 @@ func (client *Client) publishEvents(data []*messages.Event) ([]*messages.Event, 
 
 	ref := &MsgRef{
 		client: client,
-		count:  int32(len(data)),
-		total:  len(data),
 		failed: nil,
 	}
 
