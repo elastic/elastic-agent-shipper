@@ -186,7 +186,7 @@ func newSaramaConfig(log *logp.Logger, config Config) (*sarama.Config, error) {
 	}
 
 	switch {
-	// TODO: Are we still planning on Kerberos to be beta?
+	// TODO: Are we still planning on Kerberos to be beta? https://github.com/elastic/elastic-agent-shipper/issues/168
 	case config.Kerberos.IsEnabled():
 		//cfgwarn.Beta("Kerberos authentication for Kafka is beta.")
 
