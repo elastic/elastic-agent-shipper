@@ -8,8 +8,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/elastic/elastic-agent-shipper/tools"
 	"github.com/spf13/cobra"
+
+	"github.com/elastic/elastic-agent-shipper/tools"
 )
 
 func newVersionCommand() *cobra.Command {
