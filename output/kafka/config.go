@@ -17,6 +17,7 @@ import (
 	"github.com/elastic/beats/v7/libbeat/common/fmtstr"
 	libkafka "github.com/elastic/beats/v7/libbeat/common/kafka"
 	"github.com/elastic/beats/v7/libbeat/common/transport/kerberos"
+	"github.com/elastic/beats/v7/libbeat/outputs/codec"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/monitoring"
@@ -62,9 +63,7 @@ type Config struct {
 	Password           string                    `config:"password"`
 	Sasl               libkafka.SaslConfig       `config:"sasl"`
 	EnableFAST         bool                      `config:"enable_krb5_fast"`
-	// TODO: Figure out codecs
-	//Codec              codec.Config              `config:"codec"`
-
+	Codec              codec.Config              `config:"codec"`
 }
 
 type MetaConfig struct {
