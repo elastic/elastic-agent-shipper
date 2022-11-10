@@ -16,6 +16,7 @@ require (
 	github.com/elastic/elastic-agent-client/v7 v7.0.1
 	github.com/elastic/elastic-agent-shipper-client v0.4.0
 	github.com/elastic/go-elasticsearch/v8 v8.2.0
+	github.com/elastic/go-lumber v0.1.1
 	github.com/elastic/go-ucfg v0.8.6
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/magefile/mage v1.14.0

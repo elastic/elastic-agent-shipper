@@ -1,0 +1,13 @@
+version: '2.3'
+services:
+  logstash:
+    image: "${LOGSTASH_IMAGE_REF}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9600/_node/stats"]
+      retries: 600
+      interval: 1s
+    volumes:
+      - ./pipeline:/usr/share/logstash/pipeline:ro
+    ports:
+      - 5044:5044
+      - 9600:9600

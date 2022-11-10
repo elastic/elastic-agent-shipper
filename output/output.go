@@ -7,6 +7,7 @@ package output
 import (
 	"github.com/elastic/elastic-agent-shipper/output/elasticsearch"
 	"github.com/elastic/elastic-agent-shipper/output/kafka"
+	"github.com/elastic/elastic-agent-shipper/output/logstash"
 )
 
 type ConsoleConfig struct {
@@ -17,11 +18,15 @@ type Config struct {
 	Console       *ConsoleConfig        `config:"console"`
 	Elasticsearch *elasticsearch.Config `config:"elasticsearch"`
 	Kafka         *kafka.Config         `config:"kafka"`
+	Logstash      *logstash.Config      `config:"logstash"`
 }
 
 func DefaultConfig() Config {
 	defaultKafka := kafka.DefaultConfig()
+	defaultLogstash := logstash.DefaultConfig()
+
 	return Config{
-		Kafka: &defaultKafka,
+		Kafka:    &defaultKafka,
+		Logstash: &defaultLogstash,
 	}
 }

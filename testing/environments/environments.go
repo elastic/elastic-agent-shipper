@@ -36,6 +36,10 @@ var (
 		name: "Kafka",
 		path: "testing/environments/kafka/docker-compose.yml",
 	}
+	logstashImage = testImage{
+		name: "Logstash",
+		path: "testing/environments/logstash/docker-compose.yml",
+	}
 )
 
 // DefaultElasticsearch returns a configuration for an Elasticsearch server
@@ -55,6 +59,19 @@ func DefaultElasticsearch() TestImageConfig {
 // settings listening on port 9092.
 func DefaultKafka() TestImageConfig {
 	return testImageConfig{image: kafkaImage}
+}
+
+// DefaultLogstash returns a configuration for a Logstash server with default
+// settings listening on port 5044.
+func DefaultLogstash() TestImageConfig {
+	basePath := "docker.elastic.co/logstash/logstash"
+	version := tools.DefaultBeatVersion + "-SNAPSHOT"
+	return testImageConfig{
+		image: logstashImage,
+		environment: map[string]string{
+			"LOGSTASH_IMAGE_REF": fmt.Sprintf("%v:%v", basePath, version),
+		},
+	}
 }
 
 // Up calls docker-compose up on the given container configurations and returns the
