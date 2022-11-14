@@ -29,6 +29,9 @@ type ElasticSearchOutput struct {
 
 	queue *queue.Queue
 
+	client      *elasticsearch.Client
+	bulkIndexer esutil.BulkIndexer
+
 	wg sync.WaitGroup
 }
 
@@ -46,7 +49,7 @@ func serializeEvent(event *messages.Event) ([]byte, error) {
 	return nil, nil
 }
 
-func (out *ElasticSearchOutput) Start() error {
+func (es *ElasticSearchOutput) Start() error {
 	client, err := newMakeES()
 	if err != nil {
 		return err
@@ -55,18 +58,20 @@ func (out *ElasticSearchOutput) Start() error {
 		Index:         "elastic-agent-shipper",
 		Client:        client,
 		NumWorkers:    1,
-		FlushBytes:    int(0x10000000), // 256MB
+		FlushBytes:    1e+7,
 		FlushInterval: 30 * time.Second,
 	})
 	if err != nil {
 		return err
 	}
+	es.client = client
+	es.bulkIndexer = bi
 
-	out.wg.Add(1)
+	es.wg.Add(1)
 	go func() {
-		defer out.wg.Done()
+		defer es.wg.Done()
 		for {
-			batch, err := out.queue.Get(1000)
+			batch, err := es.queue.Get(1000)
 			// Once an output receives a batch, it is responsible for
 			// it until all events have been either successfully sent or
 			// discarded after failure.
@@ -85,7 +90,7 @@ func (out *ElasticSearchOutput) Start() error {
 			for _, event := range events {
 				serialized, err := serializeEvent(event)
 				if err != nil {
-					out.logger.Errorf("failed to serialize event: %v", err)
+					es.logger.Errorf("failed to serialize event: %v", err)
 					completed += 1
 					continue
 				}
@@ -98,30 +103,39 @@ func (out *ElasticSearchOutput) Start() error {
 							// TODO: update metrics
 							if atomic.AddUint64(&completed, 1) >= uint64(count) {
 								batch.Done()
+								es.wg.Done()
 							}
 						},
 						OnFailure: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem, err error) {
 							// TODO: update metrics
 							if atomic.AddUint64(&completed, 1) >= uint64(count) {
 								batch.Done()
+								es.wg.Done()
 							}
 						},
 					},
 				)
 				if err != nil {
-					out.logger.Errorf("couldn't add to bulk index request: %v", err)
+					es.logger.Errorf("couldn't add to bulk index request: %v", err)
+				} else {
+					es.wg.Add(1)
 				}
 			}
+		}
+
+		// Close the bulk indexer
+		if err := bi.Close(context.Background()); err != nil {
+			es.logger.Errorf("error closing bulk indexer: %s", err)
 		}
 	}()
 	return nil
 }
 
-// Wait until the output loop has finished. This doesn't stop the
-// loop by itself, so make sure you only call it when you close
-// the queue.
-func (out *ElasticSearchOutput) Wait() {
-	out.wg.Wait()
+// Wait until the output loop has finished and pending events have concluded in
+// success or failure. This doesn't stop the output loop by itself, so make sure
+// you only call it when the queue is closed.
+func (es *ElasticSearchOutput) Wait() {
+	es.wg.Wait()
 }
 
 func newMakeES() (*elasticsearch.Client, error) {
