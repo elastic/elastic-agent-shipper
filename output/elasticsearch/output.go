@@ -36,7 +36,7 @@ func NewElasticSearch(config *Config, queue *queue.Queue) *ElasticSearchOutput {
 }
 
 func (out *ElasticSearchOutput) Start() error {
-	client, err := makeES(*out.config)
+	client, err := oldMakeES(*out.config)
 	if err != nil {
 		return err
 	}
@@ -84,7 +84,7 @@ func (out *ElasticSearchOutput) Wait() {
 	out.wg.Wait()
 }
 
-func makeES(
+func oldMakeES(
 	/*im outputs.IndexManager,
 	beat beat.Info,
 	observer outputs.Observer,*/

@@ -22,6 +22,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing"
 	"github.com/elastic/elastic-agent-libs/version"
+	"github.com/elastic/go-elasticsearch/v8"
 
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 )
@@ -35,7 +36,8 @@ var (
 
 // Client is an elasticsearch client.
 type Client struct {
-	conn eslegclient.Connection
+	oldConn eslegclient.Connection
+	conn    *elasticsearch.Client
 
 	//index outputs.IndexSelector
 	//pipeline *outil.Selector
@@ -111,7 +113,7 @@ func NewClient(
 	}
 
 	client := &Client{
-		conn: *conn,
+		oldConn: *conn,
 		//index:    s.Index,
 		//pipeline: pipeline,
 		//observer:           s.Observer,
@@ -216,7 +218,7 @@ func (client *Client) publishEvents(ctx context.Context, data []*messages.Event)
 	origCount := len(data)
 	span.Context.SetLabel("events_original", origCount)
 
-	data, bulkItems := client.bulkEncodePublishRequest(client.conn.GetVersion(), data)
+	data, bulkItems := client.bulkEncodePublishRequest(client.oldConn.GetVersion(), data)
 	newCount := len(data)
 
 	span.Context.SetLabel("events_encoded", newCount)
@@ -227,7 +229,7 @@ func (client *Client) publishEvents(ctx context.Context, data []*messages.Event)
 		return nil, nil
 	}
 
-	status, result, sendErr := client.conn.Bulk(ctx, "", "", nil, bulkItems)
+	status, result, sendErr := client.oldConn.Bulk(ctx, "", "", nil, bulkItems)
 
 	if sendErr != nil {
 		if status == http.StatusRequestEntityTooLarge {
@@ -401,17 +403,17 @@ func (client *Client) bulkCollectPublishFails(result eslegclient.BulkResult, dat
 }
 
 func (client *Client) Connect() error {
-	return client.conn.Connect()
+	return client.oldConn.Connect()
 }
 
 func (client *Client) Close() error {
-	return client.conn.Close()
+	return client.oldConn.Close()
 }
 
 func (client *Client) String() string {
-	return "elasticsearch(" + client.conn.URL + ")"
+	return "elasticsearch(" + client.oldConn.URL + ")"
 }
 
 func (client *Client) Test(d testing.Driver) {
-	client.conn.Test(d)
+	client.oldConn.Test(d)
 }
