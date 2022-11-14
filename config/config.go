@@ -103,6 +103,7 @@ func readConfig(unpacker rawUnpacker) (config ShipperConfig, err error) {
 		Monitor: monitoring.DefaultConfig(),
 		Queue:   queue.DefaultConfig(),
 		Server:  server.DefaultConfig(),
+		Output:  output.DefaultConfig(),
 	}
 
 	err = unpacker(&config)

@@ -31,6 +31,9 @@ func NewCommand() *cobra.Command {
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("c"))
 
 	run := runCmd()
+
+	cmd.AddCommand(newVersionCommand())
+	cmd.AddCommand(run)
 	cmd.Run = run.Run
 
 	return cmd
