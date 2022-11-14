@@ -5,12 +5,16 @@
 package elasticsearch
 
 import (
+	"crypto/tls"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/elastic/beats/v7/libbeat/common/transport/kerberos"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 // Config specifies all configurable parameters for the Elasticsearch output.
@@ -75,4 +79,23 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+func (es *ElasticSearchOutput) esConfig() elasticsearch.Config {
+	tlsConfig := &tls.Config{}
+	if es.config.Transport.TLS.VerificationMode == tlscommon.VerifyNone {
+		// Unlike Beats, the shipper doesn't support the ability to verify the
+		// certificate but not the hostname, so any setting except VerifyNone
+		// falls back on full verification.
+		tlsConfig.InsecureSkipVerify = true
+	}
+	cfg := elasticsearch.Config{
+		Addresses: es.config.Hosts,
+		Username:  es.config.Username,
+		Password:  es.config.Password,
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
+	}
+	return cfg
 }

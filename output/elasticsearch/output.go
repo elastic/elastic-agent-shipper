@@ -7,15 +7,10 @@ package elasticsearch
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
-	"fmt"
-	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/elastic/beats/v7/libbeat/common"
-	"github.com/elastic/beats/v7/libbeat/esleg/eslegclient"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 	"github.com/elastic/elastic-agent-shipper/queue"
@@ -50,7 +45,7 @@ func serializeEvent(event *messages.Event) ([]byte, error) {
 }
 
 func (es *ElasticSearchOutput) Start() error {
-	client, err := newMakeES()
+	client, err := elasticsearch.NewClient(es.esConfig())
 	if err != nil {
 		return err
 	}
@@ -136,110 +131,4 @@ func (es *ElasticSearchOutput) Start() error {
 // you only call it when the queue is closed.
 func (es *ElasticSearchOutput) Wait() {
 	es.wg.Wait()
-}
-
-func newMakeES() (*elasticsearch.Client, error) {
-	cfg := elasticsearch.Config{
-		Addresses: []string{
-			"https://localhost:9200",
-		},
-		Username: "elastic",
-		Password: "pp3OwQRxejj_yt=fs*U-",
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-	}
-	return elasticsearch.NewClient(cfg)
-}
-
-func oldMakeES(
-	/*im outputs.IndexManager,
-	beat beat.Info,
-	observer outputs.Observer,*/
-	config Config,
-) (*Client, error) {
-	log := logp.NewLogger("elasticsearch")
-	/*if !cfg.HasField("bulk_max_size") {
-		cfg.SetInt("bulk_max_size", -1, defaultBulkSize)
-	}*/
-
-	/*hosts, err := outputs.ReadHostList(cfg)
-	if err != nil {
-		return outputs.Fail(err)
-	}*/
-
-	if proxyURL := config.Transport.Proxy.URL; proxyURL != nil && !config.Transport.Proxy.Disable {
-		log.Debugf("breaking down proxy URL. Scheme: '%s', host[:port]: '%s', path: '%s'", proxyURL.Scheme, proxyURL.Host, proxyURL.Path)
-		log.Infof("Using proxy URL: %s", proxyURL)
-	}
-
-	params := config.Params
-	if len(params) == 0 {
-		params = nil
-	}
-
-	if len(config.Hosts) == 0 {
-		return nil, fmt.Errorf("hosts list cannot be empty")
-	}
-	host := config.Hosts[0]
-	esURL, err := common.MakeURL(config.Protocol, config.Path, host, 9200)
-	if err != nil {
-		log.Errorf("Invalid host param set: %s, Error: %+v", host, err)
-		return nil, err
-	}
-
-	return NewClient(ClientSettings{
-		ConnectionSettings: eslegclient.ConnectionSettings{
-			URL:              esURL,
-			Beatname:         "elastic-agent-shipper",
-			Kerberos:         config.Kerberos,
-			Username:         config.Username,
-			Password:         config.Password,
-			APIKey:           config.APIKey,
-			Parameters:       params,
-			Headers:          config.Headers,
-			CompressionLevel: config.CompressionLevel,
-			// TODO: No observer yet, is leaving it nil ok?
-			EscapeHTML: config.EscapeHTML,
-			Transport:  config.Transport,
-		},
-	}, &connectCallbackRegistry)
-	/*clients := make([]*Client, len(hosts))
-	for i, host := range hosts {
-		esURL, err := common.MakeURL(config.Protocol, config.Path, host, 9200)
-		if err != nil {
-			log.Errorf("Invalid host param set: %s, Error: %+v", host, err)
-			return nil, err
-		}
-
-		//var client outputs.NetworkClient
-		client, err := NewClient(ClientSettings{
-			ConnectionSettings: eslegclient.ConnectionSettings{
-				URL:              esURL,
-				Beatname:         beat.Beat,
-				Kerberos:         config.Kerberos,
-				Username:         config.Username,
-				Password:         config.Password,
-				APIKey:           config.APIKey,
-				Parameters:       params,
-				Headers:          config.Headers,
-				CompressionLevel: config.CompressionLevel,
-				Observer:         observer,
-				EscapeHTML:       config.EscapeHTML,
-				Transport:        config.Transport,
-			},
-			Index:              index,
-			Pipeline:           pipeline,
-			Observer:           observer,
-		}, &connectCallbackRegistry)
-		if err != nil {
-			return nil, err
-		}
-
-		clients[i] = client
-	}
-
-	return outputs.SuccessNet(config.LoadBalance, config.BulkMaxSize, config.MaxRetries, clients)*/
 }
