@@ -20,9 +20,7 @@ import (
 	"github.com/elastic/beats/v7/libbeat/outputs/outil"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
-	"github.com/elastic/elastic-agent-libs/testing"
 	"github.com/elastic/elastic-agent-libs/version"
-	"github.com/elastic/go-elasticsearch/v8"
 
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 )
@@ -37,7 +35,6 @@ var (
 // Client is an elasticsearch client.
 type Client struct {
 	oldConn eslegclient.Connection
-	conn    *elasticsearch.Client
 
 	//index outputs.IndexSelector
 	//pipeline *outil.Selector
@@ -402,7 +399,10 @@ func (client *Client) bulkCollectPublishFails(result eslegclient.BulkResult, dat
 	return failed, stats
 }
 
+/*
 func (client *Client) Connect() error {
+	es, err := elasticsearch.NewClient(cfg)
+
 	return client.oldConn.Connect()
 }
 
@@ -417,3 +417,4 @@ func (client *Client) String() string {
 func (client *Client) Test(d testing.Driver) {
 	client.oldConn.Test(d)
 }
+*/

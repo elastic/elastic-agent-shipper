@@ -5,15 +5,22 @@
 package elasticsearch
 
 import (
+	"bytes"
 	"context"
+	"crypto/tls"
 	"fmt"
+	"net/http"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/libbeat/esleg/eslegclient"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 	"github.com/elastic/elastic-agent-shipper/queue"
+	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/esutil"
 )
 
 type ElasticSearchOutput struct {
@@ -35,8 +42,22 @@ func NewElasticSearch(config *Config, queue *queue.Queue) *ElasticSearchOutput {
 	return out
 }
 
+func serializeEvent(event *messages.Event) ([]byte, error) {
+	return nil, nil
+}
+
 func (out *ElasticSearchOutput) Start() error {
-	client, err := oldMakeES(*out.config)
+	client, err := newMakeES()
+	if err != nil {
+		return err
+	}
+	bi, err := esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
+		Index:         "elastic-agent-shipper",
+		Client:        client,
+		NumWorkers:    1,
+		FlushBytes:    int(0x10000000), // 256MB
+		FlushInterval: 30 * time.Second,
+	})
 	if err != nil {
 		return err
 	}
@@ -54,24 +75,43 @@ func (out *ElasticSearchOutput) Start() error {
 				// time for the output to shut down.
 				break
 			}
+
 			count := batch.Count()
 			events := make([]*messages.Event, count)
-			for i := 0; i < batch.Count(); i++ {
+			for i := 0; i < count; i++ {
 				events[i], _ = batch.Entry(i).(*messages.Event)
 			}
-
-			for len(events) > 0 {
-				events, _ = client.publishEvents(context.TODO(), events)
-				// TODO: error handling / retry backoff
+			completed := uint64(0)
+			for _, event := range events {
+				serialized, err := serializeEvent(event)
+				if err != nil {
+					out.logger.Errorf("failed to serialize event: %v", err)
+					completed += 1
+					continue
+				}
+				err = bi.Add(
+					context.Background(),
+					esutil.BulkIndexerItem{
+						Action: "index",
+						Body:   bytes.NewReader(serialized),
+						OnSuccess: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem) {
+							// TODO: update metrics
+							if atomic.AddUint64(&completed, 1) >= uint64(count) {
+								batch.Done()
+							}
+						},
+						OnFailure: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem, err error) {
+							// TODO: update metrics
+							if atomic.AddUint64(&completed, 1) >= uint64(count) {
+								batch.Done()
+							}
+						},
+					},
+				)
+				if err != nil {
+					out.logger.Errorf("couldn't add to bulk index request: %v", err)
+				}
 			}
-			// This tells the queue that we're done with these events
-			// and they can be safely discarded. The Beats queue interface
-			// doesn't provide a way to indicate failure, of either the
-			// full batch or individual events. The plan is for the
-			// shipper to track events by their queue IDs so outputs
-			// can report status back to the server; see
-			// https://github.com/elastic/elastic-agent-shipper/issues/27.
-			batch.Done()
 		}
 	}()
 	return nil
@@ -82,6 +122,22 @@ func (out *ElasticSearchOutput) Start() error {
 // the queue.
 func (out *ElasticSearchOutput) Wait() {
 	out.wg.Wait()
+}
+
+func newMakeES() (*elasticsearch.Client, error) {
+	cfg := elasticsearch.Config{
+		Addresses: []string{
+			"https://localhost:9200",
+		},
+		Username: "elastic",
+		Password: "pp3OwQRxejj_yt=fs*U-",
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+	}
+	return elasticsearch.NewClient(cfg)
 }
 
 func oldMakeES(
