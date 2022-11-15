@@ -81,18 +81,20 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-func (es *ElasticSearchOutput) esConfig() elasticsearch.Config {
+// esConfig converts the configuration for the elasticsearch shipper output
+// to the configuration for the go-elasticsearch client API.
+func (c *Config) esConfig() elasticsearch.Config {
 	tlsConfig := &tls.Config{}
-	if es.config.Transport.TLS.VerificationMode == tlscommon.VerifyNone {
+	if c.Transport.TLS.VerificationMode == tlscommon.VerifyNone {
 		// Unlike Beats, the shipper doesn't support the ability to verify the
 		// certificate but not the hostname, so any setting except VerifyNone
 		// falls back on full verification.
 		tlsConfig.InsecureSkipVerify = true
 	}
 	cfg := elasticsearch.Config{
-		Addresses: es.config.Hosts,
-		Username:  es.config.Username,
-		Password:  es.config.Password,
+		Addresses: c.Hosts,
+		Username:  c.Username,
+		Password:  c.Password,
 		Transport: &http.Transport{
 			TLSClientConfig: tlsConfig,
 		},

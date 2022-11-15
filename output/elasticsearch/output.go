@@ -45,7 +45,7 @@ func serializeEvent(event *messages.Event) ([]byte, error) {
 }
 
 func (es *ElasticSearchOutput) Start() error {
-	client, err := elasticsearch.NewClient(es.esConfig())
+	client, err := elasticsearch.NewClient(es.config.esConfig())
 	if err != nil {
 		return err
 	}
