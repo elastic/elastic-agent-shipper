@@ -7,8 +7,11 @@ package kafka
 import (
 	"github.com/Shopify/sarama"
 
-	"github.com/elastic/beats/v7/libbeat/outputs/codec/json"
-
+	"github.com/elastic/beats/v7/libbeat/beat"
+	"github.com/elastic/beats/v7/libbeat/outputs/codec"
+	_ "github.com/elastic/beats/v7/libbeat/outputs/codec/format"
+	_ "github.com/elastic/beats/v7/libbeat/outputs/codec/json"
+	"github.com/elastic/beats/v7/libbeat/version"
 	"github.com/elastic/elastic-agent-libs/logp"
 )
 
@@ -45,18 +48,15 @@ func makeKafka(
 
 	hosts := config.Hosts
 
-	// TODO: Fix encoding
-	codec := json.New("1", json.Config{
-		Pretty:     true,
-		EscapeHTML: true,
-	})
+	// The construction of the encoder requires a `beat.Info` object to be present
+	// As far as I can tell, the only property used is the version, which is used
+	// to populate metadata in the json encoder
+	beatInfo := beat.Info{Version: version.GetDefaultVersion()}
 
-	//codec, err := codec.CreateEncoder(beat, config.Codec)
-	//if err != nil {
-	//	fmt.Println("failed %v", err)
-	//	return nil, nil
-	//	//return outputs.Fail(err)
-	//}
+	codec, err := codec.CreateEncoder(beatInfo, config.Codec)
+	if err != nil {
+		return nil, err
+	}
 
 	return newKafkaClient( /*observer, */ hosts, "kafka", config.Key, topic, config.Headers, codec, libCfg)
 
