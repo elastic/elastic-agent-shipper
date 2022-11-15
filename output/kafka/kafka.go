@@ -48,6 +48,9 @@ func makeKafka(
 
 	hosts := config.Hosts
 
+	// The construction of the encoder requires a `beat.Info` object to be present
+	// As far as I can tell, the only property used is the version, which is used
+	// to populate metadata in the json encoder
 	beatInfo := beat.Info{Version: version.GetDefaultVersion()}
 
 	codec, err := codec.CreateEncoder(beatInfo, config.Codec)
