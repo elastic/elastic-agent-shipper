@@ -83,7 +83,7 @@ func (c *Config) Validate() error {
 
 // esConfig converts the configuration for the elasticsearch shipper output
 // to the configuration for the go-elasticsearch client API.
-func (c *Config) esConfig() elasticsearch.Config {
+func (c Config) esConfig() elasticsearch.Config {
 	tlsConfig := &tls.Config{}
 	if c.Transport.TLS.VerificationMode == tlscommon.VerifyNone {
 		// Unlike Beats, the shipper doesn't support the ability to verify the

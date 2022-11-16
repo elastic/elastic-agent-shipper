@@ -7,6 +7,7 @@ package elasticsearch
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -41,7 +42,10 @@ func NewElasticSearch(config *Config, queue *queue.Queue) *ElasticSearchOutput {
 }
 
 func serializeEvent(event *messages.Event) ([]byte, error) {
-	return nil, nil
+	// TODO: we need to preprocessing the raw protobuf to get fields in the
+	// right place for ECS. This just translates the protobuf structure
+	// directly to json.
+	return json.Marshal(event)
 }
 
 func (es *ElasticSearchOutput) Start() error {
@@ -50,7 +54,7 @@ func (es *ElasticSearchOutput) Start() error {
 		return err
 	}
 	bi, err := esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
-		Index:         "elastic-agent-shipper",
+		Index:         "elastic-agent-shipper-test",
 		Client:        client,
 		NumWorkers:    1,
 		FlushBytes:    1e+7,

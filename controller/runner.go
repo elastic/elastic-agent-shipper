@@ -207,7 +207,7 @@ func (r *ServerRunner) Close() (err error) {
 }
 
 func outputFromConfig(config output.Config, queue *queue.Queue) (Output, error) {
-	if config.Elasticsearch != nil {
+	if config.Elasticsearch != nil && config.Elasticsearch.Enabled {
 		return elasticsearch.NewElasticSearch(config.Elasticsearch, queue), nil
 	}
 	if config.Kafka != nil && config.Kafka.Enabled {

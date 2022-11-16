@@ -4,6 +4,7 @@
 
 package elasticsearch
 
+/*
 import (
 	"bytes"
 	"errors"
@@ -140,3 +141,4 @@ func itemStatusInner(reader *jsonReader, logger *logp.Logger) (int, []byte, erro
 	}
 	return status, msg, nil
 }
+*/
