@@ -48,31 +48,6 @@ type Backoff struct {
 	Max  time.Duration
 }
 
-/*const (
-	defaultBulkSize = 50
-)*/
-
-/*var (
-	defaultConfig = Config{
-		Protocol:         "",
-		Path:             "",
-		Params:           nil,
-		Username:         "",
-		Password:         "",
-		APIKey:           "",
-		MaxRetries:       3,
-		CompressionLevel: 0,
-		EscapeHTML:       false,
-		Kerberos:         nil,
-		LoadBalance:      true,
-		Backoff: Backoff{
-			Init: 1 * time.Second,
-			Max:  60 * time.Second,
-		},
-		Transport: httpcommon.DefaultHTTPTransportSettings(),
-	}
-)*/
-
 func (c *Config) Validate() error {
 	if c.APIKey != "" && (c.Username != "" || c.Password != "") {
 		return fmt.Errorf("cannot set both api_key and username/password")
