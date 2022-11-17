@@ -19,6 +19,14 @@ import (
 
 // LoadAndRun loads the config object and runs the gRPC server
 func LoadAndRun() error {
+	err := setPaths()
+	if err != nil {
+		return fmt.Errorf("error setting paths from -E overwrites: %w", err)
+	}
+	err = setLogging()
+	if err != nil {
+		return fmt.Errorf("error configuring logging: %w", err)
+	}
 	cfg, err := config.ReadConfigFromFile()
 	switch {
 	case err == nil:
@@ -31,7 +39,7 @@ func LoadAndRun() error {
 }
 
 // RunUnmanaged runs the shipper out of a local config file without using the control protocol.
-func RunUnmanaged(cfg config.ShipperConfig) error {
+func RunUnmanaged(cfg config.ShipperRootConfig) error {
 	log := logp.L()
 	runner, err := NewServerRunner(cfg)
 	if err != nil {
@@ -63,7 +71,7 @@ func RunUnmanaged(cfg config.ShipperConfig) error {
 }
 
 // RunManaged runs the shipper receiving configuration from the agent using the control protocol.
-func RunManaged(cfg config.ShipperConfig) error {
+func RunManaged(_ config.ShipperRootConfig) error {
 	agentClient, _, err := client.NewV2FromReader(os.Stdin, client.VersionInfo{Name: "elastic-agent-shipper", Version: "v2"})
 	if err != nil {
 		return fmt.Errorf("error reading control config from agent: %w", err)
@@ -73,4 +81,52 @@ func RunManaged(cfg config.ShipperConfig) error {
 	err = runController(ctx, agentClient)
 
 	return err
+}
+
+// runController is the main runloop for the shipper itself, and managed communication with the agent.
+func runController(ctx context.Context, agentClient client.V2) error {
+	log := logp.L()
+
+	err := agentClient.Start(ctx)
+	if err != nil {
+		return fmt.Errorf("error starting connection to client")
+	}
+
+	log.Debugf("Starting error reporter")
+	go reportErrors(ctx, agentClient)
+
+	log.Debugf("Started client, waiting")
+
+	handler := newClientHandler()
+
+	// receive the units
+	for {
+		select {
+		case <-ctx.Done():
+			handler.log.Debugf("Got context done")
+			shipperUnit := handler.units.GetOutput()
+			handler.shutdown(shipperUnit)
+			// If we get context done, just hard-stop
+			return nil
+
+		case change := <-agentClient.UnitChanges():
+
+			switch change.Type {
+			case client.UnitChangedAdded: // The agent is starting the shipper, or we added a new processor
+				go handler.handleUnitAdded(change.Unit)
+			case client.UnitChangedModified: // config for a unit has changed
+				go handler.handleUnitUpdated(change.Unit)
+			case client.UnitChangedRemoved: // a unit has been stopoped and can now be removed.
+				handler.units.DeleteUnit(change.Unit)
+				// for now, consider a remove of the shipper unit to be our sign to shut down.
+				// Take care, as we won't get this until we've sent a STOPPED to the agent
+				// TODO: we should have a timeout so we can shutdown without getting a REMOVED event
+				if change.Unit.Type() == client.UnitTypeOutput {
+					handler.log.Debugf("shipper unit removed, ending.")
+					return nil
+				}
+
+			}
+		}
+	}
 }

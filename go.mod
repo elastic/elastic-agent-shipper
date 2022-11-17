@@ -3,7 +3,7 @@ module github.com/elastic/elastic-agent-shipper
 go 1.17
 
 require (
-	github.com/elastic/elastic-agent-libs v0.2.11
+	github.com/elastic/elastic-agent-libs v0.2.15
 	github.com/spf13/cobra v1.3.0
 	google.golang.org/genproto v0.0.0-20220810155839-1856144b1d9c // indirect
 	google.golang.org/grpc v1.48.0
@@ -14,12 +14,13 @@ require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220810153818-dd118efed5a5
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20220804181728-b0328d2fe484
 	github.com/elastic/elastic-agent-shipper-client v0.4.0
-	github.com/elastic/go-ucfg v0.8.6
 	github.com/gofrs/uuid v4.2.0+incompatible
-	github.com/magefile/mage v1.13.0
-	github.com/stretchr/testify v1.7.1
+	github.com/magefile/mage v1.14.0
+	github.com/mitchellh/mapstructure v1.4.3
+	github.com/stretchr/testify v1.8.0
 	go.elastic.co/apm v1.15.0
 	go.elastic.co/go-licence-detector v0.5.0
+	go.uber.org/zap v1.23.0
 	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa
 	golang.org/x/net v0.0.0-20220809184613-07c6da5e1ced
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
@@ -35,6 +36,7 @@ require (
 	github.com/elastic/go-licenser v0.4.1 // indirect
 	github.com/elastic/go-structform v0.0.10 // indirect
 	github.com/elastic/go-sysinfo v1.8.1 // indirect
+	github.com/elastic/go-ucfg v0.8.6 // indirect
 	github.com/elastic/go-windows v1.0.1 // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
@@ -67,9 +69,8 @@ require (
 	go.elastic.co/apm/v2 v2.1.0 // indirect
 	go.elastic.co/ecszap v1.0.1 // indirect
 	go.elastic.co/fastjson v1.1.0 // indirect
-	go.uber.org/atomic v1.9.0 // indirect
+	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
-	go.uber.org/zap v1.22.0 // indirect
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab // indirect

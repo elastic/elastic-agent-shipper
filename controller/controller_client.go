@@ -5,13 +5,11 @@
 package controller
 
 import (
-	"context"
 	"fmt"
-	"os"
-	"os/signal"
 	"sync"
 	"sync/atomic"
-	"syscall"
+
+	"github.com/mitchellh/mapstructure"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
@@ -28,13 +26,10 @@ type clientHandler struct {
 	// Tells the controller that the shipper backend has gracefully shut down.
 	shutdownComplete sync.WaitGroup
 
-	unitsMut sync.Mutex
-	units    map[string]*client.Unit
-
-	// the unit ID for the shipper itself
-	shipperOutputID string
+	units *UnitMap
 
 	shipperIsStopping uint32
+	shipperIsRunning  uint32
 
 	log *logp.Logger
 }
@@ -43,13 +38,19 @@ func newClientHandler() clientHandler {
 	return clientHandler{
 		shutdownInit:      make(doneChan, 1),
 		log:               logp.L(),
-		units:             make(map[string]*client.Unit),
+		units:             NewUnitMap(),
 		shipperIsStopping: 0,
 	}
 }
 
+/*
+//////////
+////////// Shipper/output Handlers
+/////////
+*/
+
 // Run starts the gRPC server
-func (c *clientHandler) Run(cfg config.ShipperConfig, unit *client.Unit) (err error) {
+func (c *clientHandler) Run(cfg config.ShipperRootConfig, unit *client.Unit) (err error) {
 	_ = unit.UpdateState(client.UnitStateConfiguring, "Initialising shipper server", nil)
 	runner, err := NewServerRunner(cfg)
 	if err != nil {
@@ -72,30 +73,6 @@ func (c *clientHandler) Run(cfg config.ShipperConfig, unit *client.Unit) (err er
 	return runner.Start()
 }
 
-func (c *clientHandler) addUnit(unit *client.Unit) {
-	c.unitsMut.Lock()
-	c.units[unit.ID()] = unit
-	c.unitsMut.Unlock()
-}
-
-func (c *clientHandler) getUnit(ID string) *client.Unit {
-	c.unitsMut.Lock()
-	defer c.unitsMut.Unlock()
-	return c.units[ID]
-
-}
-
-func (c *clientHandler) deleteUnit(unit *client.Unit) {
-	c.unitsMut.Lock()
-	delete(c.units, unit.ID())
-	c.unitsMut.Unlock()
-}
-
-// We'll need to track the client ID that's used for the shipper backend itself.
-func (c *clientHandler) setShipperUnitID(unit *client.Unit) {
-	c.shipperOutputID = unit.ID()
-}
-
 // async stop of the shipper's GRPC server, and anything else it needs to manually shutdown
 func (c *clientHandler) stopShipper() {
 	c.log.Debugf("Stopping Shipper")
@@ -105,67 +82,88 @@ func (c *clientHandler) stopShipper() {
 
 // initialize the startup of the shipper grpc server and backend
 func (c *clientHandler) startShipper(unit *client.Unit) {
-	c.log.Debugf("Starting Shipper")
-	atomic.CompareAndSwapUint32(&c.shipperIsStopping, 1, 0)
+	if c.shipperIsRunning == 1 {
+		c.log.Warnf("WARNING: shipper is already running, but recieved another shipper output config from Unit %s", unit.ID())
+		return
+	}
 
 	// deciding to omit some of these error checks, as the client update state will only return an error if it has a JSON payload to unmarshall
 	_ = unit.UpdateState(client.UnitStateConfiguring, "reading shipper config", nil)
 
 	// Assuming that if we got here from UnitChangedAdded, we don't need to care about the expected state?
 	_, level, unitConfig := unit.Expected()
-	cfg, err := config.ShipperConfigFromUnitConfig(level, unitConfig)
+
+	cfg, err := config.ShipperConfigFromUnitConfig(level, unitConfig, unit.ID())
 	if err != nil {
-		c.log.Errorf("error unpacking config from agent: %s", err)
-		_ = unit.UpdateState(client.UnitStateFailed, err.Error(), nil)
+		c.reportError("error configuring shipper", err, unit)
 		return
 	}
-
-	err = logp.Configure(cfg.Log)
-	if err != nil {
-		c.log.Errorf("error unpacking config from agent: %s", err)
-		_ = unit.UpdateState(client.UnitStateFailed, err.Error(), nil)
+	if !cfg.Shipper.Enabled {
+		c.log.Warnf("Got output config but shipper was set to disabled: %s", unit.ID())
 		return
 	}
-
-	// reset the local logger
-	c.log = logp.L()
+	c.units.SetOutput(unit)
+	c.log.Debugf("Starting Shipper for ID '%s'", unit.ID())
+	atomic.CompareAndSwapUint32(&c.shipperIsStopping, 1, 0)
 
 	err = c.Run(cfg, unit)
 	if err != nil {
-		c.log.Errorf("error running shipper: %s", err)
-		_ = unit.UpdateState(client.UnitStateFailed, err.Error(), nil)
+		c.reportError("error running shipper", err, unit)
 		return
 	}
+	atomic.CompareAndSwapUint32(&c.shipperIsRunning, 0, 1)
 }
 
+/*
+//////////
+////////// Input Handlers
+/////////
+*/
+
 // start an individual input stream
-func (c *clientHandler) startStream(unit *client.Unit) {
+func (c *clientHandler) startInput(unit *client.Unit) {
 	// when we have individual input streams, that'll go here.
-	c.log.Debugf("Got unit stream for processor: %s", unit.ID())
+	_, _, cfg := unit.Expected()
+	conn := config.ShipperClientConfig{}
+	err := mapstructure.Decode(cfg.Source.AsMap(), &conn)
+	if err != nil {
+		c.reportError("error unpacking input config", err, unit)
+		return
+	}
+	c.units.AddUnit(unit, conn)
+
+	c.log.Debugf("Got client with config: Server: %s, CAs: %d", conn.Server, len(conn.TLS.CAs))
+
 	_ = unit.UpdateState(client.UnitStateHealthy, "healthy", nil)
 
 }
 
 // update an individual input stream
-func (c *clientHandler) updateStream(unit *client.Unit) {
+func (c *clientHandler) updateInput(unit *client.Unit) {
 	// when we have individual input streams, that'll go here.
 	c.log.Debugf("Got unit input update for processor: %s", unit.ID())
 	_ = unit.UpdateState(client.UnitStateConfiguring, "updating", nil)
 	_ = unit.UpdateState(client.UnitStateHealthy, "healthy", nil)
-
 }
+
+/*
+//////////
+////////// Generic event Handlers
+/////////
+*/
 
 // handle the UnitChangedAdded event from the V2 API
 func (c *clientHandler) handleUnitAdded(unit *client.Unit) {
-	c.addUnit(unit)
 	unitType := unit.Type()
-
+	//updatedState, _, newCfg := unit.Expected()
+	//logp.L().Debugf("got config ADDED for unit %s (expected: %s): %s", unit.ID(), updatedState.String(), mapstr.M(newCfg.Source.AsMap()).StringToPrint())
 	if unitType == client.UnitTypeOutput { // unit startup for the shipper itself
-		c.setShipperUnitID(unit)
+		//c.setShipperUnitID(unit)
 		go c.startShipper(unit)
 	}
-	if unitType == client.UnitTypeInput { // unit startup for streams? Processors? Queue?
-		go c.startStream(unit)
+	if unitType == client.UnitTypeInput { // unit startup for inputs
+
+		go c.startInput(unit)
 	}
 }
 
@@ -174,15 +172,23 @@ func (c *clientHandler) handleUnitUpdated(unit *client.Unit) {
 	c.log.Debugf("Got Unit Modified: %s", unit.ID())
 	unitType := unit.Type()
 
+	//updatedState, _, newCfg := unit.Expected()
+	//logp.L().Debugf("got config MODIFIED for unit %s (expected: %s): %s", unit.ID(), updatedState.String(), mapstr.M(newCfg.Source.AsMap()).StringToPrint())
 	if unitType == client.UnitTypeOutput {
 		state, _, _ := unit.Expected()
 		if state == client.UnitStateStopped {
 			c.shutdown(unit)
 		}
 	} else {
-		c.updateStream(unit)
+		c.updateInput(unit)
 	}
 }
+
+/*
+//////////
+////////// Helpers
+/////////
+*/
 
 // a blocking call that will wait for the shipper components to gracefully shutdown, then send the unit update
 func (c *clientHandler) shutdown(shipperUnit *client.Unit) {
@@ -197,92 +203,11 @@ func (c *clientHandler) shutdown(shipperUnit *client.Unit) {
 	c.shutdownComplete.Wait()
 	c.log.Debugf("Shutdown complete, sending STOPPPED")
 	_ = shipperUnit.UpdateState(client.UnitStateStopped, "Stopped shipper output", nil)
+	atomic.CompareAndSwapUint32(&c.shipperIsRunning, 1, 0)
 }
 
-// runController is the main runloop for the shipper itself, and managed communication with the agent.
-func runController(ctx context.Context, agentClient client.V2) error {
-	log := logp.L()
-
-	err := agentClient.Start(ctx)
-	if err != nil {
-		return fmt.Errorf("error starting connection to client")
-	}
-
-	log.Debugf("Starting error reporter")
-	go reportErrors(ctx, agentClient)
-
-	log.Debugf("Started client, waiting")
-
-	handler := newClientHandler()
-
-	// receive the units
-	for {
-		select {
-		case <-ctx.Done():
-			handler.log.Debugf("Got context done")
-			shipperUnit := handler.getUnit(handler.shipperOutputID)
-			handler.shutdown(shipperUnit)
-			// If we get context done, just hard-stop
-			return nil
-
-		case change := <-agentClient.UnitChanges():
-
-			switch change.Type {
-			case client.UnitChangedAdded: // The agent is starting the shipper, or we added a new processor
-				go handler.handleUnitAdded(change.Unit)
-			case client.UnitChangedModified: // config for a unit has changed
-				go handler.handleUnitUpdated(change.Unit)
-			case client.UnitChangedRemoved: // a unit has been stopoped and can now be removed.
-				handler.deleteUnit(change.Unit)
-				// for now, consider a remove of the shipper unit to be our sign to shut down.
-				// Take care, as we won't get this until we've sent a STOPPED to the agent
-				// TODO: we should have a timeout so we can shutdown without getting a REMOVED event
-				if change.Unit.Type() == client.UnitTypeOutput {
-					handler.log.Debugf("shipper unit removed, ending.")
-					return nil
-				}
-
-			}
-		}
-	}
-}
-
-// I am not net sure how this should work or what it should do, but we need to read from that error channel
-func reportErrors(ctx context.Context, agentClient client.V2) {
-	log := logp.L()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case err := <-agentClient.Errors():
-			log.Errorf("Got error from controller: %s", err)
-		}
-	}
-}
-
-// handle shutdown of the shipper
-func handleShutdown(shutdownFunc func(), externalSignal doneChan) {
-	log := logp.L()
-
-	// On termination signals, gracefully stop the shipper
-	sigc := make(chan os.Signal, 1)
-	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
-
-	go func() {
-		select {
-		case <-externalSignal:
-			log.Debugf("Shutting down from agent controller")
-			shutdownFunc()
-			return
-		case sig := <-sigc:
-			switch sig {
-			case syscall.SIGINT, syscall.SIGTERM:
-				log.Debug("Received sigterm/sigint, stopping")
-			case syscall.SIGHUP:
-				log.Debug("Received sighup, stopping")
-			}
-			shutdownFunc()
-			return
-		}
-	}()
+func (c *clientHandler) reportError(errorMsg string, err error, unit *client.Unit) {
+	wrapped := fmt.Sprintf("%s: %s", errorMsg, err)
+	c.log.Errorf(wrapped)
+	_ = unit.UpdateState(client.UnitStateFailed, wrapped, nil)
 }

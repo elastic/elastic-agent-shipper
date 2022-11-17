@@ -35,7 +35,7 @@ type Output interface {
 // The server runner is not re-usable and should be abandoned after `Close` or canceled context.
 type ServerRunner struct {
 	log *logp.Logger
-	cfg config.ShipperConfig
+	cfg config.ShipperRootConfig
 	// to protect the `Close` function from multiple concurrent calls,
 	// so we avoid race conditions
 	closeOnce sync.Once
@@ -52,21 +52,21 @@ type ServerRunner struct {
 // NewServerRunner creates a new runner that starts and stops the server.
 // Consumers are expected to run `Close` to release all resources created
 // by a successful result from this function even without starting the server.
-func NewServerRunner(cfg config.ShipperConfig) (r *ServerRunner, err error) {
+func NewServerRunner(cfg config.ShipperRootConfig) (r *ServerRunner, err error) {
 	r = &ServerRunner{
 		log: logp.L(),
 		cfg: cfg,
 	}
 
 	r.log.Debug("initializing the queue...")
-	r.queue, err = queue.New(cfg.Queue)
+	r.queue, err = queue.New(cfg.Shipper.Queue)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create queue: %w", err)
 	}
 	r.log.Debug("queue was initialized.")
 
 	r.log.Debug("initializing monitoring ...")
-	r.monitoring, err = monitoring.NewFromConfig(cfg.Monitor, r.queue)
+	r.monitoring, err = monitoring.NewFromConfig(cfg.Shipper.Monitor, r.queue)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing output monitor: %w", err)
 	}
@@ -74,7 +74,7 @@ func NewServerRunner(cfg config.ShipperConfig) (r *ServerRunner, err error) {
 	r.log.Debug("monitoring is ready.")
 
 	r.log.Debug("initializing the output...")
-	r.out, err = outputFromConfig(cfg.Output, r.queue)
+	r.out, err = outputFromConfig(cfg.Shipper.Output, r.queue)
 	if err != nil {
 		return nil, err
 	}
@@ -93,15 +93,15 @@ func NewServerRunner(cfg config.ShipperConfig) (r *ServerRunner, err error) {
 
 	r.log.Debug("initializing the gRPC server...")
 	var opts []grpc.ServerOption
-	if cfg.Server.TLS {
-		creds, err := credentials.NewServerTLSFromFile(cfg.Server.Cert, cfg.Server.Key)
+	if cfg.Shipper.Server.TLS {
+		creds, err := credentials.NewServerTLSFromFile(cfg.Shipper.Server.Cert, cfg.Shipper.Server.Key)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate credentials %w", err)
 		}
 		opts = []grpc.ServerOption{grpc.Creds(creds)}
 	}
 	r.server = grpc.NewServer(opts...)
-	r.shipper, err = server.NewShipperServer(cfg.Server, r.queue)
+	r.shipper, err = server.NewShipperServer(cfg.Shipper.Server, r.queue)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialise the server: %w", err)
 	}
@@ -120,7 +120,7 @@ func (r *ServerRunner) Start() (err error) {
 		return fmt.Errorf("failed to start a server runner that was previously closed")
 	}
 
-	addr := fmt.Sprintf("localhost:%d", r.cfg.Server.Port)
+	addr := fmt.Sprintf("localhost:%d", r.cfg.Shipper.Server.Port)
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		r.startMutex.Unlock()
