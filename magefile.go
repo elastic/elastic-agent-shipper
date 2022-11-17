@@ -237,6 +237,13 @@ func Notice() error {
 	return gotool.Mod.Tidy()
 }
 
+// RELEASE HELPERS
+
+// Version returns current stack version, used for the release process
+func Version() {
+	fmt.Println(tools.DefaultBeatVersion)
+}
+
 // DEPENDENCIES
 
 // Dependencies contains targets related to generating dependencies csv file
@@ -255,7 +262,7 @@ func (Dependencies) Generate() {
 	if err != nil {
 		panic(err)
 	}
-	dependenciesReportPath := filepath.Join("dev-tools", "dependencies")
+	dependenciesReportPath := filepath.Join("dev-tools", "dependencies-report")
 
 	version, err := fullVersion()
 	if err != nil {
@@ -328,7 +335,7 @@ func (Package) Artifacts() {
 		var archiveFileName string
 		targetDir := fmt.Sprintf("%s-%s", devtools.ProjectName, platform)
 		if isWindows {
-			archiveFileName = fmt.Sprintf("%s-%s.zip", devtools.ProjectName, platform)
+			archiveFileName = fmt.Sprintf("%s-%s-%s.zip", devtools.ProjectName, version, platform)
 			err = prepareZipArchive(
 				archivePath,
 				targetDir,
@@ -340,7 +347,7 @@ func (Package) Artifacts() {
 				},
 			)
 		} else {
-			archiveFileName = fmt.Sprintf("%s-%s.tar.gz", devtools.ProjectName, platform)
+			archiveFileName = fmt.Sprintf("%s-%s-%s.tar.gz", devtools.ProjectName, version, platform)
 			err = prepareTarArchive(
 				archivePath,
 				targetDir,

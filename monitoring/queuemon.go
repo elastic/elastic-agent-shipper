@@ -5,9 +5,11 @@
 package monitoring
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/opt"
 	"github.com/elastic/elastic-agent-shipper/monitoring/reporter"
@@ -110,21 +112,46 @@ func (mon QueueMonitor) End() {
 
 // updateMetrics is responsible for fetching the metrics from the queue, calculating whatever it needs to, and sending the complete events to the output
 func (mon *QueueMonitor) updateMetrics() error {
+	metrics, err := mon.getQueueMetrics()
+	if err != nil {
+		return fmt.Errorf("error fetching queue metrics: %w", err)
+	}
+	mon.sendToReporters(metrics)
+
+	return nil
+}
+
+// DiagnosticsCallback returns a function that can be sent to a V2 unit's RegisterDiagnosticHook
+func (mon *QueueMonitor) DiagnosticsCallback() client.DiagnosticHook {
+	return func() []byte {
+		metrics, err := mon.getQueueMetrics()
+		if err != nil {
+			return mon.diagCallbackError(err)
+		}
+		metricsJSON, err := json.MarshalIndent(metrics, "", " ")
+		if err != nil {
+			return mon.diagCallbackError(err)
+		}
+		return metricsJSON
+	}
+}
+
+func (mon *QueueMonitor) getQueueMetrics() (reporter.QueueMetrics, error) {
 	raw, err := mon.target.Metrics()
 	if err != nil {
-		return fmt.Errorf("error fetching queue Metrics: %w", err)
+		return reporter.QueueMetrics{}, fmt.Errorf("error fetching queue Metrics: %w", err)
 	}
 
 	count, limit, queueIsFull, err := getLimits(raw)
 	if err != nil {
-		return fmt.Errorf("could not get queue metrics limits: %w", err)
+		return reporter.QueueMetrics{}, fmt.Errorf("could not get queue metrics limits: %w", err)
 	}
 
 	if queueIsFull {
 		mon.queueLimitCount = mon.queueLimitCount + 1
 	}
 
-	mon.sendToReporters(reporter.QueueMetrics{
+	metrics := reporter.QueueMetrics{
 		CurrentLevel:      opt.UintWith(count),
 		MaxLevel:          opt.UintWith(limit),
 		IsFull:            queueIsFull,
@@ -133,9 +160,19 @@ func (mon *QueueMonitor) updateMetrics() error {
 		// Running on a philosophy that the outputs should be dumb and unopinionated,
 		//so we're doing the type conversion here.
 		OldestActiveTimestamp: raw.OldestActiveTimestamp.String(),
-	})
+	}
+	return metrics, nil
+}
 
-	return nil
+// diagcallbackError is a wrapper for handling errors in the V2 client diagnostics callback.
+// I'm operating on the understanding that if something should return JSON, it must *always* return JSON.
+func (mon *QueueMonitor) diagCallbackError(origErr error) []byte {
+	mon.log.Errorf("Got error while fetching metrics for elastic-agent diagnostics: %s", origErr)
+	jsonErr, err := json.MarshalIndent(map[string]string{"error fetching queue metrics": origErr.Error()}, "", " ")
+	if err != nil {
+		mon.log.Errorf("error marshalling error response from DiagnosticsCallback(): %s", err)
+	}
+	return jsonErr
 }
 
 func (mon QueueMonitor) sendToReporters(metrics reporter.QueueMetrics) {

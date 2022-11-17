@@ -15,7 +15,7 @@ builds:
       - -buildmode=pie
     ldflags:
       - '{{ if eq .Env.DEV "false" }}-s -w{{ end }}'
-      - -X main.Version={{ .Env.DEFAULT_VERSION }} -X main.Commit={{.Commit}} -X main.BuildTime={{.Date}}
+      - -X github.com/elastic/elastic-agent-shipper/tools.commit={{.Commit}} -X github.com/elastic/elastic-agent-shipper/tools.buildTime={{.Date}} -X github.com/elastic/elastic-agent-shipper/tools.snapshot={{ .Env.SNAPSHOT }}
     gcflags:
       - '{{ if eq .Env.DEV "true" }}all=-N -l{{ end }}'
     no_unique_dist_dir: true
@@ -30,7 +30,7 @@ builds:
     no_unique_dist_dir: true
     ldflags:
       - '{{ if eq .Env.DEV "false" }}-s -w{{end}}'
-      - -X main.Version={{ .Env.DEFAULT_VERSION }} -X main.Commit={{.Commit}} -X main.BuildTime={{.Date}}
+      - -X github.com/elastic/elastic-agent-shipper/tools.commit={{.Commit}} -X github.com/elastic/elastic-agent-shipper/tools.buildTime={{.Date}} -X github.com/elastic/elastic-agent-shipper/tools.snapshot={{ .Env.SNAPSHOT }}
     gcflags:
       - '{{ if eq .Env.DEV "true" }}all=-N -l{{ end }}'
     overrides:
@@ -58,7 +58,7 @@ builds:
       - -buildmode=pie
     ldflags:
       - '{{ if eq .Env.DEV "false" }}-s -w{{ end }}'
-      - -X main.Version={{ .Env.DEFAULT_VERSION }} -X main.Commit={{.Commit}} -X main.BuildTime={{.Date}}
+      - -X github.com/elastic/elastic-agent-shipper/tools.commit={{.Commit}} -X github.com/elastic/elastic-agent-shipper/tools.buildTime={{.Date}} -X github.com/elastic/elastic-agent-shipper/tools.snapshot={{ .Env.SNAPSHOT }}
     gcflags:
       - '{{ if eq .Env.DEV "true" }}all=-N -l{{ end }}'
 changelog:

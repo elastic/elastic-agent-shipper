@@ -56,7 +56,7 @@ func (c *clientHandler) Run(cfg config.ShipperRootConfig, unit *client.Unit) (er
 	if err != nil {
 		return err
 	}
-
+	unit.RegisterDiagnosticHook("queue", "queue metrics", "", "application/json", runner.monitoring.DiagnosticsCallback())
 	handleShutdown(func() { _ = runner.Close() }, c.shutdownInit)
 
 	// This will get sent after the server has shutdown, signaling to the runloop that it can stop.
