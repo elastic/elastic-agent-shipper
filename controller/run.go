@@ -41,7 +41,7 @@ func LoadAndRun() error {
 // RunUnmanaged runs the shipper out of a local config file without using the control protocol.
 func RunUnmanaged(cfg config.ShipperRootConfig) error {
 	log := logp.L()
-	runner, err := NewServerRunner(cfg)
+	runner, err := NewOutputServer(cfg)
 	if err != nil {
 		return err
 	}
@@ -96,7 +96,6 @@ func runController(ctx context.Context, agentClient client.V2) error {
 	go reportErrors(ctx, agentClient)
 
 	log.Debugf("Started client, waiting")
-
 	handler := newClientHandler()
 
 	// receive the units

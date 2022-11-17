@@ -55,6 +55,7 @@ func handleShutdown(shutdownFunc func(), externalSignal doneChan) {
 	}()
 }
 
+// initialize the global logging variables
 func setLogging() error {
 	wrapper := struct {
 		Logging *cfglib.C `config:"logging"`
@@ -67,7 +68,7 @@ func setLogging() error {
 
 	err = configure.Logging("shipper", wrapper.Logging)
 	if err != nil {
-		return fmt.Errorf("error setting up logging config: %s", err)
+		return fmt.Errorf("error setting up logging config: %w", err)
 	}
 	return nil
 }

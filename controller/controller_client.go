@@ -52,7 +52,7 @@ func newClientHandler() clientHandler {
 // Run starts the gRPC server
 func (c *clientHandler) Run(cfg config.ShipperRootConfig, unit *client.Unit) (err error) {
 	_ = unit.UpdateState(client.UnitStateConfiguring, "Initialising shipper server", nil)
-	runner, err := NewServerRunner(cfg)
+	runner, err := NewOutputServer(cfg)
 	if err != nil {
 		return err
 	}
@@ -83,7 +83,7 @@ func (c *clientHandler) stopShipper() {
 // initialize the startup of the shipper grpc server and backend
 func (c *clientHandler) startShipper(unit *client.Unit) {
 	if c.shipperIsRunning == 1 {
-		c.log.Warnf("WARNING: shipper is already running, but recieved another shipper output config from Unit %s", unit.ID())
+		c.log.Warnf("WARNING: shipper is already running, but received another shipper output config from Unit %s", unit.ID())
 		return
 	}
 
@@ -122,7 +122,11 @@ func (c *clientHandler) startShipper(unit *client.Unit) {
 
 // start an individual input stream
 func (c *clientHandler) startInput(unit *client.Unit) {
-	// when we have individual input streams, that'll go here.
+	// Still not 100% sure how the inputs factor into the shipper config
+	// Right now the only gRPC server config comes from inputs,
+	// which supply us with the server endpoint name and TLS settings
+	// However, I don't know if that's technically the "correct" TLS for the
+	// gRPC server.
 	_, _, cfg := unit.Expected()
 	conn := config.ShipperClientConfig{}
 	err := mapstructure.Decode(cfg.Source.AsMap(), &conn)
@@ -131,9 +135,7 @@ func (c *clientHandler) startInput(unit *client.Unit) {
 		return
 	}
 	c.units.AddUnit(unit, conn)
-
-	c.log.Debugf("Got client with config: Server: %s, CAs: %d", conn.Server, len(conn.TLS.CAs))
-
+	c.log.Debugf("Got client %s with config: Server: %s", unit.ID(), conn.Server)
 	_ = unit.UpdateState(client.UnitStateHealthy, "healthy", nil)
 
 }
@@ -141,7 +143,7 @@ func (c *clientHandler) startInput(unit *client.Unit) {
 // update an individual input stream
 func (c *clientHandler) updateInput(unit *client.Unit) {
 	// when we have individual input streams, that'll go here.
-	c.log.Debugf("Got unit input update for processor: %s", unit.ID())
+	c.log.Debugf("Got unit input update for input: %s", unit.ID())
 	_ = unit.UpdateState(client.UnitStateConfiguring, "updating", nil)
 	_ = unit.UpdateState(client.UnitStateHealthy, "healthy", nil)
 }
@@ -155,14 +157,10 @@ func (c *clientHandler) updateInput(unit *client.Unit) {
 // handle the UnitChangedAdded event from the V2 API
 func (c *clientHandler) handleUnitAdded(unit *client.Unit) {
 	unitType := unit.Type()
-	//updatedState, _, newCfg := unit.Expected()
-	//logp.L().Debugf("got config ADDED for unit %s (expected: %s): %s", unit.ID(), updatedState.String(), mapstr.M(newCfg.Source.AsMap()).StringToPrint())
 	if unitType == client.UnitTypeOutput { // unit startup for the shipper itself
-		//c.setShipperUnitID(unit)
 		go c.startShipper(unit)
 	}
 	if unitType == client.UnitTypeInput { // unit startup for inputs
-
 		go c.startInput(unit)
 	}
 }
@@ -171,9 +169,6 @@ func (c *clientHandler) handleUnitAdded(unit *client.Unit) {
 func (c *clientHandler) handleUnitUpdated(unit *client.Unit) {
 	c.log.Debugf("Got Unit Modified: %s", unit.ID())
 	unitType := unit.Type()
-
-	//updatedState, _, newCfg := unit.Expected()
-	//logp.L().Debugf("got config MODIFIED for unit %s (expected: %s): %s", unit.ID(), updatedState.String(), mapstr.M(newCfg.Source.AsMap()).StringToPrint())
 	if unitType == client.UnitTypeOutput {
 		state, _, _ := unit.Expected()
 		if state == client.UnitStateStopped {

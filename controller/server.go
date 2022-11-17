@@ -49,10 +49,9 @@ type ServerRunner struct {
 	out        Output
 }
 
-// NewServerRunner creates a new runner that starts and stops the server.
-// Consumers are expected to run `Close` to release all resources created
-// by a successful result from this function even without starting the server.
-func NewServerRunner(cfg config.ShipperRootConfig) (r *ServerRunner, err error) {
+// NewOutputServer initializes the shipper queue and output based on the config received
+// This does not include the queue, as we get the queue config from the shipper inputs
+func NewOutputServer(cfg config.ShipperRootConfig) (r *ServerRunner, err error) {
 	r = &ServerRunner{
 		log: logp.L(),
 		cfg: cfg,

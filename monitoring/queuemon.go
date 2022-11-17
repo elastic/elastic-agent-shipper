@@ -10,12 +10,10 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/opt"
-
 	"github.com/elastic/elastic-agent-shipper/monitoring/reporter"
-	"github.com/elastic/elastic-agent-shipper/queue"
-
 	"github.com/elastic/elastic-agent-shipper/monitoring/reporter/expvar"
 	"github.com/elastic/elastic-agent-shipper/monitoring/reporter/log"
+	"github.com/elastic/elastic-agent-shipper/queue"
 )
 
 //QueueMonitor is the main handler object for the queue monitor, and will be responsible for startup, shutdown, handling config, and persistent tracking of metrics.

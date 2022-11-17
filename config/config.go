@@ -14,12 +14,13 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
-	"go.uber.org/zap/zapcore"
 
 	"github.com/elastic/elastic-agent-shipper/monitoring"
 	"github.com/elastic/elastic-agent-shipper/output"
 	"github.com/elastic/elastic-agent-shipper/queue"
 	"github.com/elastic/elastic-agent-shipper/server"
+
+	"go.uber.org/zap/zapcore"
 )
 
 var (
@@ -53,7 +54,7 @@ type ShipperClientTLS struct {
 	Key  string   `config:"key" mapstructure:"key"`
 }
 
-// ShipperRootConfig defines the options present in the config file
+// ShipperRootConfig defines the shipper config we get from elastic-agent's output unit
 type ShipperRootConfig struct {
 	Type    string        `config:"type"`
 	Shipper ShipperConfig `config:"shipper"`
@@ -111,18 +112,23 @@ func ReadConfigFromFile() (ShipperRootConfig, error) {
 func ShipperConfigFromUnitConfig(level client.UnitLogLevel, rawConfig *proto.UnitExpectedConfig, unitID string) (ShipperRootConfig, error) {
 	cfgObject := DefaultConfig()
 
+	//TODO: Right now, don't update the log level, since I'm
+	// not sure how to tell the elastic-agent to set it in debug
 	logp.L().Debugf("Got new log level: %s", level.String())
 	//logp.SetLevel(ZapFromUnitLogLevel(level))
 
 	// Generate basic config object from the source
+	// TODO: I would prefer to use the mapstructure library here,
+	// since it's more ergonomic, but we import a bunch of libraries
+	// into that config, all of which use our own `config` struct tag.
 	mapCfg := rawConfig.GetSource().AsMap()
-	//logp.L().Debugf("got config: %s", mapstr.M(mapCfg).StringToPrint())
 	cfg, err := config.NewConfigFrom(mapCfg)
 	if err != nil {
 		return ShipperRootConfig{}, fmt.Errorf("error reading in raw map config: %w", err)
 	}
 
-	// We should merge config overwrites here from the -E flag, but they seem to step on the elasticsearch config,
+	//TODO: We should merge config overwrites here from the -E flag,
+	// but they seem to step on the elasticsearch config, since there's no
 	// so for now, don't.
 
 	err = cfg.Unpack(&cfgObject)
@@ -130,7 +136,7 @@ func ShipperConfigFromUnitConfig(level client.UnitLogLevel, rawConfig *proto.Uni
 		return ShipperRootConfig{}, fmt.Errorf("error unpacking shipper config: %w", err)
 	}
 
-	// hack, elastic-agent currently tries to start two shippers with the same config
+	// TODO: hack, elastic-agent currently tries to start two shippers with the same config
 	if unitID == "shipper-monitoring" {
 		cfgObject.Shipper.Server.Port = 50052
 	}
@@ -162,6 +168,7 @@ func readConfig(unpacker rawUnpacker) (config ShipperRootConfig, err error) {
 		return config, fmt.Errorf("error unpacking shipper config: %w", err)
 	}
 
+	// TODO: uncommented for the standalone mode, since log setup is kind of in-progress
 	// otherwise the logging configuration is just ignored
 	// err = logp.Configure(config.Shipper.Log)
 	// if err != nil {

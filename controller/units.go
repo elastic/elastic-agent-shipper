@@ -17,12 +17,6 @@ type UnitMap struct {
 	outputUnit *client.Unit
 }
 
-// ShipperUnit wraps the available config for a units
-type ShipperUnit struct {
-	Unit *client.Unit
-	Conn config.ShipperClientConfig
-}
-
 // NewUnitMap creates a new Unit manager
 func NewUnitMap() *UnitMap {
 	return &UnitMap{
@@ -65,4 +59,10 @@ func (c *UnitMap) GetOutput() *client.Unit {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 	return c.outputUnit
+}
+
+// ShipperUnit wraps the available config for a unit
+type ShipperUnit struct {
+	Unit *client.Unit
+	Conn config.ShipperClientConfig
 }
