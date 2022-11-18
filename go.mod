@@ -17,7 +17,7 @@ require (
 	github.com/elastic/elastic-agent-shipper-client v0.4.0
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/magefile/mage v1.14.0
-	github.com/mitchellh/mapstructure v1.4.3
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/stretchr/testify v1.8.0
 	go.elastic.co/apm v1.15.0
 	go.elastic.co/go-licence-detector v0.5.0
