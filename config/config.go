@@ -41,7 +41,7 @@ func init() {
 
 }
 
-// ShipperClientConfig is the shipper-relevant portion of the config recived from input units
+// ShipperClientConfig is the shipper-relevant portion of the config received from input units
 type ShipperClientConfig struct {
 	Server string           `config:"server" mapstructure:"server"`
 	TLS    ShipperClientTLS `config:"ssl" mapstructure:"ssl"`
