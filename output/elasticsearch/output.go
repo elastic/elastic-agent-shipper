@@ -9,7 +9,6 @@ import (
 	"context"
 	"encoding/json"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -57,7 +56,7 @@ func (es *ElasticSearchOutput) Start() error {
 		Index:         "elastic-agent-shipper-test",
 		Client:        client,
 		NumWorkers:    1,
-		FlushBytes:    1e+7,
+		FlushBytes:    1e+8, // 20MB
 		FlushInterval: 30 * time.Second,
 	})
 	if err != nil {
@@ -80,17 +79,11 @@ func (es *ElasticSearchOutput) Start() error {
 				break
 			}
 
-			count := batch.Count()
-			events := make([]*messages.Event, count)
-			for i := 0; i < count; i++ {
-				events[i], _ = batch.Entry(i).(*messages.Event)
-			}
-			completed := uint64(0)
+			events := batch.Events()
 			for _, event := range events {
 				serialized, err := serializeEvent(event)
 				if err != nil {
 					es.logger.Errorf("failed to serialize event: %v", err)
-					completed += 1
 					continue
 				}
 				err = bi.Add(
@@ -100,17 +93,11 @@ func (es *ElasticSearchOutput) Start() error {
 						Body:   bytes.NewReader(serialized),
 						OnSuccess: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem) {
 							// TODO: update metrics
-							if atomic.AddUint64(&completed, 1) >= uint64(count) {
-								batch.Done()
-								es.wg.Done()
-							}
+							batch.Done(1)
 						},
 						OnFailure: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem, err error) {
 							// TODO: update metrics
-							if atomic.AddUint64(&completed, 1) >= uint64(count) {
-								batch.Done()
-								es.wg.Done()
-							}
+							batch.Done(1)
 						},
 					},
 				)
