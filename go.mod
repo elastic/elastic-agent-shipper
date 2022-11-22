@@ -75,7 +75,6 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/xdg/scram v1.0.3 // indirect
 	github.com/xdg/stringprep v1.0.3 // indirect
-	go.elastic.co/apm/module/apmelasticsearch/v2 v2.0.0 // indirect
 	go.elastic.co/apm/module/apmhttp/v2 v2.0.0 // indirect
 	go.elastic.co/apm/v2 v2.1.0 // indirect
 	go.elastic.co/ecszap v1.0.1 // indirect
