@@ -120,17 +120,16 @@ func TestQueueTypes(t *testing.T) {
 		for {
 			batch, err := queue.Get(len(tracker))
 			assert.NoError(t, err, "couldn't get queue batch")
-			for i := 0; i < batch.Count(); i++ {
+			events := batch.Events()
+			for i := 0; i < len(events); i++ {
 				// get each event and mark the index as received
-				event, ok := batch.Entry(i).(*messages.Event)
-				require.True(t, ok)
-				data := event.GetFields().GetData()
+				data := events[i].GetFields().GetData()
 				testField, prs := data["message"]
 				assert.True(t, prs)
 				v := testField.GetNumberValue()
 				tracker[int(v)] = true
 			}
-			got = got + batch.Count()
+			got = got + len(events)
 			if got == len(tracker) {
 				break
 			}

@@ -79,6 +79,11 @@ func (es *ElasticSearchOutput) Start() error {
 				break
 			}
 
+			// Add this batch to the shutdown wait group and release it
+			// in the batch's completion callback
+			es.wg.Add(1)
+			batch.CompletionCallback = es.wg.Done
+
 			events := batch.Events()
 			for _, event := range events {
 				serialized, err := serializeEvent(event)
@@ -103,8 +108,8 @@ func (es *ElasticSearchOutput) Start() error {
 				)
 				if err != nil {
 					es.logger.Errorf("couldn't add to bulk index request: %v", err)
-				} else {
-					es.wg.Add(1)
+					// This event couldn't be attempted, so mark it as finished.
+					batch.Done(1)
 				}
 			}
 		}

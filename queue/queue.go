@@ -94,8 +94,12 @@ func (queue *Queue) Metrics() (Metrics, error) {
 	return Metrics(metrics), err
 }
 
-func (queue *Queue) Get(eventCount int) (WrappedBatch, error) {
-	return queue.eventQueue.Get(eventCount)
+func (queue *Queue) Get(eventCount int) (*WrappedBatch, error) {
+	batch, err := queue.eventQueue.Get(eventCount)
+	if err != nil {
+		return nil, err
+	}
+	return &WrappedBatch{batch: batch}, nil
 }
 
 func (queue *Queue) Close() error {
@@ -124,18 +128,18 @@ func (queue *Queue) PersistedIndex() (EntryID, error) {
 // while the queue can only track an entire batch at a time.
 // The plan is to eliminate WrappedBatch once batch assembly / acknowledgment
 // is moved out of the libbeat queue.
-type WrappedBatch interface {
-	Events() []*messages.Event
-	Done(count int)
-	//beatsqueue.Batch
-}
+type WrappedBatch struct {
+	batch beatsqueue.Batch
 
-type wrappedBatch struct {
+	// how many events from the batch have been acknowledged
 	doneCount uint64
-	batch     beatsqueue.Batch
+
+	// If CompletionCallback is non-nil, wrappedBatch will call it
+	// when all events have been consumed.
+	CompletionCallback func()
 }
 
-func (w wrappedBatch) Events() []*messages.Event {
+func (w *WrappedBatch) Events() []*messages.Event {
 	events := make([]*messages.Event, w.batch.Count())
 	for i := 0; i < w.batch.Count(); i++ {
 		events[i], _ = w.batch.Entry(i).(*messages.Event)
@@ -143,8 +147,11 @@ func (w wrappedBatch) Events() []*messages.Event {
 	return events
 }
 
-func (w *wrappedBatch) Done(count int) {
+func (w *WrappedBatch) Done(count int) {
 	if atomic.AddUint64(&w.doneCount, uint64(count)) >= uint64(w.batch.Count()) {
 		w.batch.Done()
+		if w.CompletionCallback != nil {
+			w.CompletionCallback()
+		}
 	}
 }
