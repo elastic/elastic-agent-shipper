@@ -1,4 +1,6 @@
 # Make sure to check the documentation at https://goreleaser.com
+env:
+ - SNAPSHOT={{ if index .Env "SNAPSHOT"  }}{{ .Env.SNAPSHOT }}{{ else }}false{{ end }}
 before:
   hooks:
     - go mod tidy
