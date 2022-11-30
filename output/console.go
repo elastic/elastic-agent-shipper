@@ -47,7 +47,7 @@ func (out *ConsoleOutput) Start() error {
 			// shipper to track events by their queue IDs so outputs
 			// can report status back to the server; see
 			// https://github.com/elastic/elastic-agent-shipper/issues/27.
-			batch.Done(len(events))
+			batch.Done(uint64(len(events)))
 		}
 	}()
 	return nil

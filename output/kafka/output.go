@@ -59,12 +59,12 @@ func (out *KafkaOutput) Start() error {
 				break
 			}
 			events := batch.Events()
-			remaining := len(events)
+			remaining := uint64(len(events))
 			for len(events) > 0 {
 				client.log.Debugf("Sending %d events to client to publish", len(events))
 				events, _ = client.publishEvents(events)
-				completed := remaining - len(events)
-				remaining = len(events)
+				completed := remaining - uint64(len(events))
+				remaining = uint64(len(events))
 				batch.Done(completed)
 				// TODO: error handling / retry backoff?
 				client.log.Debugf("Finished sending batch with %v errors", len(events))

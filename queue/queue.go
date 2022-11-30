@@ -147,8 +147,8 @@ func (w *WrappedBatch) Events() []*messages.Event {
 	return events
 }
 
-func (w *WrappedBatch) Done(count int) {
-	if atomic.AddUint64(&w.doneCount, uint64(count)) >= uint64(w.batch.Count()) {
+func (w *WrappedBatch) Done(count uint64) {
+	if atomic.AddUint64(&w.doneCount, count) >= uint64(w.batch.Count()) {
 		w.batch.Done()
 		if w.CompletionCallback != nil {
 			w.CompletionCallback()
