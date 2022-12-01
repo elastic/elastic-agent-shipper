@@ -36,10 +36,9 @@ func (out *ConsoleOutput) Start() error {
 				// time for the output to shut down.
 				break
 			}
-			for i := 0; i < batch.Count(); i++ {
-				if event, ok := batch.Entry(i).(*messages.Event); ok {
-					out.send(event)
-				}
+			events := batch.Events()
+			for i := 0; i < len(events); i++ {
+				out.send(events[i])
 			}
 			// This tells the queue that we're done with these events
 			// and they can be safely discarded. The Beats queue interface
@@ -48,7 +47,7 @@ func (out *ConsoleOutput) Start() error {
 			// shipper to track events by their queue IDs so outputs
 			// can report status back to the server; see
 			// https://github.com/elastic/elastic-agent-shipper/issues/27.
-			batch.Done()
+			batch.Done(uint64(len(events)))
 		}
 	}()
 	return nil

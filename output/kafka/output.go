@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 	"github.com/elastic/elastic-agent-shipper/queue"
 )
 
@@ -59,15 +58,14 @@ func (out *KafkaOutput) Start() error {
 				client.log.Errorf("Shutting output down, queue closed: %v", err)
 				break
 			}
-			count := batch.Count()
-			events := make([]*messages.Event, count)
-			for i := 0; i < batch.Count(); i++ {
-				events[i], _ = batch.Entry(i).(*messages.Event)
-			}
-
+			events := batch.Events()
+			remaining := uint64(len(events))
 			for len(events) > 0 {
 				client.log.Debugf("Sending %d events to client to publish", len(events))
 				events, _ = client.publishEvents(events)
+				completed := remaining - uint64(len(events))
+				remaining = uint64(len(events))
+				batch.Done(completed)
 				// TODO: error handling / retry backoff?
 				client.log.Debugf("Finished sending batch with %v errors", len(events))
 			}
@@ -78,7 +76,7 @@ func (out *KafkaOutput) Start() error {
 			// shipper to track events by their queue IDs so outputs
 			// can report status back to the server; see
 			// https://github.com/elastic/elastic-agent-shipper/issues/27.
-			batch.Done()
+			batch.Done(remaining)
 		}
 	}()
 	return nil

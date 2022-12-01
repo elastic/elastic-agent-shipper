@@ -7,6 +7,7 @@ package queue
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 
 	beatsqueue "github.com/elastic/beats/v7/libbeat/publisher/queue"
 	diskqueue "github.com/elastic/beats/v7/libbeat/publisher/queue/diskqueue"
@@ -93,8 +94,12 @@ func (queue *Queue) Metrics() (Metrics, error) {
 	return Metrics(metrics), err
 }
 
-func (queue *Queue) Get(eventCount int) (beatsqueue.Batch, error) {
-	return queue.eventQueue.Get(eventCount)
+func (queue *Queue) Get(eventCount int) (*WrappedBatch, error) {
+	batch, err := queue.eventQueue.Get(eventCount)
+	if err != nil {
+		return nil, err
+	}
+	return &WrappedBatch{batch: batch}, nil
 }
 
 func (queue *Queue) Close() error {
@@ -115,5 +120,38 @@ func (queue *Queue) PersistedIndex() (EntryID, error) {
 		// When a memory queue event is persisted, it is removed from the queue,
 		// so we return the oldest remaining entry ID.
 		return EntryID(metrics.OldestEntryID), nil
+	}
+}
+
+// WrappedBatch is a bookkeeping wrapper around a libbeat queue batch,
+// to work around the fact that shipper acknowledgements are per-event
+// while the queue can only track an entire batch at a time.
+// The plan is to eliminate WrappedBatch once batch assembly / acknowledgment
+// is moved out of the libbeat queue.
+type WrappedBatch struct {
+	batch beatsqueue.Batch
+
+	// how many events from the batch have been acknowledged
+	doneCount uint64
+
+	// If CompletionCallback is non-nil, wrappedBatch will call it
+	// when all events have been consumed.
+	CompletionCallback func()
+}
+
+func (w *WrappedBatch) Events() []*messages.Event {
+	events := make([]*messages.Event, w.batch.Count())
+	for i := 0; i < w.batch.Count(); i++ {
+		events[i], _ = w.batch.Entry(i).(*messages.Event)
+	}
+	return events
+}
+
+func (w *WrappedBatch) Done(count uint64) {
+	if atomic.AddUint64(&w.doneCount, count) >= uint64(w.batch.Count()) {
+		w.batch.Done()
+		if w.CompletionCallback != nil {
+			w.CompletionCallback()
+		}
 	}
 }
