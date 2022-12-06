@@ -8,6 +8,9 @@ import (
 	"github.com/elastic/beats/v7/libbeat/beat"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
+	libconfig "github.com/elastic/elastic-agent-libs/config"
+	"github.com/elastic/beats/v7/libbeat/outputs/outil"
+
 )
 
 func mapstrForValue(v *messages.Value) interface{} {
@@ -60,74 +63,21 @@ func beatsEventForProto(e *messages.Event) *beat.Event {
 	}
 }
 
-//// BuildSelectorFromConfig creates a selector from a configuration object.
-//func BuildSelectorFromConfig(
-//    cfg *Config,
-//    settings Settings,
-//) (Selector, error) {
-//    var sel []SelectorExpr
-//
-//    key := settings.Key
-//    multiKey := settings.MultiKey
-//    found := false
-//
-//    if cfg.HasField(multiKey) {
-//        found = true
-//        sub, err := cfg.Child(multiKey, -1)
-//        if err != nil {
-//            return Selector{}, err
-//        }
-//
-//        var table []*config.C
-//        if err := sub.Unpack(&table); err != nil {
-//            return Selector{}, err
-//        }
-//
-//        for _, config := range table {
-//            action, err := buildSingle(config, key, settings.Case)
-//            if err != nil {
-//                return Selector{}, err
-//            }
-//
-//            if action != nilSelector {
-//                sel = append(sel, action)
-//            }
-//        }
-//    }
-//
-//    if settings.EnableSingleOnly && cfg.HasField(key) {
-//        found = true
-//
-//        // expect event-format-string
-//        str, err := cfg.String(key, -1)
-//        if err != nil {
-//            return Selector{}, err
-//        }
-//
-//        fmtstr, err := fmtstr.CompileEvent(str)
-//        if err != nil {
-//            return Selector{}, fmt.Errorf("%v in %v", err, cfg.PathOf(key))
-//        }
-//
-//        fmtsel, err := FmtSelectorExpr(fmtstr, "", settings.Case)
-//        if err != nil {
-//            return Selector{}, fmt.Errorf("%v in %v", err, cfg.PathOf(key))
-//        }
-//
-//        if fmtsel != nilSelector {
-//            sel = append(sel, fmtsel)
-//        }
-//    }
-//
-//    if settings.FailEmpty && !found {
-//        if settings.EnableSingleOnly {
-//            return Selector{}, fmt.Errorf("missing required '%v' or '%v' in %v",
-//                key, multiKey, cfg.Path())
-//        }
-//
-//        return Selector{}, fmt.Errorf("missing required '%v' in %v",
-//            multiKey, cfg.Path())
-//    }
-//
-//    return MakeSelector(sel...), nil
-//}
+func buildTopicSelector(config Config) (outil.Selector, error) {
+	t := config.Topic
+	ts := config.Topics
+	configMap := map[string]interface{}{"topic": t, "topics": ts }
+	cfg, err := libconfig.NewConfigFrom(configMap)
+
+	if err != nil {
+		return outil.Selector{}, err
+	}
+
+	return outil.BuildSelectorFromConfig(cfg, outil.Settings{
+		Key:              "topic",
+		MultiKey:         "topics",
+		EnableSingleOnly: true,
+		FailEmpty:        true,
+		Case:             outil.SelectorKeepCase,
+	})
+}

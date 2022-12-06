@@ -37,7 +37,8 @@ type Header struct {
 
 type Config struct {
 	Enabled            bool                      `config:"enabled"`
-	Topic              *fmtstr.EventFormatString `config:"topic"`
+	Topic              string                    `config:"topic"`
+	Topics             []map[string]interface{}  `config:"topics"`
 	Hosts              []string                  `config:"hosts"`
 	TLS                *tlscommon.Config         `config:"ssl"`
 	Kerberos           *kerberos.Config          `config:"kerberos"`
@@ -135,10 +136,6 @@ func (client *Config) Validate() error {
 	if client.Enabled {
 		if len(client.Hosts) == 0 {
 			return errors.New("missing required field 'hosts'")
-		}
-
-		if client.Topic == nil {
-			return errors.New("missing required field 'topic'")
 		}
 
 		if _, ok := compressionModes[strings.ToLower(client.Compression)]; !ok {

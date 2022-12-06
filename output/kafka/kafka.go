@@ -32,13 +32,7 @@ func makeKafka(
 
 	log.Info("initialize kafka output")
 
-	// TODO: Use the topic selector
-	topic := config.Topic
-	//topic, err := buildTopicSelector(&config)
-	//if err != nil {
-	//	return nil,nil
-	//	//return outputs.Fail(err)
-	//}
+	topic, err := buildTopicSelector(config)
 
 	libCfg, err := newSaramaConfig(log, config)
 	if err != nil {
@@ -71,15 +65,3 @@ func makeKafka(
 	//}
 	//return outputs.Success(config.BulkMaxSize, retry, client)
 }
-
-//// TODO: Topic interpolation...
-//func buildTopicSelector(cfg *config.C) (outil.Selector, error) {
-//	return outil.BuildSelectorFromConfig(cfg, outil.Settings{
-//		Key:              "topic",
-//		MultiKey:         "topics",
-//		EnableSingleOnly: true,
-//		FailEmpty:        true,
-//		Case:             outil.SelectorKeepCase,
-//	})
-//	//return nil, nil
-//}
