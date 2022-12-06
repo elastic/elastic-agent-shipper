@@ -19,8 +19,8 @@ import (
 	"github.com/elastic/beats/v7/libbeat/outputs/codec"
 	"github.com/elastic/elastic-agent-libs/logp"
 
-	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 	"github.com/elastic/beats/v7/libbeat/outputs/outil"
+	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 )
 
 type Client struct {

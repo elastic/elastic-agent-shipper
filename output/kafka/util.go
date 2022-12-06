@@ -6,11 +6,10 @@ package kafka
 
 import (
 	"github.com/elastic/beats/v7/libbeat/beat"
+	"github.com/elastic/beats/v7/libbeat/outputs/outil"
+	libconfig "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
-	libconfig "github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/beats/v7/libbeat/outputs/outil"
-
 )
 
 func mapstrForValue(v *messages.Value) interface{} {
@@ -66,7 +65,7 @@ func beatsEventForProto(e *messages.Event) *beat.Event {
 func buildTopicSelector(config Config) (outil.Selector, error) {
 	t := config.Topic
 	ts := config.Topics
-	configMap := map[string]interface{}{"topic": t, "topics": ts }
+	configMap := map[string]interface{}{"topic": t, "topics": ts}
 	cfg, err := libconfig.NewConfigFrom(configMap)
 
 	if err != nil {
