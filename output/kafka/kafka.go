@@ -23,7 +23,6 @@ func init() {
 	sarama.Logger = kafkaLogger{log: logp.NewLogger(logSelector)}
 }
 
-// TODO: Fix up topic and codec creation
 func makeKafka(
 	config Config,
 ) (*Client, error) {
@@ -32,8 +31,7 @@ func makeKafka(
 
 	log.Info("initialize kafka output")
 
-	topic, err := buildTopicSelector(config)
-
+	topic, err := buildTopicSelectorFromConfig(config)
 	libCfg, err := newSaramaConfig(log, config)
 	if err != nil {
 		log.Errorf("Sarama error %v", err)

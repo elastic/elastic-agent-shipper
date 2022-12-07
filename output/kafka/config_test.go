@@ -9,8 +9,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-libs/config"
+	"github.com/elastic/beats/v7/libbeat/beat"
+	libconfig "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/mapstr"
 )
 
 func TestKafkaConfig(t *testing.T) {
@@ -176,7 +178,7 @@ func TestKafkaConfig(t *testing.T) {
 	}
 
 	for name, tc := range tests {
-		cfg, err := config.NewConfigWithYAML([]byte(tc.config), "")
+		cfg, err := libconfig.NewConfigWithYAML([]byte(tc.config), "")
 		require.NoErrorf(t, err, "%s: error making config from yaml: %s, %s", name, tc.config, err)
 		config := DefaultConfig()
 		err = cfg.Unpack(&config)
@@ -195,5 +197,140 @@ func TestKafkaConfig(t *testing.T) {
 			t.Fatalf("Failure creating sarama config: %v", err)
 		}
 
+	}
+}
+
+func TestTopicSelection(t *testing.T) {
+	cases := map[string]struct {
+		//cfg   map[string]interface{}
+		cfg   string
+		event beat.Event
+		want  string
+	}{
+		"topic configured": {
+			cfg: `
+                  enabled: "true"
+                  hosts: "localhost:9092"
+                  topic: "test"
+                  `,
+			event: beat.Event{
+				Fields: mapstr.M{"field": "anything"},
+			},
+			want: "test",
+		},
+		"topic must keep case": {
+			cfg: `
+                  enabled: "true"
+                  hosts: "localhost:9092"
+                  topic: "Test"
+                  `,
+			event: beat.Event{
+				Fields: mapstr.M{"field": "anything"},
+			},
+			want: "Test",
+		},
+		"topics setting": {
+			cfg: `
+                  enabled: "true"
+                  hosts: "localhost:9092"
+                  topics:
+                  - topic: "test"
+                  `,
+			event: beat.Event{
+				Fields: mapstr.M{"field": "anything"},
+			},
+			want: "test",
+		},
+		"topics setting must keep case": {
+			cfg: `
+                  enabled: "true"
+                  hosts: "localhost:9092"
+                  topics:
+                  - topic: "Test"
+                  `,
+			event: beat.Event{
+				Fields: mapstr.M{"field": "anything"},
+			},
+			want: "Test",
+		},
+		"topic uses event field": {
+			cfg: `
+                  enabled: "true"
+                  hosts: "localhost:9092"
+                  topic: "test-%{[field]}"
+                  `,
+			event: beat.Event{
+				Fields: mapstr.M{"field": "from-event"},
+			},
+			want: "test-from-event",
+		},
+		"topic using event field must keep correct case": {
+			cfg: `
+                  enabled: "true"
+                  hosts: "localhost:9092"
+                  topic: "Test-%{[field]}"
+                  `,
+			event: beat.Event{
+				Fields: mapstr.M{"field": "From-Event"},
+			},
+			want: "Test-From-Event",
+		},
+		"Topic should pick specific clause over default when matched": {
+			cfg: `
+                  enabled: "true"
+                  hosts: "localhost:9092"
+                  topics:
+                  - topic: "Test-Found"
+                    when.contains:
+                      field: "Matched"
+                  - topic: "Default"
+                    default:
+                  `,
+			event: beat.Event{
+				Fields: mapstr.M{"field": "Matched"},
+			},
+			want: "Test-Found",
+		},
+		"Topic should pick default over specific clause when not matched": {
+			cfg: `
+                  enabled: "true"
+                  hosts: "localhost:9092"
+                  topics:
+                  - topic: "Topic-Found"
+                    when.contains:
+                      field: "Matched"
+                  - topic: "Default"
+                    default:
+                  `,
+			event: beat.Event{
+				Fields: mapstr.M{"field": "Not here"},
+			},
+			want: "Default",
+		},
+	}
+
+	for name, test := range cases {
+		t.Run(name, func(t *testing.T) {
+			cfg, err := libconfig.NewConfigWithYAML([]byte(test.cfg), "")
+			require.NoErrorf(t, err, "%s: error making config from yaml: %s, %s", name, test.cfg, err)
+			config := DefaultConfig()
+			err = cfg.Unpack(&config)
+
+			selector, err := buildTopicSelectorFromConfig(config)
+
+			if err != nil {
+				t.Fatalf("Failed to parse configuration: %v", err)
+			}
+
+			got, err := selector.Select(&test.event)
+
+			if err != nil {
+				t.Fatalf("Failed to create topic name: %v", err)
+			}
+
+			if test.want != got {
+				t.Errorf("%v: Topic name missmatch (want: %v, got: %v)", name, test.want, got)
+			}
+		})
 	}
 }
