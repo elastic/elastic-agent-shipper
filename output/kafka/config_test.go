@@ -275,7 +275,7 @@ func TestTopicSelection(t *testing.T) {
 			},
 			want: "Test-From-Event",
 		},
-		"Topic should pick specific clause over default when matched": {
+		"Topic should select from rule over default when matched": {
 			cfg: `
                   enabled: "true"
                   hosts: "localhost:9092"
@@ -291,7 +291,7 @@ func TestTopicSelection(t *testing.T) {
 			},
 			want: "Test-Found",
 		},
-		"Topic should pick default over specific clause when not matched": {
+		"Topic should select default when rule not matched": {
 			cfg: `
                   enabled: "true"
                   hosts: "localhost:9092"
@@ -302,6 +302,53 @@ func TestTopicSelection(t *testing.T) {
                   - topic: "Default"
                     default:
                   `,
+			event: beat.Event{
+				Fields: mapstr.M{"field": "Not here"},
+			},
+			want: "Default",
+		},
+		"Topic should select default from single topic: field when rule not matched and no multi key default": {
+			cfg: `
+                 enabled: "true"
+                 hosts: "localhost:9092"
+                 topic: "Default single"
+                 topics:
+                 - topic: "Topic-Found"
+                   when.contains:
+                     field: "Matched"
+                 `,
+			event: beat.Event{
+				Fields: mapstr.M{"field": "Not here"},
+			},
+			want: "Default single",
+		},
+		"Topic should not select default from single topic: field when rule matched": {
+			cfg: `
+                  enabled: "true"
+                  hosts: "localhost:9092"
+                  topic: "Default"
+                  topics:
+                  - topic: "Topic-Found"
+                    when.contains:
+                      field: "Matched"
+                  `,
+			event: beat.Event{
+				Fields: mapstr.M{"field": "Matched"},
+			},
+			want: "Topic-Found",
+		},
+		"Topic should select default from multikey topics: field when rule not matched and multi key has default": {
+			cfg: `
+                 enabled: "true"
+                 hosts: "localhost:9092"
+                 topic: "Default single"
+                 topics:
+                 - topic: "Topic-Found"
+                   when.contains:
+                     field: "Matched"
+                 - topic: "Default"
+                   default:
+                 `,
 			event: beat.Event{
 				Fields: mapstr.M{"field": "Not here"},
 			},
