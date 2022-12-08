@@ -184,18 +184,20 @@ func (e *TestingEnvironment) Fatalf(format string, args ...interface{}) {
 }
 
 func TestServerStarts(t *testing.T) {
-	var config strings.Builder
-
-	_, _ = config.WriteString("server:\n")
-	_, _ = config.WriteString("  strict_mode: false\n")
-	_, _ = config.WriteString("  port: 50052\n")
-	_, _ = config.WriteString("  tls: false\n")
-	_, _ = config.WriteString("logging:\n")
-	_, _ = config.WriteString("  level: debug\n")
-	_, _ = config.WriteString("  selectors: [\"*\"]\n")
-	_, _ = config.WriteString("  to_stderr: true\n")
-
-	env := NewTestingEnvironment(t, config.String())
+	config := `
+server:
+  strict_mode: false
+  port: 50052
+  tls: false
+logging:
+  level: debug
+  selectors: ["*"]
+  to_stderr: true
+output:
+  console:
+    enabled: true
+`
+	env := NewTestingEnvironment(t, config)
 	t.Cleanup(func() { env.Stop() })
 
 	found := env.WaitUntil("stderr", "gRPC server is ready and is listening on")
@@ -206,18 +208,21 @@ func TestServerStarts(t *testing.T) {
 }
 
 func TestServerFailsToStart(t *testing.T) {
-	var config strings.Builder
+	config := `
+server:
+  strict_mode: false
+  port: 50052
+  tls: not_boolean
+logging:
+  level: debug
+  selectors: ["*"]
+  to_stderr: true
+output:
+  console:
+    enabled: true
+`
 
-	_, _ = config.WriteString("server:\n")
-	_, _ = config.WriteString("  strict_mode: false\n")
-	_, _ = config.WriteString("  port: 50052\n")
-	_, _ = config.WriteString("  tls: not_boolean\n")
-	_, _ = config.WriteString("logging:\n")
-	_, _ = config.WriteString("  level: debug\n")
-	_, _ = config.WriteString("  selectors: [\"*\"]\n")
-	_, _ = config.WriteString("  to_stderr: true\n")
-
-	env := NewTestingEnvironment(t, config.String())
+	env := NewTestingEnvironment(t, config)
 	t.Cleanup(func() { env.Stop() })
 
 	found := env.WaitUntil("stderr", "error unpacking shipper config")
@@ -228,18 +233,21 @@ func TestServerFailsToStart(t *testing.T) {
 }
 
 func TestPublishMessage(t *testing.T) {
-	var config strings.Builder
+	config := `
+server:
+  strict_mode: false
+  port: 50052
+  tls: false
+logging:
+  level: debug
+  selectors: ["*"]
+  to_stderr: true
+output:
+  console:
+    enabled: true
+`
 
-	_, _ = config.WriteString("server:\n")
-	_, _ = config.WriteString("  strict_mode: false\n")
-	_, _ = config.WriteString("  port: 50052\n")
-	_, _ = config.WriteString("  tls: false\n")
-	_, _ = config.WriteString("logging:\n")
-	_, _ = config.WriteString("  level: debug\n")
-	_, _ = config.WriteString("  selectors: [\"*\"]\n")
-	_, _ = config.WriteString("  to_stderr: true\n")
-
-	env := NewTestingEnvironment(t, config.String())
+	env := NewTestingEnvironment(t, config)
 	t.Cleanup(func() { env.Stop() })
 
 	found := env.WaitUntil("stderr", "gRPC server is ready and is listening on")
@@ -271,23 +279,27 @@ func TestPublishMessage(t *testing.T) {
 }
 
 func TestPublishDiskQueue(t *testing.T) {
-	var config strings.Builder
 	queue_path := t.TempDir()
 
-	_, _ = config.WriteString("server:\n")
-	_, _ = config.WriteString("  strict_mode: false\n")
-	_, _ = config.WriteString("  port: 50052\n")
-	_, _ = config.WriteString("  tls: false\n")
-	_, _ = config.WriteString("logging:\n")
-	_, _ = config.WriteString("  level: debug\n")
-	_, _ = config.WriteString("  selectors: [\"*\"]\n")
-	_, _ = config.WriteString("  to_stderr: true\n")
-	_, _ = config.WriteString("queue:\n")
-	_, _ = config.WriteString("  disk:\n")
-	_, _ = config.WriteString("    path: " + queue_path + "\n")
-	_, _ = config.WriteString("    max_size: 10G\n")
+	config := `
+server:
+  strict_mode: false
+  port: 50052
+  tls: false
+logging:
+  level: debug
+  selectors: ["*"]
+  to_stderr: true
+output:
+  console:
+    enabled: true
+queue:
+  disk:
+    path: ` + queue_path + `
+    max_size: 10G
+`
 
-	env := NewTestingEnvironment(t, config.String())
+	env := NewTestingEnvironment(t, config)
 	t.Cleanup(func() { env.Stop() })
 
 	found := env.WaitUntil("stderr", "gRPC server is ready and is listening on")
@@ -319,25 +331,29 @@ func TestPublishDiskQueue(t *testing.T) {
 }
 
 func TestPublishCompressEncryptedDiskQueue(t *testing.T) {
-	var config strings.Builder
 	queue_path := t.TempDir()
 
-	_, _ = config.WriteString("server:\n")
-	_, _ = config.WriteString("  strict_mode: false\n")
-	_, _ = config.WriteString("  port: 50052\n")
-	_, _ = config.WriteString("  tls: false\n")
-	_, _ = config.WriteString("logging:\n")
-	_, _ = config.WriteString("  level: debug\n")
-	_, _ = config.WriteString("  selectors: [\"*\"]\n")
-	_, _ = config.WriteString("  to_stderr: true\n")
-	_, _ = config.WriteString("queue:\n")
-	_, _ = config.WriteString("  disk:\n")
-	_, _ = config.WriteString("    path: " + queue_path + "\n")
-	_, _ = config.WriteString("    max_size: 10G\n")
-	_, _ = config.WriteString("    use_compression: true\n")
-	_, _ = config.WriteString("    encryption_password: secret\n")
+	config := `
+server:
+  strict_mode: false
+  port: 50052
+  tls: false
+logging:
+  level: debug
+  selectors: ["*"]
+  to_stderr: true
+output:
+  console:
+    enabled: true
+queue:
+  disk:
+    path: ` + queue_path + `
+    max_size: 10G
+    use_compression: true
+    encryption_password: secret
+`
 
-	env := NewTestingEnvironment(t, config.String())
+	env := NewTestingEnvironment(t, config)
 	t.Cleanup(func() { env.Stop() })
 
 	found := env.WaitUntil("stderr", "gRPC server is ready and is listening on")
