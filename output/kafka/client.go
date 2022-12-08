@@ -229,8 +229,9 @@ func (client *Client) getEventMessage(data *messages.Event) (*Message, error) {
 		topic, err := client.topic.Select(beatsEvent)
 
 		if err != nil {
-			return nil, fmt.Errorf("setting kafka topic failed with %v", err)
+			return nil, fmt.Errorf("setting kafka topic failed with %w", err)
 		}
+
 		if topic == "" {
 			return nil, errNoTopicsSelected
 		}

@@ -32,6 +32,12 @@ func makeKafka(
 	log.Info("initialize kafka output")
 
 	topic, err := buildTopicSelectorFromConfig(config)
+
+	if err != nil {
+		log.Errorf("Error building topic selector %v", err)
+		return nil, nil
+	}
+
 	libCfg, err := newSaramaConfig(log, config)
 	if err != nil {
 		log.Errorf("Sarama error %v", err)

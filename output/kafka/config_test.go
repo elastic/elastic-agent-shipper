@@ -316,6 +316,10 @@ func TestTopicSelection(t *testing.T) {
 			config := DefaultConfig()
 			err = cfg.Unpack(&config)
 
+			if err != nil {
+				t.Fatalf("Failed to parse configuration: %v", err)
+			}
+
 			selector, err := buildTopicSelectorFromConfig(config)
 
 			if err != nil {
