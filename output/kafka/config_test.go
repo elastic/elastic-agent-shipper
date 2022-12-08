@@ -367,7 +367,7 @@ func TestTopicSelection(t *testing.T) {
 				t.Fatalf("Failed to parse configuration: %v", err)
 			}
 
-			selector, err := buildTopicSelectorFromConfig(config)
+			selector, err := buildTopicSelector(config)
 
 			if err != nil {
 				t.Fatalf("Failed to parse configuration: %v", err)

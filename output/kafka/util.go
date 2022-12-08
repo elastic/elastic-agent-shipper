@@ -62,7 +62,7 @@ func beatsEventForProto(e *messages.Event) *beat.Event {
 	}
 }
 
-func buildTopicSelectorFromConfig(config Config) (outil.Selector, error) {
+func buildTopicSelector(config Config) (outil.Selector, error) {
 	t := config.Topic
 	ts := config.Topics
 	configMap := map[string]interface{}{"topic": t, "topics": ts}
@@ -70,10 +70,6 @@ func buildTopicSelectorFromConfig(config Config) (outil.Selector, error) {
 	if err != nil {
 		return outil.Selector{}, err
 	}
-	return buildTopicSelector(cfg)
-}
-
-func buildTopicSelector(cfg *libconfig.C) (outil.Selector, error) {
 	return outil.BuildSelectorFromConfig(cfg, outil.Settings{
 		Key:              "topic",
 		MultiKey:         "topics",

@@ -31,7 +31,7 @@ func makeKafka(
 
 	log.Info("initialize kafka output")
 
-	topic, err := buildTopicSelectorFromConfig(config)
+	topic, err := buildTopicSelector(config)
 
 	if err != nil {
 		log.Errorf("Error building topic selector %v", err)
