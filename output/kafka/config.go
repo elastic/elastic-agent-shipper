@@ -138,6 +138,10 @@ func (client *Config) Validate() error {
 			return errors.New("missing required field 'hosts'")
 		}
 
+		if client.Topic == "" && client.Topics == nil {
+			return errors.New("setting 'topic' and/or 'topics' is required")
+		}
+
 		if _, ok := compressionModes[strings.ToLower(client.Compression)]; !ok {
 			return fmt.Errorf("compression mode '%v' unknown", client.Compression)
 		}

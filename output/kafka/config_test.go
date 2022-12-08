@@ -81,7 +81,7 @@ func TestKafkaConfig(t *testing.T) {
                      hosts: "localhost:9092"
                     `,
 			errorCondition: true,
-			errorString:    "missing required field 'topic' accessing config",
+			errorString:    "setting 'topic' and/or 'topics' is required accessing config",
 		},
 		"no hosts": {
 			config: `
