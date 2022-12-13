@@ -6,6 +6,7 @@ package kafka
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -18,13 +19,14 @@ import (
 	"github.com/elastic/beats/v7/libbeat/outputs/codec"
 	"github.com/elastic/elastic-agent-libs/logp"
 
+	"github.com/elastic/beats/v7/libbeat/outputs/outil"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 )
 
 type Client struct {
 	log           *logp.Logger
 	hosts         []string
-	topic         *fmtstr.EventFormatString
+	topic         outil.Selector
 	key           *fmtstr.EventFormatString
 	index         string
 	codec         codec.Codec
@@ -37,8 +39,6 @@ type Client struct {
 	wg            sync.WaitGroup
 
 	//observer outputs.Observer             TODO: what to do with observers?
-	//topic    outil.Selector               TODO: Work out how to do selectors in the new world.
-
 }
 
 type MsgRef struct {
@@ -49,17 +49,16 @@ type MsgRef struct {
 	// batch         publisher.Batch            //       and how to retry after a batch is complete.
 }
 
-//var (
-//	errNoTopicsSelected = errors.New("no topic could be selected")
-//)
+var (
+	errNoTopicsSelected = errors.New("no topic could be selected")
+)
 
 func newKafkaClient(
 	//observer outputs.Observer,
 	hosts []string,
 	index string,
 	key *fmtstr.EventFormatString,
-	topic *fmtstr.EventFormatString,
-	//topic    outil.Selector,
+	topic outil.Selector,
 	headers []Header,
 	writer codec.Codec, // TODO: Proper codec support
 	cfg *sarama.Config,
@@ -225,28 +224,21 @@ func (client *Client) getEventMessage(data *messages.Event) (*Message, error) {
 	//	}
 	//}
 
-	//TODO: Topic creation based on selectors
-	//if msg.topic == "" {
-	//	topic, err := client.topic.Select(data)
-	//
-	//	if err != nil {
-	//		return nil, fmt.Errorf("setting kafka topic failed with %v", err)
-	//	}
-	//	if topic == "" {
-	//		return nil, errNoTopicsSelected
-	//	}
-	//	msg.topic = topic
-	//	//if _, err := data.Cache.Put("topic", topic); err != nil {
-	//	//	return nil, fmt.Errorf("setting kafka topic in publisher event failed: %v", err)
-	//	//}
-	//}
-
 	beatsEvent := beatsEventForProto(data)
+	if msg.topic == "" {
+		topic, err := client.topic.Select(beatsEvent)
 
-	if client.topic != nil {
-		if topic, err := client.topic.Run(beatsEvent); err == nil {
-			msg.topic = topic
+		if err != nil {
+			return nil, fmt.Errorf("setting kafka topic failed with %w", err)
 		}
+
+		if topic == "" {
+			return nil, errNoTopicsSelected
+		}
+		msg.topic = topic
+		//if _, err := data.Cache.Put("topic", topic); err != nil {
+		//	return nil, fmt.Errorf("setting kafka topic in publisher event failed: %v", err)
+		//}
 	}
 
 	serializedEvent, err := client.codec.Encode(client.index, beatsEvent)
