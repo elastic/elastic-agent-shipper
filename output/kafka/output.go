@@ -76,7 +76,9 @@ func (out *KafkaOutput) Start() error {
 			// shipper to track events by their queue IDs so outputs
 			// can report status back to the server; see
 			// https://github.com/elastic/elastic-agent-shipper/issues/27.
-			batch.Done(remaining)
+			if remaining > 0 {
+				batch.Done(remaining)
+			}
 		}
 	}()
 	return nil
