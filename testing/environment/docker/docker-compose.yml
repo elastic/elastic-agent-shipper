@@ -1,0 +1,12 @@
+version: '2.3'
+services:
+  kafka:
+    build: /Users/robbavey/code/elastic-agent-shipper/testing/environment/docker/dockerfiles/kafka 
+    ports:
+      - 9092:9092
+      - 9093:9093
+      - 9094:9094
+      - 2181:2181
+    environment:
+      - ADVERTISED_HOST=kafka
+

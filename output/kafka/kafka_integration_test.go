@@ -212,7 +212,6 @@ ssl.certificate_authorities: ../../testing/environment/docker/dockerfiles/kafka/
 				"host": getTestSASLKafkaHost(),
 			}, id),
 		},
-
 	}
 
 	for i, test := range tests {
@@ -279,7 +278,6 @@ ssl.certificate_authorities: ../../testing/environment/docker/dockerfiles/kafka/
 	}
 }
 
-
 func getTestKafkaHost() string {
 	return fmt.Sprintf("%v:%v",
 		getenv("KAFKA_HOST", kafkaDefaultHost),
@@ -341,7 +339,6 @@ func findEvent(events []*messages.Event, msg interface{}) *messages.Event {
 	}
 	return nil
 }
-
 
 func createEvent(v map[string]interface{}, id string) []*messages.Event {
 	return createEvents(v, id, 1)
@@ -495,4 +492,3 @@ func (m *topicOffsetMap) SetOffset(topic string, partition int32, offset int64) 
 
 	m.m[topic][partition] = offset
 }
-
