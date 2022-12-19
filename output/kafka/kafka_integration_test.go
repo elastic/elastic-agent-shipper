@@ -14,6 +14,7 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
+// go:build integration
 
 package kafka
 
@@ -74,23 +75,6 @@ topic: %v
 			}, id),
 		},
 		{
-			"publish single event to test topic with ssl",
-			fmt.Sprintf(`
-hosts: %v
-username: beats
-password: KafkaTest
-topic: %v
-protocol: https
-sasl.mechanism: SCRAM-SHA-512
-ssl.verification_mode: certificate
-ssl.certificate_authorities: ../../testing/environment/docker/dockerfiles/kafka/certs/ca-cert
-`, getTestSASLKafkaHost(), topic),
-			topic,
-			createEvent(map[string]interface{}{
-				"host": getTestSASLKafkaHost(),
-			}, id),
-		},
-		{
 			"publish single event with topic from type",
 			fmt.Sprintf(`
 hosts: %v
@@ -116,8 +100,31 @@ codec.format.string: %v
 			}, id),
 		},
 		{
-			// warning: this test uses random keys. In case keys are reused, test might fail.
-			"batch publish with fields hash partitioner",
+			"publish batch of event to test topic",
+			fmt.Sprintf(`
+hosts: %v
+topic: %v
+`, getTestKafkaHost(), topic),
+			topic,
+			createEvents(map[string]interface{}{
+				"host": "localhost",
+			}, id, 10),
+		},
+		{
+			"publish batch of events with topic from type",
+			fmt.Sprintf(`
+hosts: %v
+timeout: "1s"
+topic: %v
+`, getTestKafkaHost(), `"%{[type]}"`),
+			topic,
+			createEvents(map[string]interface{}{
+				"host": getTestKafkaHost(),
+				"type": topic,
+			}, id, 10),
+		},
+		{
+			"batch publish with headers",
 			fmt.Sprintf(`
 hosts: %v
 topic: %v
@@ -126,6 +133,32 @@ headers:
     value: "some value"
   - key: "another-key"
     value: "another value"
+`, getTestKafkaHost(), topic),
+			topic,
+			createEvents(map[string]interface{}{
+				"host": getTestKafkaHost(),
+				"type": "log",
+			}, id, 5),
+		},
+		{
+			"batch publish with random partitioner",
+			fmt.Sprintf(`
+hosts: %v
+topic: %v
+partition.random:
+  group_events: 1
+`, getTestKafkaHost(), topic),
+			topic,
+			createEvents(map[string]interface{}{
+				"host": getTestKafkaHost(),
+				"type": "log",
+			}, id, 5),
+		},
+		{
+			"batch publish with fields hash partitioner",
+			fmt.Sprintf(`
+hosts: %v
+topic: %v
 partition.hash.hash: ["@timestamp", "type", "message"]
 `, getTestKafkaHost(), topic),
 			topic,
@@ -134,6 +167,52 @@ partition.hash.hash: ["@timestamp", "type", "message"]
 				"type": "log",
 			}, id, 5),
 		},
+		{
+			"batch publish with hash partitioner with key",
+			fmt.Sprintf(`
+hosts: %v
+topic: %v
+key: %v
+partition.hash:
+`, getTestKafkaHost(), topic, `"%{[message]}"`),
+			topic,
+			createEvents(map[string]interface{}{
+				"host": getTestKafkaHost(),
+				"type": "log",
+			}, id, 5),
+		},
+		{
+			"batch publish with hash partitioner without key (fallback to random)",
+			fmt.Sprintf(`
+hosts: %v
+topic: %v
+partition.hash:
+`, getTestKafkaHost(), topic),
+			topic,
+			createEvents(map[string]interface{}{
+				"host": getTestKafkaHost(),
+				"type": "log",
+			}, id, 5),
+		},
+
+		{
+			"publish single event to test topic with ssl",
+			fmt.Sprintf(`
+hosts: %v
+username: beats
+password: KafkaTest
+topic: %v
+protocol: https
+sasl.mechanism: SCRAM-SHA-512
+ssl.verification_mode: certificate
+ssl.certificate_authorities: ../../testing/environment/docker/dockerfiles/kafka/certs/ca-cert
+`, getTestSASLKafkaHost(), topic),
+			topic,
+			createEvent(map[string]interface{}{
+				"host": getTestSASLKafkaHost(),
+			}, id),
+		},
+
 	}
 
 	for i, test := range tests {
@@ -193,12 +272,26 @@ partition.hash.hash: ["@timestamp", "type", "message"]
 					}
 				}
 				msg := validate(t, s.Value, expected)
-				fmt.Println(msg)
 				seenMsgs[msg] = struct{}{}
 			}
 			assert.Equal(t, len(expected), len(seenMsgs))
 		})
 	}
+}
+
+
+func getTestKafkaHost() string {
+	return fmt.Sprintf("%v:%v",
+		getenv("KAFKA_HOST", kafkaDefaultHost),
+		getenv("KAFKA_PORT", kafkaDefaultPort),
+	)
+}
+
+func getTestSASLKafkaHost() string {
+	return fmt.Sprintf("%v:%v",
+		getenv("KAFKA_HOST", kafkaDefaultHost),
+		getenv("KAFKA_SASL_PORT", kafkaDefaultSASLPort),
+	)
 }
 
 func validateJSON(t *testing.T, value []byte, events []*messages.Event) string {
@@ -230,13 +323,11 @@ func makeValidateFmtStr(fmtStr string) func(*testing.T, []byte, []*messages.Even
 			t.Errorf("could not find expected event with message: %v", msg)
 			return ""
 		}
-
 		beatsEvent := beatsEventForProto(event)
 		_, err := fmtString.Run(beatsEvent)
 		if err != nil {
 			t.Fatal(err)
 		}
-
 		return msg
 	}
 }
@@ -251,80 +342,37 @@ func findEvent(events []*messages.Event, msg interface{}) *messages.Event {
 	return nil
 }
 
-func strDefault(a, defaults string) string {
-	if len(a) == 0 {
-		return defaults
-	}
-	return a
+
+func createEvent(v map[string]interface{}, id string) []*messages.Event {
+	return createEvents(v, id, 1)
 }
 
-func getenv(name, defaultValue string) string {
-	return strDefault(os.Getenv(name), defaultValue)
-}
+func createEvents(v map[string]interface{}, id string, count int) []*messages.Event {
+	events := make([]*messages.Event, count)
+	for i := 0; i < count; i++ {
+		v["message"] = fmt.Sprintf("%v:%v", id, i)
+		fields, err := helpers.NewStruct(v)
+		if err != nil {
+			return nil
+		}
 
-func getTestKafkaHost() string {
-	return fmt.Sprintf("%v:%v",
-		getenv("KAFKA_HOST", kafkaDefaultHost),
-		getenv("KAFKA_PORT", kafkaDefaultPort),
-	)
-}
-
-func getTestSASLKafkaHost() string {
-	return fmt.Sprintf("%v:%v",
-		getenv("KAFKA_HOST", kafkaDefaultHost),
-		getenv("KAFKA_SASL_PORT", kafkaDefaultSASLPort),
-	)
-}
-
-func newTestConsumer(t *testing.T) sarama.Consumer {
-	hosts := []string{getTestKafkaHost()}
-	consumer, err := sarama.NewConsumer(hosts, nil)
-	if err != nil {
-		t.Fatal(err)
+		e := &messages.Event{
+			Timestamp: timestamppb.Now(),
+			Source: &messages.Source{
+				InputId:  "input",
+				StreamId: "stream",
+			},
+			DataStream: &messages.DataStream{
+				Type:      "log",
+				Dataset:   "default",
+				Namespace: "default",
+			},
+			Metadata: fields,
+			Fields:   fields,
+		}
+		events[i] = e
 	}
-	return consumer
-}
-
-// topicOffsetMap is threadsafe map from topic => partition => offset
-type topicOffsetMap struct {
-	m  map[string]map[int32]int64
-	mu sync.RWMutex
-}
-
-func (m *topicOffsetMap) GetOffset(topic string, partition int32) int64 {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if m.m == nil {
-		return sarama.OffsetOldest
-	}
-
-	topicMap, ok := m.m[topic]
-	if !ok {
-		return sarama.OffsetOldest
-	}
-
-	offset, ok := topicMap[partition]
-	if !ok {
-		return sarama.OffsetOldest
-	}
-
-	return offset
-}
-
-func (m *topicOffsetMap) SetOffset(topic string, partition int32, offset int64) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if m.m == nil {
-		m.m = map[string]map[int32]int64{}
-	}
-
-	if _, ok := m.m[topic]; !ok {
-		m.m[topic] = map[int32]int64{}
-	}
-
-	m.m[topic][partition] = offset
+	return events
 }
 
 var testTopicOffsets = topicOffsetMap{}
@@ -386,54 +434,65 @@ func testReadFromKafkaTopic(
 	return messages
 }
 
-func randString(length int) string {
-	return string(randASCIIBytes(length))
-}
-
-func randASCIIBytes(length int) []byte {
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = randChar()
+func strDefault(a, defaults string) string {
+	if len(a) == 0 {
+		return defaults
 	}
-	return b
+	return a
 }
 
-func randChar() byte {
-	start, end := 'a', 'z'
-	if rand.Int31n(2) == 1 {
-		start, end = 'A', 'Z'
+func getenv(name, defaultValue string) string {
+	return strDefault(os.Getenv(name), defaultValue)
+}
+
+func newTestConsumer(t *testing.T) sarama.Consumer {
+	hosts := []string{getTestKafkaHost()}
+	consumer, err := sarama.NewConsumer(hosts, nil)
+	if err != nil {
+		t.Fatal(err)
 	}
-	return byte(rand.Int31n(end-start+1) + start)
+	return consumer
 }
 
-func createEvent(v map[string]interface{}, id string) []*messages.Event {
-	return createEvents(v, id, 1)
+// topicOffsetMap is threadsafe map from topic => partition => offset
+type topicOffsetMap struct {
+	m  map[string]map[int32]int64
+	mu sync.RWMutex
 }
 
-func createEvents(v map[string]interface{}, id string, count int) []*messages.Event {
-	events := make([]*messages.Event, count)
-	for i := 0; i < count; i++ {
-		v["message"] = fmt.Sprintf("%v:%v", id, i)
-		fields, err := helpers.NewStruct(v)
-		if err != nil {
-			return nil
-		}
+func (m *topicOffsetMap) GetOffset(topic string, partition int32) int64 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 
-		e := &messages.Event{
-			Timestamp: timestamppb.Now(),
-			Source: &messages.Source{
-				InputId:  "input",
-				StreamId: "stream",
-			},
-			DataStream: &messages.DataStream{
-				Type:      "log",
-				Dataset:   "default",
-				Namespace: "default",
-			},
-			Metadata: fields,
-			Fields:   fields,
-		}
-		events[i] = e
+	if m.m == nil {
+		return sarama.OffsetOldest
 	}
-	return events
+
+	topicMap, ok := m.m[topic]
+	if !ok {
+		return sarama.OffsetOldest
+	}
+
+	offset, ok := topicMap[partition]
+	if !ok {
+		return sarama.OffsetOldest
+	}
+
+	return offset
 }
+
+func (m *topicOffsetMap) SetOffset(topic string, partition int32, offset int64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.m == nil {
+		m.m = map[string]map[int32]int64{}
+	}
+
+	if _, ok := m.m[topic]; !ok {
+		m.m[topic] = map[int32]int64{}
+	}
+
+	m.m[topic][partition] = offset
+}
+
