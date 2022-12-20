@@ -1,0 +1,40 @@
+version: '2.3'
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.6.0-SNAPSHOT
+    healthcheck:
+      test: ["CMD", "curl", "-u", "admin:testing", "-f", "https://localhost:9200", "--insecure"]
+      retries: 1200
+      interval: 5s
+      start_period: 60s
+    environment:
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "transport.host=127.0.0.1"
+      - "http.host=0.0.0.0"
+      - "xpack.security.enabled=true"
+      - "indices.id_field_data.enabled=true"
+      - "xpack.license.self_generated.type=trial"
+      - "xpack.security.http.ssl.enabled=true"
+      - "xpack.security.http.ssl.key=/usr/share/elasticsearch/config/pki/elasticsearchssl/elasticsearchssl.key"
+      - "xpack.security.http.ssl.certificate=/usr/share/elasticsearch/config/pki/elasticsearchssl/elasticsearchssl.crt"
+      - "xpack.security.http.ssl.certificate_authorities=/usr/share/elasticsearch/config/pki/ca/ca.crt"
+      # Do no used indices as the storage for credentials, using file based allow Elasticsearch
+      # to be online and green much quicker.
+      - "xpack.security.authc.realms.file.file1.order=0"
+    volumes:
+      - ./pki:/usr/share/elasticsearch/config/pki:ro
+      - ./roles.yml:/usr/share/elasticsearch/config/roles.yml
+      - ./users:/usr/share/elasticsearch/config/users
+      - ./users_roles:/usr/share/elasticsearch/config/users_roles
+    ports:
+      - 9200:9200
+
+  es_healthy:
+    image: busybox
+    depends_on:
+      elasticsearch:               { condition: service_healthy }
+    healthcheck:
+      interval: 1s
+      retries: 1200
+
+
