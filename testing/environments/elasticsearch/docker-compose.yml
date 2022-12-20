@@ -1,7 +1,7 @@
 version: '2.3'
 services:
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.6.0-SNAPSHOT
+    image: "${ELASTICSEARCH_IMAGE_REF}"
     healthcheck:
       test: ["CMD", "curl", "-u", "admin:testing", "-f", "https://localhost:9200", "--insecure"]
       retries: 1200
