@@ -192,7 +192,7 @@ topic: %v
 protocol: https
 sasl.mechanism: SCRAM-SHA-512
 ssl.verification_mode: certificate
-ssl.certificate_authorities: ../../testing/environment/docker/dockerfiles/kafka/certs/ca-cert
+ssl.certificate_authorities: ../../testing/environments/kafka/dockerfiles/certs/ca-cert
 `, getTestSASLKafkaHost(), topic),
 			topic,
 			createEvent(map[string]interface{}{
