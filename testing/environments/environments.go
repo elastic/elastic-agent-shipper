@@ -9,8 +9,9 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/elastic/elastic-agent-shipper/tools"
 	"github.com/magefile/mage/mg"
+
+	"github.com/elastic/elastic-agent-shipper/tools"
 )
 
 type testImage struct {
