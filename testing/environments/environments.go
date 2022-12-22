@@ -33,6 +33,8 @@ var (
 	}
 )
 
+// DefaultElasticsearch returns a configuration for an Elasticsearch server
+// with default settings listening on port 9200.
 func DefaultElasticsearch() TestImageConfig {
 	basePath := "docker.elastic.co/elasticsearch/elasticsearch"
 	version := tools.DefaultBeatVersion + "-SNAPSHOT"
@@ -44,16 +46,20 @@ func DefaultElasticsearch() TestImageConfig {
 	}
 }
 
+// DefaultKafka returns a configuration for a Kafka server with default
+// settings listening on port 9092.
 func DefaultKafka() TestImageConfig {
 	return testImageConfig{image: kafkaImage}
 }
 
+// Up calls docker-compose up on the given container configurations and returns the result.
 func Up(configs []TestImageConfig) error {
 	cmd := dockerComposeCommand([]string{"up", "-d"}, configs)
 
 	return cmd.Run()
 }
 
+// Down calls docker-compose down on the given container configurations and returns the result.
 func Down(configs []TestImageConfig) error {
 	cmd := dockerComposeCommand([]string{"down"}, configs)
 
@@ -78,9 +84,10 @@ func dockerComposeCommand(args []string, configs []TestImageConfig) *exec.Cmd {
 	return cmd
 }
 
-// This interface wrapper is to make the internal representation of the
+// TestImageConfig is a wrapper to make the internal representation of the
 // test images and configuration opaque to callers, since we will probably
-// want to change them as we expand to cover more environments.
+// want to change them as we expand to cover more environments / support
+// more features.
 type TestImageConfig interface {
 	im() testImage          // The docker image
 	env() map[string]string // Environment variables for docker-compose
