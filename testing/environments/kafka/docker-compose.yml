@@ -1,0 +1,12 @@
+version: '2.3'
+services:
+  kafka:
+    build: ./dockerfiles
+    ports:
+      - 9092:9092
+      - 9093:9093
+      - 9094:9094
+      - 2181:2181
+    environment:
+      - ADVERTISED_HOST=kafka
+

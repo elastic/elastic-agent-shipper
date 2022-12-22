@@ -223,7 +223,6 @@ func (client *Client) getEventMessage(data *messages.Event) (*Message, error) {
 	//		msg.topic = topic
 	//	}
 	//}
-
 	beatsEvent := beatsEventForProto(data)
 	if msg.topic == "" {
 		topic, err := client.topic.Select(beatsEvent)
