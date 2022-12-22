@@ -57,11 +57,12 @@ func DefaultKafka() TestImageConfig {
 	return testImageConfig{image: kafkaImage}
 }
 
-// Up calls docker-compose up on the given container configurations and returns the result.
-func Up(configs []TestImageConfig) error {
+// Up calls docker-compose up on the given container configurations and returns the
+// resulting standard output and its result.
+func Up(configs []TestImageConfig) ([]byte, error) {
 	cmd := dockerComposeCommand([]string{"up", "-d"}, configs)
 
-	return cmd.Run()
+	return cmd.Output()
 }
 
 // Down calls docker-compose down on the given container configurations and returns the result.
