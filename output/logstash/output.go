@@ -32,7 +32,7 @@ func NewLogstash(config *Config, queue *queue.Queue) *LogstashOutput {
 func (ls *LogstashOutput) Start() error {
 	client, err := NewLogstashClient(ls.config, ls.logger)
 	if err != nil {
-		return fmt.Errorf("Error creating logstash client: %w", err)
+		return fmt.Errorf("error creating logstash client: %w", err)
 	}
 	ls.client = client
 	ls.wg.Add(1)

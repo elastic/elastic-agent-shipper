@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/elastic/elastic-agent-libs/logp"
+
 	"github.com/stretchr/testify/assert"
 )
 

@@ -42,9 +42,9 @@ func NewLogstashClient(config *Config, logger *logp.Logger) (*LogstashClient, er
 }
 
 func (lc *LogstashClient) Publish(events []*messages.Event) (uint64, error) {
-	ls_events := make([]interface{}, len(events))
+	lsEvents := make([]interface{}, len(events))
 	for i := range events {
-		ls_events[i] = events[i]
+		lsEvents[i] = events[i]
 	}
 	for i, j := 0, lc.current; i < len(lc.hosts); i, j = i+1, (j+1)%len(lc.hosts) {
 		lc.current = j
@@ -71,8 +71,8 @@ func (lc *LogstashClient) Publish(events []*messages.Event) (uint64, error) {
 				continue
 			}
 		}
-		lc.logger.Debugf("sending %d events to %s", len(ls_events), sc.conn.Host())
-		n, err := sc.client.Send(ls_events)
+		lc.logger.Debugf("sending %d events to %s", len(lsEvents), sc.conn.Host())
+		n, err := sc.client.Send(lsEvents)
 		if err != nil {
 			lc.logger.Errorf("error sending to %s: %s", sc.conn.Host(), err)
 			continue
