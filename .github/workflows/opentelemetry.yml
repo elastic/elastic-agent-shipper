@@ -4,9 +4,7 @@ name: golangci-lint
 on:
   workflow_run:
     workflows:
-      - test
-      - test-reporter
-      - release
+      - golangci-lint
     types: [completed]
 
 jobs:
