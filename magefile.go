@@ -333,7 +333,7 @@ func (Package) Artifacts() {
 		// prepare package
 		var err error
 		var archiveFileName string
-		targetDir := fmt.Sprintf("%s-%s", devtools.ProjectName, platform)
+		targetDir := fmt.Sprintf("%s-%s-%s", devtools.ProjectName, version, platform)
 		if isWindows {
 			archiveFileName = fmt.Sprintf("%s-%s-%s.zip", devtools.ProjectName, version, platform)
 			err = prepareZipArchive(
