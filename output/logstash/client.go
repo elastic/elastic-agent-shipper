@@ -57,10 +57,6 @@ func (lc *LogstashClient) Publish(events []*messages.Event) (uint64, error) {
 					lc.logger.Errorf("error reconnecting to logstash host: %w", err)
 					continue
 				}
-				// reset window size on reconnect
-				//                                if c.win != nil {
-				//      c.win.windowSize = int32(defaultStartMaxWindowSize)
-				//                                }
 			default:
 			}
 		}

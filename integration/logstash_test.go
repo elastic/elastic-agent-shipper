@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type LogstashEventStats struct {
+type logstashEventStats struct {
 	Events struct {
 		In  int
 		Out int
@@ -264,8 +264,8 @@ output:
 	require.Equalf(t, postStats.Events.Out, preStats.Events.Out+1, "post.out was %d, pre.out was %d", postStats.Events.Out, preStats.Events.Out)
 }
 
-func getEventStats() (LogstashEventStats, error) {
-	events := LogstashEventStats{}
+func getEventStats() (logstashEventStats, error) {
+	events := logstashEventStats{}
 	res, err := http.Get("http://localhost:9600/_node/stats/events")
 	if err != nil {
 		return events, fmt.Errorf("error getting logstash event stats: %w", err)
