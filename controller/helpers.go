@@ -7,9 +7,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	cfglib "github.com/elastic/elastic-agent-libs/config"
@@ -30,33 +27,6 @@ func reportErrors(ctx context.Context, agentClient client.V2) {
 			log.Errorf("Got error from controller: %s", err)
 		}
 	}
-}
-
-// handle shutdown of the shipper
-func handleShutdown(shutdownFunc func(), externalSignal doneChan) {
-	log := logp.L()
-
-	// On termination signals, gracefully stop the shipper
-	sigc := make(chan os.Signal, 1)
-	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
-
-	go func() {
-		select {
-		case <-externalSignal:
-			log.Debugf("Shutting down from agent controller")
-			shutdownFunc()
-			return
-		case sig := <-sigc:
-			switch sig {
-			case syscall.SIGINT, syscall.SIGTERM:
-				log.Debug("Received sigterm/sigint, stopping")
-			case syscall.SIGHUP:
-				log.Debug("Received sighup, stopping")
-			}
-			shutdownFunc()
-			return
-		}
-	}()
 }
 
 // initialize the global logging variables

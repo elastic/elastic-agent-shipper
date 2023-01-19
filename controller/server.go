@@ -8,6 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -51,8 +54,7 @@ type ServerRunner struct {
 }
 
 // NewOutputServer initializes the shipper queue and output based on the config received
-// This does not include the queue, as we get the queue config from the shipper inputs
-func NewOutputServer(cfg config.ShipperRootConfig) (r *ServerRunner, err error) {
+func NewOutputServer(cfg config.ShipperRootConfig, grpcTLS credentials.TransportCredentials) (r *ServerRunner, err error) {
 	r = &ServerRunner{
 		log: logp.L(),
 		cfg: cfg,
@@ -92,21 +94,14 @@ func NewOutputServer(cfg config.ShipperRootConfig) (r *ServerRunner, err error) 
 	}()
 
 	r.log.Debug("initializing the gRPC server...")
-	var opts []grpc.ServerOption
-	if cfg.Shipper.Server.TLS {
-		creds, err := credentials.NewServerTLSFromFile(cfg.Shipper.Server.Cert, cfg.Shipper.Server.Key)
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate credentials %w", err)
-		}
-		opts = []grpc.ServerOption{grpc.Creds(creds)}
-	}
+	opts := []grpc.ServerOption{grpc.Creds(grpcTLS)}
 	r.server = grpc.NewServer(opts...)
-	r.shipper, err = server.NewShipperServer(cfg.Shipper.Server, r.queue)
+	r.shipper, err = server.NewShipperServer(cfg.Shipper.StrictMode, r.queue)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialise the server: %w", err)
 	}
 	pb.RegisterProducerServer(r.server, r.shipper)
-	r.log.Debug("gRPC server initialized.")
+	r.log.Debugf("gRPC server initialized.")
 
 	return r, nil
 }
@@ -120,11 +115,20 @@ func (r *ServerRunner) Start() (err error) {
 		return fmt.Errorf("failed to start a server runner that was previously closed")
 	}
 
-	addr := fmt.Sprintf("localhost:%d", r.cfg.Shipper.Server.Port)
-	lis, err := net.Listen("tcp", addr)
+	listenSocket := strings.TrimPrefix(r.cfg.Shipper.Server.Server, "unix://")
+	// paranoid checking, make sure we have the base directory.
+	dir := filepath.Dir(listenSocket)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		err = os.MkdirAll(dir, 0755)
+		if err != nil {
+			return fmt.Errorf("could not create directory for unix socket %s: %w", dir, err)
+		}
+	}
+
+	lis, err := net.Listen("unix", listenSocket)
 	if err != nil {
 		r.startMutex.Unlock()
-		return fmt.Errorf("failed to listen on %s: %w", addr, err)
+		return fmt.Errorf("failed to listen on %s: %w", listenSocket, err)
 	}
 
 	var wg errgroup.Group
@@ -136,16 +140,16 @@ func (r *ServerRunner) Start() (err error) {
 	// Otherwise if `Close` is called at the same time as `Start` it causes race condition.
 	wg.Go(func() error {
 		defer r.startMutex.Unlock()
-		con, err := net.Dial("tcp", addr)
+		con, err := net.Dial("unix", listenSocket)
 		if err != nil {
-			err = fmt.Errorf("failed to test connection with the gRPC server on %s: %w", addr, err)
+			err = fmt.Errorf("failed to test connection with the gRPC server on %s: %w", listenSocket, err)
 			r.log.Error(err)
 			// this will stop the other go routine in the wait group
 			r.server.Stop()
 			return err
 		}
 		_ = con.Close()
-		r.log.Debugf("gRPC server is ready and is listening on %s", addr)
+		r.log.Debugf("gRPC server is ready and is listening on %s", listenSocket)
 		return nil
 	})
 

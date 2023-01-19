@@ -56,13 +56,13 @@ type shipperServer struct {
 	ctx   context.Context
 	stop  func()
 
-	cfg Config
+	strictMode bool
 
 	pb.UnimplementedProducerServer
 }
 
 // NewShipperServer creates a new server instance for handling gRPC endpoints.
-func NewShipperServer(cfg Config, publisher Publisher) (ShipperServer, error) {
+func NewShipperServer(strictMode bool, publisher Publisher) (ShipperServer, error) {
 	if publisher == nil {
 		return nil, errors.New("publisher cannot be nil")
 	}
@@ -73,11 +73,11 @@ func NewShipperServer(cfg Config, publisher Publisher) (ShipperServer, error) {
 	}
 
 	s := shipperServer{
-		uuid:      id.String(),
-		logger:    logp.NewLogger("shipper-server"),
-		publisher: publisher,
-		close:     &sync.Once{},
-		cfg:       cfg,
+		uuid:       id.String(),
+		logger:     logp.NewLogger("shipper-server"),
+		publisher:  publisher,
+		close:      &sync.Once{},
+		strictMode: strictMode,
 	}
 
 	s.ctx, s.stop = context.WithCancel(context.Background())
@@ -101,7 +101,7 @@ func (serv *shipperServer) PublishEvents(ctx context.Context, req *messages.Publ
 		return nil, status.Error(codes.InvalidArgument, "publish request must contain at least one event")
 	}
 
-	if serv.cfg.StrictMode {
+	if serv.strictMode {
 		for _, e := range req.Events {
 			err := serv.validateEvent(e)
 			if err != nil {

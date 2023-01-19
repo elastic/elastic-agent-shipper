@@ -21,28 +21,36 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client/mock"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent-libs/logp"
 )
 
 func TestAgentControl(t *testing.T) {
 	unitOneID := mock.NewID()
+	unitTwoID := mock.NewID()
 
 	token := mock.NewID()
 	var gotConfig, gotHealthy, gotStopped bool
 
 	var mut sync.Mutex
+	_ = logp.DevelopmentSetup()
 
+	doneWaiter := sync.WaitGroup{}
 	t.Logf("Creating mock server")
 	srv := mock.StubServerV2{
 		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
 			mut.Lock()
 			defer mut.Unlock()
 			if observed.Token == token {
-				if len(observed.Units) > 0 {
-					t.Logf("Current unit state is: %v", observed.Units[0].State)
+				if unitsAreFailed(observed.Units) {
+					t.Logf("Got failed unit")
+					t.FailNow()
 				}
-
+				if gotStopped {
+					doneWaiter.Done()
+				}
 				// initial checkin
 				if len(observed.Units) == 0 || observed.Units[0].State == proto.State_STARTING {
+					t.Logf("starting initial checkin")
 					gotConfig = true
 					return &proto.CheckinExpected{
 						Units: []*proto.UnitExpected{
@@ -50,23 +58,39 @@ func TestAgentControl(t *testing.T) {
 								Id:             unitOneID,
 								Type:           proto.UnitType_OUTPUT,
 								ConfigStateIdx: 1,
+								State:          proto.State_HEALTHY,
+								LogLevel:       proto.UnitLogLevel_DEBUG,
 								Config: &proto.UnitExpectedConfig{
 									Source: MustNewStruct(t, map[string]interface{}{
 										"logging": map[string]interface{}{
 											"level": "debug",
 										},
-										"output": map[string]interface{}{
-											"console": map[string]interface{}{
-												"enabled": "true",
-											},
-										},
+										"type":    "console",
+										"enabled": "true",
 									}),
 								},
-								State: proto.State_HEALTHY,
+							},
+							{
+								Id:             unitTwoID,
+								Type:           proto.UnitType_INPUT,
+								ConfigStateIdx: 1,
+								State:          proto.State_HEALTHY,
+								LogLevel:       proto.UnitLogLevel_DEBUG,
+								Config: &proto.UnitExpectedConfig{
+									Source: MustNewStruct(t, map[string]interface{}{
+										"logging": map[string]interface{}{
+											"level": "debug",
+										},
+										"server": fmt.Sprintf("/tmp/%s.sock", mock.NewID()),
+										//"tls":    config.ShipperTLS{},
+									},
+									),
+								},
 							},
 						},
 					}
-				} else if observed.Units[0].State == proto.State_HEALTHY {
+				} else if outputIsState(observed.Units, proto.State_HEALTHY) {
+					t.Logf("Got unit state healthy, sending STOPPED")
 					gotHealthy = true
 					//shutdown
 					return &proto.CheckinExpected{
@@ -74,16 +98,24 @@ func TestAgentControl(t *testing.T) {
 							{
 								Id:             unitOneID,
 								Type:           proto.UnitType_OUTPUT,
-								ConfigStateIdx: 1,
+								ConfigStateIdx: 2,
+								LogLevel:       proto.UnitLogLevel_DEBUG,
 								State:          proto.State_STOPPED,
+							},
+							{
+								Id:             unitTwoID,
+								Type:           proto.UnitType_INPUT,
+								ConfigStateIdx: 2,
+								State:          proto.State_STOPPED,
+								LogLevel:       proto.UnitLogLevel_DEBUG,
 							},
 						},
 					}
-				} else if observed.Units[0].State == proto.State_STOPPED {
+				} else if outputIsState(observed.Units, proto.State_STOPPED) {
 					gotStopped = true
-					// remove the unit? I think?
+					t.Logf("Got unit state STOPPED, removing")
 					return &proto.CheckinExpected{
-						Units: nil,
+						Units: []*proto.UnitExpected{},
 					}
 				}
 			}
@@ -99,6 +131,7 @@ func TestAgentControl(t *testing.T) {
 	} // end of srv declaration
 
 	require.NoError(t, srv.Start())
+	doneWaiter.Add(1)
 	defer srv.Stop()
 
 	t.Logf("creating client")
@@ -113,7 +146,11 @@ func TestAgentControl(t *testing.T) {
 
 	t.Logf("starting shipper controller")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
+	go func() {
+		doneWaiter.Wait()
+		cancel()
+	}()
+
 	err := runController(ctx, validClient)
 	assert.NoError(t, err)
 
@@ -122,10 +159,29 @@ func TestAgentControl(t *testing.T) {
 	assert.True(t, gotStopped, "stopped state")
 }
 
+func unitsAreFailed(units []*proto.UnitObserved) bool {
+	for _, unit := range units {
+		if unit.State == proto.State_FAILED {
+			return true
+		}
+	}
+	return false
+}
+
+func outputIsState(units []*proto.UnitObserved, state proto.State) bool {
+	for _, unit := range units {
+		if unit.Type == proto.UnitType_OUTPUT {
+			if unit.State != state {
+				return false
+			}
+		}
+		//t.Logf("unit %s has state %s", unit.Id, unit.State.String())
+	}
+	return true
+}
+
 func MustNewStruct(t *testing.T, contents map[string]interface{}) *structpb.Struct {
 	result, err := structpb.NewStruct(contents)
-	if err != nil {
-		t.Fatalf("failed to create test struct for contents [%v]: %v", contents, err)
-	}
+	require.NoError(t, err, "failed to create test struct for contents [%v]: %v", contents, err)
 	return result
 }
