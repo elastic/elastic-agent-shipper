@@ -5,12 +5,16 @@
 package elasticsearch
 
 import (
+	"crypto/tls"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/elastic/beats/v7/libbeat/common/transport/kerberos"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 // Config specifies all configurable parameters for the Elasticsearch output.
@@ -44,35 +48,31 @@ type Backoff struct {
 	Max  time.Duration
 }
 
-/*const (
-	defaultBulkSize = 50
-)*/
-
-/*var (
-	defaultConfig = Config{
-		Protocol:         "",
-		Path:             "",
-		Params:           nil,
-		Username:         "",
-		Password:         "",
-		APIKey:           "",
-		MaxRetries:       3,
-		CompressionLevel: 0,
-		EscapeHTML:       false,
-		Kerberos:         nil,
-		LoadBalance:      true,
-		Backoff: Backoff{
-			Init: 1 * time.Second,
-			Max:  60 * time.Second,
-		},
-		Transport: httpcommon.DefaultHTTPTransportSettings(),
-	}
-)*/
-
 func (c *Config) Validate() error {
 	if c.APIKey != "" && (c.Username != "" || c.Password != "") {
 		return fmt.Errorf("cannot set both api_key and username/password")
 	}
 
 	return nil
+}
+
+// esConfig converts the configuration for the elasticsearch shipper output
+// to the configuration for the go-elasticsearch client API.
+func (c Config) esConfig() elasticsearch.Config {
+	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12}
+	if c.Transport.TLS.VerificationMode == tlscommon.VerifyNone {
+		// Unlike Beats, the shipper doesn't support the ability to verify the
+		// certificate but not the hostname, so any setting except VerifyNone
+		// falls back on full verification.
+		tlsConfig.InsecureSkipVerify = true
+	}
+	cfg := elasticsearch.Config{
+		Addresses: c.Hosts,
+		Username:  c.Username,
+		Password:  c.Password,
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
+	}
+	return cfg
 }

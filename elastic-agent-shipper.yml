@@ -140,6 +140,7 @@ output:
     enabled: false
     hosts: ["localhost:9092", "localhost:9093"]
     topic: '%{[metricset][name]}'
-    partition.round_robin:
-      reachable_only: true
-    key: '%{[metricset][name]}'
+
+  logstash:
+    enabled: false
+    hosts: ["localhost:5044"]

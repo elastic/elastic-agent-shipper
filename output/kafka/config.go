@@ -37,7 +37,8 @@ type Header struct {
 
 type Config struct {
 	Enabled            bool                      `config:"enabled"`
-	Topic              *fmtstr.EventFormatString `config:"topic"`
+	Topic              string                    `config:"topic"`
+	Topics             []map[string]interface{}  `config:"topics"`
 	Hosts              []string                  `config:"hosts"`
 	TLS                *tlscommon.Config         `config:"ssl"`
 	Kerberos           *kerberos.Config          `config:"kerberos"`
@@ -55,7 +56,7 @@ type Config struct {
 	BulkMaxSize        int                       `config:"bulk_max_size"`
 	BulkFlushFrequency time.Duration             `config:"bulk_flush_frequency"`
 	MaxRetries         int                       `config:"max_retries"         validate:"min=-1,nonzero"`
-	Headers            []Header                  `config:"Headers"`
+	Headers            []Header                  `config:"headers"`
 	Backoff            BackoffConfig             `config:"backoff"`
 	ClientID           string                    `config:"client_id"`
 	ChanBufferSize     int                       `config:"channel_buffer_size" validate:"min=1"`
@@ -137,8 +138,8 @@ func (client *Config) Validate() error {
 			return errors.New("missing required field 'hosts'")
 		}
 
-		if client.Topic == nil {
-			return errors.New("missing required field 'topic'")
+		if client.Topic == "" && client.Topics == nil {
+			return errors.New("setting 'topic' and/or 'topics' is required")
 		}
 
 		if _, ok := compressionModes[strings.ToLower(client.Compression)]; !ok {

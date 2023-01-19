@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent-shipper/output"
 	"github.com/elastic/elastic-agent-shipper/output/elasticsearch"
 	"github.com/elastic/elastic-agent-shipper/output/kafka"
+	"github.com/elastic/elastic-agent-shipper/output/logstash"
 	"github.com/elastic/elastic-agent-shipper/queue"
 	"github.com/elastic/elastic-agent-shipper/server"
 
@@ -210,7 +211,7 @@ func (r *ServerRunner) Close() (err error) {
 }
 
 func outputFromConfig(config output.Config, queue *queue.Queue) (Output, error) {
-	if config.Elasticsearch != nil {
+	if config.Elasticsearch != nil && config.Elasticsearch.Enabled {
 		return elasticsearch.NewElasticSearch(config.Elasticsearch, queue), nil
 	}
 	if config.Kafka != nil && config.Kafka.Enabled {
@@ -218,6 +219,9 @@ func outputFromConfig(config output.Config, queue *queue.Queue) (Output, error) 
 	}
 	if config.Console != nil && config.Console.Enabled {
 		return output.NewConsole(queue), nil
+	}
+	if config.Logstash != nil && config.Logstash.Enabled {
+		return logstash.NewLogstash(config.Logstash, queue), nil
 	}
 	return nil, errors.New("no active output configuration")
 }
