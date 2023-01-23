@@ -9,7 +9,6 @@ import (
 	"context"
 	"encoding/json"
 	"sync"
-	"time"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
@@ -55,9 +54,9 @@ func (es *ElasticSearchOutput) Start() error {
 	bi, err := esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
 		Index:         "elastic-agent-shipper-test",
 		Client:        client,
-		NumWorkers:    1,
-		FlushBytes:    1e+8, // 20MB
-		FlushInterval: 30 * time.Second,
+		NumWorkers:    es.config.NumWorkers,
+		FlushBytes:    es.config.BatchSize,
+		FlushInterval: es.config.FlushTimeout,
 	})
 	if err != nil {
 		return err

@@ -6,12 +6,9 @@ package elasticsearch
 
 import (
 	"crypto/tls"
-	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/elastic/beats/v7/libbeat/common/transport/kerberos"
-	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/go-elasticsearch/v8"
@@ -21,26 +18,36 @@ import (
 // Currently these are identical to the parameters in the Beats Elasticsearch
 // output, however this is subject to change as we approach official release.
 type Config struct {
-	Enabled            bool              `config:"enabled"`
-	Hosts              []string          `config:"hosts"`
-	Protocol           string            `config:"protocol"`
-	Path               string            `config:"path"`
-	Params             map[string]string `config:"parameters"`
-	Headers            map[string]string `config:"headers"`
-	Username           string            `config:"username"`
-	Password           string            `config:"password"`
-	APIKey             string            `config:"api_key"`
-	LoadBalance        bool              `config:"loadbalance"`
-	CompressionLevel   int               `config:"compression_level" validate:"min=0, max=9"`
-	EscapeHTML         bool              `config:"escape_html"`
-	Kerberos           *kerberos.Config  `config:"kerberos"`
-	BulkMaxSize        int               `config:"bulk_max_size"`
-	MaxRetries         int               `config:"max_retries"`
-	Backoff            Backoff           `config:"backoff"`
-	NonIndexablePolicy *config.Namespace `config:"non_indexable_policy"`
-	AllowOlderVersion  bool              `config:"allow_older_versions"`
+	Enabled  bool     `config:"enabled"`
+	Hosts    []string `config:"hosts"`
+	Username string   `config:"username"`
+	Password string   `config:"password"`
+
+	Backoff    Backoff `config:"backoff"`
+	MaxRetries int     `config:"max_retries"`
 
 	Transport httpcommon.HTTPTransportSettings `config:",inline"`
+
+	// The following configuration flags are copied from the equivalent Beats
+	// configuration, but are commented out because they are not yet active/implemented:
+	//Protocol           string            `config:"protocol"`
+	//Path               string            `config:"path"`
+	//Params             map[string]string `config:"parameters"`
+	//Headers            map[string]string `config:"headers"`
+	//APIKey             string            `config:"api_key"`
+	//LoadBalance        bool              `config:"loadbalance"`
+	//CompressionLevel   int               `config:"compression_level" validate:"min=0, max=9"`
+	//EscapeHTML         bool              `config:"escape_html"`
+	//Kerberos           *kerberos.Config  `config:"kerberos"`
+	//NonIndexablePolicy *config.Namespace `config:"non_indexable_policy"`
+	//AllowOlderVersion  bool              `config:"allow_older_versions"`
+
+	// The following parameters have no equivalent in the go-elasticsearch
+	// config, and need to be specified directly when the indexer is created
+	// instead of being returned in esConfig().
+	NumWorkers   int           `config:"num_workers"`
+	BatchSize    int           `config:"batch_size"`
+	FlushTimeout time.Duration `config:"flush_timeout"`
 }
 
 type Backoff struct {
@@ -48,10 +55,21 @@ type Backoff struct {
 	Max  time.Duration
 }
 
-func (c *Config) Validate() error {
-	if c.APIKey != "" && (c.Username != "" || c.Password != "") {
-		return fmt.Errorf("cannot set both api_key and username/password")
+func (b Backoff) delayTime(attempt int) time.Duration {
+	result := b.Init
+	for i := 0; i < attempt; i++ {
+		result *= 2
+		if result >= b.Max {
+			return b.Max
+		}
 	}
+	return result
+}
+
+func (c *Config) Validate() error {
+	/*if c.APIKey != "" && (c.Username != "" || c.Password != "") {
+		return fmt.Errorf("cannot set both api_key and username/password")
+	}*/
 
 	return nil
 }
@@ -67,9 +85,11 @@ func (c Config) esConfig() elasticsearch.Config {
 		tlsConfig.InsecureSkipVerify = true
 	}
 	cfg := elasticsearch.Config{
-		Addresses: c.Hosts,
-		Username:  c.Username,
-		Password:  c.Password,
+		Addresses:    c.Hosts,
+		Username:     c.Username,
+		Password:     c.Password,
+		RetryBackoff: c.Backoff.delayTime,
+		MaxRetries:   c.MaxRetries,
 		Transport: &http.Transport{
 			TLSClientConfig: tlsConfig,
 		},
