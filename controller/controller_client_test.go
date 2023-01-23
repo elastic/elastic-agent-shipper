@@ -101,6 +101,7 @@ func TestAgentControl(t *testing.T) {
 								ConfigStateIdx: 2,
 								LogLevel:       proto.UnitLogLevel_DEBUG,
 								State:          proto.State_STOPPED,
+								Config:         &proto.UnitExpectedConfig{},
 							},
 							{
 								Id:             unitTwoID,
@@ -108,6 +109,7 @@ func TestAgentControl(t *testing.T) {
 								ConfigStateIdx: 2,
 								State:          proto.State_STOPPED,
 								LogLevel:       proto.UnitLogLevel_DEBUG,
+								Config:         &proto.UnitExpectedConfig{},
 							},
 						},
 					}
