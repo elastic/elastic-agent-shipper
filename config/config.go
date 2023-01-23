@@ -8,13 +8,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/mapstr"
 
 	"github.com/elastic/elastic-agent-shipper/monitoring"
 	"github.com/elastic/elastic-agent-shipper/output"
@@ -92,7 +91,7 @@ func ReadConfigFromFile() (ShipperRootConfig, error) {
 	if configFilePath == "" {
 		return ShipperRootConfig{}, ErrConfigIsNotSet
 	}
-	contents, err := ioutil.ReadFile(configFilePath)
+	contents, err := os.ReadFile(configFilePath)
 	if err != nil {
 		return ShipperRootConfig{}, fmt.Errorf("error reading input file %s: %w", configFilePath, err)
 	}
@@ -126,10 +125,6 @@ func ShipperConfigFromUnitConfig(level client.UnitLogLevel, rawConfig *proto.Uni
 	if err != nil {
 		return ShipperRootConfig{}, fmt.Errorf("error reading in raw map config: %w", err)
 	}
-
-	dbgMap := mapstr.M{}
-	cfg.Unpack(&dbgMap)
-	logp.L().Debugf("Got shipper output config: %s", dbgMap.StringToPrint())
 
 	// We should merge config overwrites here from the -E flag,
 	// but they seem to step on the elasticsearch config,

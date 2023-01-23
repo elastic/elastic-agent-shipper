@@ -13,10 +13,11 @@ import (
 	"syscall"
 	"time"
 
+	"google.golang.org/grpc/credentials"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper/config"
-	"google.golang.org/grpc/credentials"
 )
 
 // LoadAndRun loads the config object and runs the gRPC server

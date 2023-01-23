@@ -60,18 +60,18 @@ func (c *clientHandler) BounceShipper() {
 			}
 		} else if state == client.UnitStateStopped { // shut down
 			c.log.Debugf("Stopping shipper")
-			outUnit.UpdateState(client.UnitStateStopped, "shipper is shutting down", nil)
+			_ = outUnit.UpdateState(client.UnitStateStopped, "shipper is shutting down", nil)
 			c.stopShipper(outUnit)
-			outUnit.UpdateState(client.UnitStateStopped, "shipper has stopped", nil)
+			_ = outUnit.UpdateState(client.UnitStateStopped, "shipper has stopped", nil)
 		} else {
 			c.log.Errorf("Got output unit with unexpected state: %s", state.String())
 		}
 	} else {
 		if c.shipperIsRunning { // we have missing config but the shipper is running, shut down.
 			c.log.Debugf("Stopping shipper")
-			outUnit.UpdateState(client.UnitStateStopped, "shipper is shutting down", nil)
+			_ = outUnit.UpdateState(client.UnitStateStopped, "shipper is shutting down", nil)
 			c.stopShipper(outUnit)
-			outUnit.UpdateState(client.UnitStateStopped, "shipper has stopped", nil)
+			_ = outUnit.UpdateState(client.UnitStateStopped, "shipper has stopped", nil)
 		}
 	}
 
