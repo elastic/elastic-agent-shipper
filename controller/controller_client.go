@@ -45,6 +45,7 @@ func newClientHandler() clientHandler {
 
 // BounceShipper performs a (re)start of the shipper's backend components when triggered by another component
 func (c *clientHandler) BounceShipper() {
+	// TODO: once https://github.com/elastic/elastic-agent-shipper/issues/225 is done, a lot of this logic will need to change
 	if outUnit, gRPCConfig, ok := c.units.ShipperConfig(); ok { // do we have an output config?
 		if state, _, _ := outUnit.Expected(); state == client.UnitStateHealthy { // does the agent want us to be running?
 			// start shipper
@@ -53,36 +54,30 @@ func (c *clientHandler) BounceShipper() {
 				c.startShipper(outUnit, gRPCConfig)
 			} else { // shipper is already running, restart
 				c.log.Debugf("Restarting shipper")
-				// We should eventually consider a more granular restart system. If, for example,
-				// we want to restart the output, we should be able to do it without touching the gRPC or the queues.
 				c.stopShipper(outUnit)
 				c.startShipper(outUnit, gRPCConfig)
 			}
 		} else if state == client.UnitStateStopped { // shut down
 			c.log.Debugf("Stopping shipper")
-			_ = outUnit.UpdateState(client.UnitStateStopped, "shipper is shutting down", nil)
 			c.stopShipper(outUnit)
-			_ = outUnit.UpdateState(client.UnitStateStopped, "shipper has stopped", nil)
 		} else {
 			c.log.Errorf("Got output unit with unexpected state: %s", state.String())
 		}
 	} else {
 		if c.shipperIsRunning { // we have missing config but the shipper is running, shut down.
 			c.log.Debugf("Stopping shipper")
-			_ = outUnit.UpdateState(client.UnitStateStopped, "shipper is shutting down", nil)
 			c.stopShipper(outUnit)
-			_ = outUnit.UpdateState(client.UnitStateStopped, "shipper has stopped", nil)
 		}
 	}
 
 }
 
 // initialize the startup of the shipper grpc server, queues and other backend components of the output
-func (c *clientHandler) startShipper(outUnit *client.Unit, grpcUnit config.ShipperClientConfig) {
+func (c *clientHandler) startShipper(outUnit *client.Unit, grpcUnit ShipperUnit) {
 	_ = outUnit.UpdateState(client.UnitStateConfiguring, "reading shipper config", nil)
 	_, level, unitConfig := outUnit.Expected()
 
-	cfg, err := config.ShipperConfigFromUnitConfig(level, unitConfig, grpcUnit)
+	cfg, err := config.ShipperConfigFromUnitConfig(level, unitConfig, grpcUnit.Conn)
 	if err != nil {
 		c.reportError("error configuring shipper", err, outUnit)
 		return
@@ -106,19 +101,19 @@ func (c *clientHandler) startShipper(outUnit *client.Unit, grpcUnit config.Shipp
 	// 	MinVersion:     tls.VersionTLS12,
 	// })
 
-	runner, err := NewOutputServer(cfg, creds)
+	runner, err := NewOutputServer(cfg, creds, outUnit, grpcUnit.Unit)
 	if err != nil {
-		c.reportError("error starting shipper", err, outUnit)
+		c.log.Debugf("failed to create a new output server: %s", err)
 		return
 	}
 	c.runner = runner
 
 	outUnit.RegisterDiagnosticHook("queue", "queue metrics", "", "application/json", runner.monitoring.DiagnosticsCallback())
 
-	c.shipperIsRunning = true
 	_ = outUnit.UpdateState(client.UnitStateHealthy, "Shipper Running", nil)
 
 	go func() {
+		c.shipperIsRunning = true
 		err := c.runner.Start()
 		if err != nil {
 			c.reportError("error running shipper server", err, outUnit)
@@ -164,7 +159,7 @@ func (c *clientHandler) inputAdded(unit *client.Unit) {
 
 /*
 //////////
-////////// Generic event Handlers
+////////// Generic event Handlers, called from the V2 listener runloop
 /////////
 */
 

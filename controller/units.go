@@ -72,21 +72,23 @@ func (c *UnitMap) ShipperHasConfig() bool {
 }
 
 // ShipperConfig "bundles" the input and output config needed for the shipper to start.
-func (c *UnitMap) ShipperConfig() (*client.Unit, config.ShipperClientConfig, bool) {
+// TODO: once https://github.com/elastic/elastic-agent-shipper/issues/225 is delt with, we'll want a more elegant way to "bundle"
+// the two dedicated units, since nearly every sub-component cares about the distinction between the input status and output status
+func (c *UnitMap) ShipperConfig() (*client.Unit, ShipperUnit, bool) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 	if c.outputUnit == nil {
-		return nil, config.ShipperClientConfig{}, false
+		return nil, ShipperUnit{}, false
 	}
 	// doesn't actually matter which input we get the config from, they should all be the same.
-	newUnit := config.ShipperClientConfig{}
+	newUnit := ShipperUnit{}
 	found := false
 	for _, u := range c.inputUnits {
-		newUnit = u.Conn
+		newUnit = u
 		found = true
 	}
 	if !found {
-		return nil, config.ShipperClientConfig{}, false
+		return nil, ShipperUnit{}, false
 	}
 
 	return c.outputUnit, newUnit, true

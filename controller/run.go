@@ -52,7 +52,7 @@ func RunUnmanaged(cfg config.ShipperRootConfig) error {
 		}
 	}
 	log := logp.L()
-	runner, err := NewOutputServer(cfg, creds)
+	runner, err := NewOutputServer(cfg, creds, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -114,7 +114,7 @@ func runController(ctx context.Context, agentClient client.V2) error {
 	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 
 	// use a timer to "bounce" the shipper based on external changes
-	// useful since we require two units for the shipper to actually start, which can arrive at different times.
+	// useful since we require two units for the shipper to actually start, which can arrive at different times, or get updated with different states
 	// This also makes it a little easier to deal with multple events requiring
 	// a (re)start of the shipper backend, in which case we'll only restart once with the latest config.
 	bounceTime := 200 * time.Millisecond // give us enough time to get multiple units before the shipper takes any action
@@ -140,6 +140,9 @@ func runController(ctx context.Context, agentClient client.V2) error {
 			shipperSetTimer.Reset(bounceTime)
 			return nil
 		case change := <-agentClient.UnitChanges():
+			// Unsure of if we want to make some of these unit change operations parallel.
+			// Because we have to juggle state between two units, there's a lot of back-and-forth logic that can lead to races. Ditto with BounceShipper().
+			// for now, block while unit changes propigate instead of adding more mutexes.
 			restart := false
 			switch change.Type {
 			case client.UnitChangedAdded: // The agent is starting the shipper, or we added a new processor

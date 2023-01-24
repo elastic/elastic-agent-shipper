@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 	pb "github.com/elastic/elastic-agent-shipper-client/pkg/proto"
 
@@ -38,6 +39,9 @@ type Output interface {
 
 // ServerRunner starts and gracefully stops the shipper server on demand.
 // The server runner is not re-usable and should be abandoned after `Close` or canceled context.
+// under V2, this object will assume control of any unit state changes that happen internally,
+// and will be responsible for marking the shipper's units as failed, started, etc
+// This is because the input and output unit will map to different internal components; queue/output for the Output unit, gRPC for tine Input unit.
 type ServerRunner struct {
 	log *logp.Logger
 	cfg config.ShipperRootConfig
@@ -52,68 +56,91 @@ type ServerRunner struct {
 	queue      *queue.Queue
 	monitoring *monitoring.QueueMonitor
 	out        Output
+
+	// units for reporting state
+	// In the future, we'll have a dedicated input unit for GRPC
+	// Right now, the mapping is:
+	// output unit -> queue/output state
+	// input unit -> gRPC state
+	outUnit *client.Unit
+	inUnit  *client.Unit
 }
 
 // NewOutputServer initializes the shipper queue and output based on the config received
-func NewOutputServer(cfg config.ShipperRootConfig, grpcTLS credentials.TransportCredentials) (r *ServerRunner, err error) {
+// errors and state will be sent upstream based on if the error was in an input or output subsystem.
+func NewOutputServer(cfg config.ShipperRootConfig, grpcTLS credentials.TransportCredentials, outUnit *client.Unit, inUnit *client.Unit) (r *ServerRunner, err error) {
 	r = &ServerRunner{
-		log: logp.L(),
-		cfg: cfg,
+		log:     logp.L(),
+		cfg:     cfg,
+		outUnit: outUnit,
+		inUnit:  inUnit,
 	}
 
-	r.log.Debug("initializing the queue...")
+	r.reportState(r.outUnit, "initializing the queue...", client.UnitStateStarting)
 	r.queue, err = queue.New(cfg.Shipper.Queue)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't create queue: %w", err)
+		msg := fmt.Errorf("couldn't create queue: %w", err)
+		r.reportState(r.outUnit, msg.Error(), client.UnitStateFailed)
+		return nil, msg
 	}
-	r.log.Debug("queue was initialized.")
 
-	r.log.Debug("initializing monitoring ...")
+	r.reportState(r.outUnit, "queue was initialized.", client.UnitStateStarting)
+
+	r.reportState(r.outUnit, "initializing monitoring ...", client.UnitStateStarting)
+
 	r.monitoring, err = monitoring.NewFromConfig(cfg.Shipper.Monitor, r.queue)
 	if err != nil {
-		return nil, fmt.Errorf("error initializing output monitor: %w", err)
+		msg := fmt.Errorf("error initializing output monitor: %w", err)
+		r.reportState(r.outUnit, msg.Error(), client.UnitStateFailed)
+		return nil, msg
 	}
-	r.monitoring.Watch()
-	r.log.Debug("monitoring is ready.")
 
-	r.log.Debug("initializing the output...")
+	r.monitoring.Watch()
+	r.reportState(r.outUnit, "monitoring is ready.", client.UnitStateStarting)
+
+	r.reportState(r.outUnit, "initializing the output...", client.UnitStateStarting)
+
 	r.out, err = outputFromConfig(cfg.Shipper.Output, r.queue)
 	if err != nil {
-		return nil, err
+		msg := fmt.Errorf("error generating output config: %w", err)
+		r.reportState(r.outUnit, msg.Error(), client.UnitStateFailed)
+		return nil, msg
 	}
 	err = r.out.Start()
 	if err != nil {
-		return nil, fmt.Errorf("couldn't start output: %w", err)
+		msg := fmt.Errorf("couldn't start output: %w", err)
+		r.reportState(r.outUnit, msg.Error(), client.UnitStateFailed)
+		return nil, msg
 	}
-	r.log.Debug("output was initialized.")
-	// in case of an initialization error we must clean up all created resources
-	defer func() {
-		if err != nil {
-			// this will account for partial initialization in case of an error, so there are no leaks
-			r.Close()
-		}
-	}()
 
-	r.log.Debug("initializing the gRPC server...")
+	r.reportState(r.outUnit, "output was initialized.", client.UnitStateStarting)
+
+	r.reportState(r.inUnit, "initializing the gRPC server...", client.UnitStateStarting)
 	opts := []grpc.ServerOption{grpc.Creds(grpcTLS)}
 	r.server = grpc.NewServer(opts...)
 	r.shipper, err = server.NewShipperServer(cfg.Shipper.StrictMode, r.queue)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialise the server: %w", err)
+		msg := fmt.Errorf("could not initialize gRPC: %w", err)
+		r.reportState(r.inUnit, msg.Error(), client.UnitStateFailed)
+		return nil, msg
 	}
+
 	pb.RegisterProducerServer(r.server, r.shipper)
-	r.log.Debugf("gRPC server initialized.")
+	r.reportState(r.inUnit, "gRPC server initialized.", client.UnitStateStarting)
 
 	return r, nil
 }
 
 // Start runs the shipper server according to the set configuration.
 // The server stops after calling `Close`, this function blocks until then.
-func (r *ServerRunner) Start() (err error) {
+// will report failures and state upstream to its assigned input unit
+func (r *ServerRunner) Start() error {
 	r.startMutex.Lock()
 	if r.server == nil {
 		r.startMutex.Unlock()
-		return fmt.Errorf("failed to start a server runner that was previously closed")
+		msg := fmt.Errorf("failed to start a server runner that was previously closed")
+		r.reportState(r.inUnit, msg.Error(), client.UnitStateFailed)
+		return msg
 	}
 
 	listenSocket := strings.TrimPrefix(r.cfg.Shipper.Server.Server, "unix://")
@@ -122,14 +149,19 @@ func (r *ServerRunner) Start() (err error) {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		err = os.MkdirAll(dir, 0755)
 		if err != nil {
-			return fmt.Errorf("could not create directory for unix socket %s: %w", dir, err)
+			r.startMutex.Unlock()
+			msg := fmt.Errorf("could not create directory for unix socket %s: %w", dir, err)
+			r.reportState(r.inUnit, msg.Error(), client.UnitStateFailed)
+			return msg
 		}
 	}
 
 	lis, err := net.Listen("unix", listenSocket)
 	if err != nil {
 		r.startMutex.Unlock()
-		return fmt.Errorf("failed to listen on %s: %w", listenSocket, err)
+		msg := fmt.Errorf("failed to listen on %s: %w", listenSocket, err)
+		r.reportState(r.inUnit, msg.Error(), client.UnitStateFailed)
+		return msg
 	}
 
 	var wg errgroup.Group
@@ -144,17 +176,25 @@ func (r *ServerRunner) Start() (err error) {
 		con, err := net.Dial("unix", listenSocket)
 		if err != nil {
 			err = fmt.Errorf("failed to test connection with the gRPC server on %s: %w", listenSocket, err)
-			r.log.Error(err)
+			r.reportState(r.inUnit, err.Error(), client.UnitStateFailed)
 			// this will stop the other go routine in the wait group
 			r.server.Stop()
 			return err
 		}
 		_ = con.Close()
-		r.log.Debugf("gRPC server is ready and is listening on %s", listenSocket)
+		r.reportState(r.inUnit, "gRPC server is ready and is listening", client.UnitStateHealthy)
+		// not sure if we have a better place to mark the output components as healthy
+		r.reportState(r.outUnit, "shipper server is ready and is listening", client.UnitStateHealthy)
 		return nil
 	})
 
-	return wg.Wait()
+	err = wg.Wait()
+	if err != nil {
+		err = fmt.Errorf("error in shipper server: %w", err)
+		r.reportState(r.inUnit, err.Error(), client.UnitStateFailed)
+		return err
+	}
+	return nil
 }
 
 // Close shuts the whole shipper server down. Can be called only once, following calls are noop.
@@ -166,48 +206,62 @@ func (r *ServerRunner) Close() (err error) {
 	r.closeOnce.Do(func() {
 		// we must stop the shipper first which is closing index subscriptions
 		// otherwise `GracefulStop` will hang forever
+
+		// shipper and server map to the input units
 		if r.shipper != nil {
-			r.log.Debugf("shipper is shutting down...")
+			r.reportState(r.inUnit, "shipper is shutting down...", client.UnitStateStopping)
 			err = r.shipper.Close()
 			if err != nil {
 				r.log.Error(err)
 			}
 			r.shipper = nil
-			r.log.Debugf("shipper is stopped.")
+			r.reportState(r.inUnit, "shipper is stopped", client.UnitStateStopping)
 		}
 		if r.server != nil {
-			r.log.Debugf("gRPC server is shutting down...")
+			r.reportState(r.inUnit, "gRPC server is shutting down...", client.UnitStateStopping)
 			r.server.GracefulStop()
 			r.server = nil
-			r.log.Debugf("gRPC server is stopped, all connections closed.")
+			r.reportState(r.inUnit, "gRPC server is stopped, all connections closed.", client.UnitStateStopping)
 		}
+
+		r.reportState(r.inUnit, "input stopped", client.UnitStateStopped)
+
+		// the rest are mapped to the output unit
 		if r.monitoring != nil {
-			r.log.Debugf("monitoring is shutting down...")
+			r.reportState(r.outUnit, "monitoring is shutting down...", client.UnitStateStopping)
 			r.monitoring.End()
 			r.monitoring = nil
-			r.log.Debugf("monitoring is stopped.")
+			r.reportState(r.outUnit, "monitoring has stopped", client.UnitStateStopping)
 		}
 		if r.queue != nil {
-			r.log.Debugf("queue is shutting down...")
+			r.reportState(r.outUnit, "queue is shutting down...", client.UnitStateStopping)
 			err := r.queue.Close()
 			if err != nil {
 				r.log.Error(err)
 			}
 			r.queue = nil
-			r.log.Debugf("queue is stopped.")
+			r.reportState(r.outUnit, "queue has stoppped", client.UnitStateStopping)
 		}
 		if r.out != nil {
 			// The output will shut down once the queue is closed.
 			// We call Wait to give it a chance to finish with events
 			// it has already read.
-			r.log.Debugf("waiting for pending events in the output...")
+			r.reportState(r.outUnit, "output is stopping...", client.UnitStateStopping)
 			r.out.Wait()
 			r.out = nil
-			r.log.Debugf("all pending events are flushed")
+			r.reportState(r.outUnit, "all pending events are flushed", client.UnitStateStopping)
 		}
+		r.reportState(r.outUnit, "output stopped", client.UnitStateStopped)
 	})
 
 	return nil
+}
+
+func (r *ServerRunner) reportState(unit *client.Unit, msg string, state client.UnitState) {
+	r.log.Debugf("output state: %s", msg)
+	if unit != nil {
+		_ = unit.UpdateState(state, msg, nil)
+	}
 }
 
 func outputFromConfig(config output.Config, queue *queue.Queue) (Output, error) {
