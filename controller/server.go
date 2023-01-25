@@ -258,9 +258,10 @@ func (r *ServerRunner) Close() (err error) {
 }
 
 func (r *ServerRunner) reportState(unit *client.Unit, msg string, state client.UnitState) {
-	r.log.Debugf("updated state: %s", msg)
 	if unit != nil {
 		_ = unit.UpdateState(state, msg, nil)
+	} else {
+		r.log.Debugf("updated state: %s", msg)
 	}
 }
 
