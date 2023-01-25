@@ -62,7 +62,6 @@ type ShipperRootConfig struct {
 
 // ShipperConfig defines the config values stored under the `shipper` key in the fleet config
 type ShipperConfig struct {
-	// Don't know what logging config will look like via fleet yet,
 	Monitor monitoring.Config `config:"monitoring"` //Queue monitoring settings
 	Queue   queue.Config      `config:"queue"`      //Queue settings
 	Output  output.Config     `config:"output"`     //Output settings
@@ -113,8 +112,12 @@ func ReadConfigFromFile() (ShipperRootConfig, error) {
 func ShipperConfigFromUnitConfig(level client.UnitLogLevel, rawConfig *proto.UnitExpectedConfig, grpcConfig ShipperClientConfig) (ShipperRootConfig, error) {
 	cfgObject := DefaultConfig()
 
-	logp.L().Debugf("Got new log level: %s", level.String())
-	logp.SetLevel(ZapFromUnitLogLevel(level))
+	// set config based on the lowest log level
+	lowestLevel := client.UnitLogLevelError
+	if level > lowestLevel {
+		logp.L().Debugf("Got new log level: %s", level.String())
+		logp.SetLevel(ZapFromUnitLogLevel(level))
+	}
 
 	// Generate basic config object from the source
 	// I would prefer to use the mapstructure library here,

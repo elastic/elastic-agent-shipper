@@ -145,7 +145,7 @@ func runController(ctx context.Context, agentClient client.V2) error {
 			// for now, block while unit changes propigate instead of adding more mutexes.
 			restart := false
 			switch change.Type {
-			case client.UnitChangedAdded: // The agent is starting the shipper, or we added a new processor
+			case client.UnitChangedAdded: // The agent is starting the shipper
 				restart = handler.handleUnitAdded(change.Unit)
 			case client.UnitChangedModified: // config for a unit has changed
 				restart = handler.handleUnitUpdated(change.Unit)
@@ -157,7 +157,7 @@ func runController(ctx context.Context, agentClient client.V2) error {
 				shipperSetTimer.Reset(bounceTime)
 			}
 		case <-shipperSetTimer.C:
-			handler.BounceShipper()
+			handler.ReloadShipperServer()
 		}
 	}
 }

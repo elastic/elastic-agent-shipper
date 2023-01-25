@@ -76,7 +76,7 @@ func NewOutputServer(cfg config.ShipperRootConfig, grpcTLS credentials.Transport
 		inUnit:  inUnit,
 	}
 
-	r.reportState(r.outUnit, "initializing the queue...", client.UnitStateStarting)
+	r.log.Debugf("initializing the queue...")
 	r.queue, err = queue.New(cfg.Shipper.Queue)
 	if err != nil {
 		msg := fmt.Errorf("couldn't create queue: %w", err)
@@ -84,9 +84,9 @@ func NewOutputServer(cfg config.ShipperRootConfig, grpcTLS credentials.Transport
 		return nil, msg
 	}
 
-	r.reportState(r.outUnit, "queue was initialized.", client.UnitStateStarting)
+	r.reportState(r.outUnit, "queue initialized.", client.UnitStateStarting)
 
-	r.reportState(r.outUnit, "initializing monitoring ...", client.UnitStateStarting)
+	r.log.Debugf("initializing monitoring ...")
 
 	r.monitoring, err = monitoring.NewFromConfig(cfg.Shipper.Monitor, r.queue)
 	if err != nil {
@@ -94,11 +94,11 @@ func NewOutputServer(cfg config.ShipperRootConfig, grpcTLS credentials.Transport
 		r.reportState(r.outUnit, msg.Error(), client.UnitStateFailed)
 		return nil, msg
 	}
-
 	r.monitoring.Watch()
+
 	r.reportState(r.outUnit, "monitoring is ready.", client.UnitStateStarting)
 
-	r.reportState(r.outUnit, "initializing the output...", client.UnitStateStarting)
+	r.log.Debugf("initializing the output...")
 
 	r.out, err = outputFromConfig(cfg.Shipper.Output, r.queue)
 	if err != nil {
@@ -115,7 +115,7 @@ func NewOutputServer(cfg config.ShipperRootConfig, grpcTLS credentials.Transport
 
 	r.reportState(r.outUnit, "output was initialized.", client.UnitStateStarting)
 
-	r.reportState(r.inUnit, "initializing the gRPC server...", client.UnitStateStarting)
+	r.log.Debugf("initializing the gRPC server...")
 	opts := []grpc.ServerOption{grpc.Creds(grpcTLS)}
 	r.server = grpc.NewServer(opts...)
 	r.shipper, err = server.NewShipperServer(cfg.Shipper.StrictMode, r.queue)
@@ -258,7 +258,7 @@ func (r *ServerRunner) Close() (err error) {
 }
 
 func (r *ServerRunner) reportState(unit *client.Unit, msg string, state client.UnitState) {
-	r.log.Debugf("output state: %s", msg)
+	r.log.Debugf("updated state: %s", msg)
 	if unit != nil {
 		_ = unit.UpdateState(state, msg, nil)
 	}

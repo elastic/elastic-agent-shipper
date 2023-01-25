@@ -23,7 +23,6 @@ type clientHandler struct {
 	// hashmap of units we get
 	units *UnitMap
 
-	//shipperIsStopping uint32
 	shipperIsRunning bool
 	runner           *ServerRunner
 	log              *logp.Logger
@@ -43,29 +42,29 @@ func newClientHandler() clientHandler {
 /////////
 */
 
-// BounceShipper performs a (re)start of the shipper's backend components when triggered by another component
-func (c *clientHandler) BounceShipper() {
+// ReloadShipperServer performs a (re)start of the shipper's backend components when triggered by another component
+func (c *clientHandler) ReloadShipperServer() {
 	// TODO: once https://github.com/elastic/elastic-agent-shipper/issues/225 is done, a lot of this logic will need to change
 	if outUnit, gRPCConfig, ok := c.units.ShipperConfig(); ok { // do we have an output config?
 		if state, _, _ := outUnit.Expected(); state == client.UnitStateHealthy { // does the agent want us to be running?
 			// start shipper
 			if !c.shipperIsRunning {
-				c.log.Debugf("Starting shipper")
+				c.log.Info("Starting shipper")
 				c.startShipper(outUnit, gRPCConfig)
 			} else { // shipper is already running, restart
-				c.log.Debugf("Restarting shipper")
+				c.log.Info("Restarting shipper")
 				c.stopShipper(outUnit)
 				c.startShipper(outUnit, gRPCConfig)
 			}
 		} else if state == client.UnitStateStopped { // shut down
-			c.log.Debugf("Stopping shipper")
+			c.log.Info("Stopping shipper")
 			c.stopShipper(outUnit)
 		} else {
 			c.log.Errorf("Got output unit with unexpected state: %s", state.String())
 		}
 	} else {
 		if c.shipperIsRunning { // we have missing config but the shipper is running, shut down.
-			c.log.Debugf("Stopping shipper")
+			c.log.Info("Stopping shipper")
 			c.stopShipper(outUnit)
 		}
 	}
@@ -208,7 +207,7 @@ func (c *clientHandler) handleUnitRemoved(unit *client.Unit) bool {
 	state, logLvl, _ := unit.Expected()
 	c.log.Debugf("Got unit removed for ID %s (%s/%s)", unit.ID(), state.String(), logLvl.String())
 	unitType := unit.Type()
-	if unitType == client.UnitTypeOutput {
+	if unitType == client.UnitTypeInput {
 		c.units.DeleteInput(unit)
 	} else {
 		c.units.DeleteOutput()
