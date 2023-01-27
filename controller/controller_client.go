@@ -14,6 +14,8 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper/config"
+	"github.com/elastic/elastic-agent-shipper/grpcserver"
+	"github.com/elastic/elastic-agent-shipper/publisherserver"
 )
 
 type doneChan chan struct{}
@@ -22,18 +24,21 @@ type doneChan chan struct{}
 type clientHandler struct {
 	// hashmap of units we get
 	units *UnitMap
+	log   *logp.Logger
 
-	shipperIsRunning bool
-	runner           *ServerRunner
-	log              *logp.Logger
+	// handlers for input and output components
+	grpcServer    *grpcserver.InputHandler
+	outputHandler *publisherserver.ServerRunner
 }
 
 func newClientHandler() clientHandler {
-	return clientHandler{
-		log:              logp.L(),
-		units:            NewUnitMap(),
-		shipperIsRunning: false,
+	handler := clientHandler{
+		log:           logp.L(),
+		units:         NewUnitMap(),
+		outputHandler: publisherserver.NewOutputServer(),
 	}
+	handler.grpcServer = grpcserver.NewGRPCServer(handler.outputHandler)
+	return handler
 }
 
 /*
@@ -42,48 +47,55 @@ func newClientHandler() clientHandler {
 /////////
 */
 
-// ReloadShipperServer performs a (re)start of the shipper's backend components when triggered by another component
-func (c *clientHandler) ReloadShipperServer() {
-	// TODO: once https://github.com/elastic/elastic-agent-shipper/issues/225 is done, a lot of this logic will need to change
-	if outUnit, gRPCConfig, ok := c.units.ShipperConfig(); ok { // do we have an output config?
-		if state, _, _ := outUnit.Expected(); state == client.UnitStateHealthy { // does the agent want us to be running?
-			// start shipper
-			if !c.shipperIsRunning {
-				c.log.Info("Starting shipper")
-				c.startShipper(outUnit, gRPCConfig)
-			} else { // shipper is already running, restart
-				c.log.Info("Restarting shipper")
-				c.stopShipper(outUnit)
-				c.startShipper(outUnit, gRPCConfig)
-			}
-		} else if state == client.UnitStateStopped { // shut down
-			c.log.Info("Stopping shipper")
-			c.stopShipper(outUnit)
-		} else {
-			c.log.Errorf("Got output unit with unexpected state: %s", state.String())
-		}
-	} else {
-		if c.shipperIsRunning { // we have missing config but the shipper is running, shut down.
-			c.log.Info("Stopping shipper")
-			c.stopShipper(outUnit)
-		}
+// close the runner connection. Called from BounceShipper
+func (c *clientHandler) stopShipper() {
+	err := c.outputHandler.Close()
+	if err != nil {
+		c.log.Errorf("error stopping shipper: %s", err)
 	}
-
 }
 
-// initialize the startup of the shipper grpc server, queues and other backend components of the output
-func (c *clientHandler) startShipper(outUnit *client.Unit, grpcUnit ShipperUnit) {
-	_ = outUnit.UpdateState(client.UnitStateConfiguring, "reading shipper config", nil)
-	_, level, unitConfig := outUnit.Expected()
+func (c *clientHandler) startShipper(unit *client.Unit) {
+	_ = unit.UpdateState(client.UnitStateConfiguring, "reading shipper config", nil)
+	_, level, unitConfig := unit.Expected()
 
-	cfg, err := config.ShipperConfigFromUnitConfig(level, unitConfig, grpcUnit.Conn)
+	cfg, err := config.ShipperConfigFromUnitConfig(level, unitConfig)
 	if err != nil {
-		c.reportError("error configuring shipper", err, outUnit)
+		c.reportError("error configuring shipper", err, unit)
 		return
 	}
 
-	c.log.Debugf("Starting Shipper with endpoint '%s'", cfg.Shipper.Server.Server)
+	err = c.outputHandler.Start(cfg)
+	if err != nil {
+		c.reportError("error starting output server shipper", err, unit)
+		return
+	}
+	_ = unit.UpdateState(client.UnitStateHealthy, "outputs initialized", nil)
+}
 
+// called when we get a UnitUpdated for the output unit
+func (c *clientHandler) updateShipper(unit *client.Unit) {
+	c.log.Debugf("updating output unit %s", unit.ID())
+	state, _, _ := unit.Expected()
+	c.units.SetOutput(unit)
+	if state == client.UnitStateHealthy { // config update, so restart
+		_ = unit.UpdateState(client.UnitStateStopping, "shipper is restarting", nil)
+		c.stopShipper()
+		c.startShipper(unit)
+	} else if state == client.UnitStateStopped { // shut down
+		_ = unit.UpdateState(client.UnitStateStopping, "shipper is stopping", nil)
+		c.stopShipper()
+		_ = unit.UpdateState(client.UnitStateStopped, "shipper is stopped", nil)
+	}
+}
+
+/*
+//////////
+////////// Input Handlers
+/////////
+*/
+
+func (c *clientHandler) startgRPC(unit *client.Unit, cfg config.ShipperClientConfig) {
 	//TODO: until we get TLS config fixed/figured out, run in insecure mode
 	// certPool := x509.NewCertPool()
 	// for _, cert := range cfg.Shipper.Server.TLS.CAs {
@@ -100,47 +112,22 @@ func (c *clientHandler) startShipper(outUnit *client.Unit, grpcUnit ShipperUnit)
 	// 	MinVersion:     tls.VersionTLS12,
 	// })
 
-	runner, err := NewOutputServer(cfg, creds, outUnit, grpcUnit.Unit)
+	err := c.grpcServer.Start(creds, cfg.Server)
 	if err != nil {
-		c.log.Debugf("failed to create a new output server: %s", err)
+		c.reportError("failed to start grpc server", err, unit)
 		return
 	}
-	c.runner = runner
-
-	outUnit.RegisterDiagnosticHook("queue", "queue metrics", "", "application/json", runner.monitoring.DiagnosticsCallback())
-
-	_ = outUnit.UpdateState(client.UnitStateHealthy, "Shipper Running", nil)
-
-	go func() {
-		c.shipperIsRunning = true
-		err := c.runner.Start()
-		if err != nil {
-			c.reportError("error running shipper server", err, outUnit)
-			c.shipperIsRunning = false
-		}
-	}()
+	c.log.Debugf("gRPC started")
 
 }
 
-// close the runner connection. Called from BounceShipper
-func (c *clientHandler) stopShipper(outUnit *client.Unit) {
-	if c.shipperIsRunning {
-		err := c.runner.Close()
-		if err != nil {
-			c.reportError("error running shipper server", err, outUnit)
-		}
-		c.shipperIsRunning = false
-	}
+func (c *clientHandler) stopGRPC() {
+	c.grpcServer.Stop()
+	c.log.Debugf("gRPC server stopped")
 }
-
-/*
-//////////
-////////// Input Handlers
-/////////
-*/
 
 // start an individual input stream
-func (c *clientHandler) inputAdded(unit *client.Unit) {
+func (c *clientHandler) addInput(unit *client.Unit) {
 	// I assume that once we connect output processors, that will go somewhere here
 	_, _, cfg := unit.Expected()
 	// decode the gRPC config used by the shipper
@@ -154,6 +141,25 @@ func (c *clientHandler) inputAdded(unit *client.Unit) {
 	c.log.Debugf("Got client %s with config: Server: %s", unit.ID(), conn.Server)
 	_ = unit.UpdateState(client.UnitStateHealthy, "healthy", nil)
 
+	// figure out if we need to initialize the gRPC endpoint
+	// TODO: this is another thing that will change with https://github.com/elastic/elastic-agent-shipper/issues/225,
+	// As we'll have a dedicated unit for the input, and we won't be using random input unit updates to see if we need to update the gRPC endpoint.
+	c.startgRPC(unit, conn)
+
+}
+
+// called when we get a UnitUpdated for an input
+func (c *clientHandler) updateInput(unit *client.Unit) {
+	// I assume there will be more here once processors are added
+	c.log.Debugf("updating input unit %s", unit.ID())
+	state, _, _ := unit.Expected()
+
+	// For now, assume the gRPC config is static, don't update the server when we get input updates
+	c.units.UpdateUnit(unit)
+	if state == client.UnitStateStopped {
+		_ = unit.UpdateState(client.UnitStateStopped, "unit has stopped", nil)
+	}
+
 }
 
 /*
@@ -163,47 +169,33 @@ func (c *clientHandler) inputAdded(unit *client.Unit) {
 */
 
 // handle the UnitChangedAdded event from the V2 API
-// returns true if the shipper component needs to be bounced.
-func (c *clientHandler) handleUnitAdded(unit *client.Unit) bool {
+func (c *clientHandler) handleUnitAdded(unit *client.Unit) {
 	unitType := unit.Type()
 	state, logLvl, _ := unit.Expected()
 	c.log.Debugf("Got unit added for ID %s (%s/%s)", unit.ID(), state.String(), logLvl.String())
-	needsRestart := false
 	if unitType == client.UnitTypeOutput {
 		c.units.SetOutput(unit)
-		if c.units.ShipperHasConfig() { // case: we got the input unit first, now we have the output, and can start
-			needsRestart = true
-		}
+		c.startShipper(unit)
 	}
 	if unitType == client.UnitTypeInput { // unit startup for inputs
-		c.inputAdded(unit)
-		if c.units.ShipperHasConfig() && !c.shipperIsRunning { // case: we got the output first, now we have an input, and can start
-			needsRestart = true
-		}
+		c.addInput(unit)
 	}
-
-	return needsRestart
 }
 
 // handle the UnitChangedModified event from the V2 API
-// returns true if the shipper component needs to be bounced.
-func (c *clientHandler) handleUnitUpdated(unit *client.Unit) bool {
+func (c *clientHandler) handleUnitUpdated(unit *client.Unit) {
 	state, logLvl, _ := unit.Expected()
 	c.log.Debugf("Got unit updated for ID %s (%s/%s)", unit.ID(), state.String(), logLvl.String())
-	needsRestart := false
 	unitType := unit.Type()
 	if unitType == client.UnitTypeOutput {
-		c.units.SetOutput(unit)
-		needsRestart = true
+		c.updateShipper(unit)
 	} else {
-		c.units.UpdateUnit(unit)
+		c.updateInput(unit)
 	}
-	return needsRestart
 }
 
 // handle the UnitChangedRemoved event from the V2 API
-// returns true if the shipper component needs to be bounced.
-func (c *clientHandler) handleUnitRemoved(unit *client.Unit) bool {
+func (c *clientHandler) handleUnitRemoved(unit *client.Unit) {
 	state, logLvl, _ := unit.Expected()
 	c.log.Debugf("Got unit removed for ID %s (%s/%s)", unit.ID(), state.String(), logLvl.String())
 	unitType := unit.Type()
@@ -212,9 +204,15 @@ func (c *clientHandler) handleUnitRemoved(unit *client.Unit) bool {
 	} else {
 		c.units.DeleteOutput()
 	}
+	// until we have a dedicated unit for gRPC, use this as a sign to shut down the input
+	if c.units.AvailableUnitCount() == 0 {
+		c.stopGRPC()
+		out := c.units.GetOutput()
+		if out != nil {
+			_ = out.UpdateState(client.UnitStateStopped, "gRPC server stopped", nil)
+		}
+	}
 
-	// if the unit is no longer in a runnable state, the bounce will stop it
-	return !c.units.ShipperHasConfig()
 }
 
 /*

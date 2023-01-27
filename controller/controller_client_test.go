@@ -25,8 +25,8 @@ import (
 )
 
 func TestAgentControl(t *testing.T) {
-	unitOneID := mock.NewID()
-	unitTwoID := mock.NewID()
+	unitOutputID := fmt.Sprintf("%s-output", mock.NewID())
+	unitInputID := fmt.Sprintf("%s-input", mock.NewID())
 
 	token := mock.NewID()
 	var gotConfig, gotHealthy, gotStopped bool
@@ -55,7 +55,7 @@ func TestAgentControl(t *testing.T) {
 					return &proto.CheckinExpected{
 						Units: []*proto.UnitExpected{
 							{
-								Id:             unitOneID,
+								Id:             unitOutputID,
 								Type:           proto.UnitType_OUTPUT,
 								ConfigStateIdx: 1,
 								State:          proto.State_HEALTHY,
@@ -71,7 +71,7 @@ func TestAgentControl(t *testing.T) {
 								},
 							},
 							{
-								Id:             unitTwoID,
+								Id:             unitInputID,
 								Type:           proto.UnitType_INPUT,
 								ConfigStateIdx: 1,
 								State:          proto.State_HEALTHY,
@@ -82,21 +82,20 @@ func TestAgentControl(t *testing.T) {
 											"level": "debug",
 										},
 										"server": fmt.Sprintf("/tmp/%s.sock", mock.NewID()),
-										//"tls":    config.ShipperTLS{},
 									},
 									),
 								},
 							},
 						},
 					}
-				} else if outputIsState(observed.Units, proto.State_HEALTHY) {
+				} else if unitsAreState(t, proto.State_HEALTHY, observed.Units) {
 					t.Logf("Got unit state healthy, sending STOPPED")
 					gotHealthy = true
 					//shutdown
 					return &proto.CheckinExpected{
 						Units: []*proto.UnitExpected{
 							{
-								Id:             unitOneID,
+								Id:             unitOutputID,
 								Type:           proto.UnitType_OUTPUT,
 								ConfigStateIdx: 2,
 								LogLevel:       proto.UnitLogLevel_DEBUG,
@@ -104,7 +103,7 @@ func TestAgentControl(t *testing.T) {
 								Config:         &proto.UnitExpectedConfig{},
 							},
 							{
-								Id:             unitTwoID,
+								Id:             unitInputID,
 								Type:           proto.UnitType_INPUT,
 								ConfigStateIdx: 2,
 								State:          proto.State_STOPPED,
@@ -113,12 +112,17 @@ func TestAgentControl(t *testing.T) {
 							},
 						},
 					}
-				} else if outputIsState(observed.Units, proto.State_STOPPED) {
+				} else if unitsAreState(t, proto.State_STOPPED, observed.Units) {
 					gotStopped = true
 					t.Logf("Got unit state STOPPED, removing")
 					return &proto.CheckinExpected{
 						Units: []*proto.UnitExpected{},
 					}
+				} else {
+					for _, unit := range observed.Units {
+						t.Logf("current state for %s is: %s", unit.Id, unit.Message)
+					}
+
 				}
 			}
 
@@ -161,6 +165,16 @@ func TestAgentControl(t *testing.T) {
 	assert.True(t, gotStopped, "stopped state")
 }
 
+func unitsAreState(t *testing.T, expected proto.State, units []*proto.UnitObserved) bool {
+	for _, unit := range units {
+		if unit.State != expected {
+			t.Logf("unit %s was not state %s", unit.Id, expected.String())
+			return false
+		}
+	}
+	return true
+}
+
 func unitsAreFailed(units []*proto.UnitObserved) bool {
 	for _, unit := range units {
 		if unit.State == proto.State_FAILED {
@@ -168,18 +182,6 @@ func unitsAreFailed(units []*proto.UnitObserved) bool {
 		}
 	}
 	return false
-}
-
-func outputIsState(units []*proto.UnitObserved, state proto.State) bool {
-	for _, unit := range units {
-		if unit.Type == proto.UnitType_OUTPUT {
-			if unit.State != state {
-				return false
-			}
-		}
-		//t.Logf("unit %s has state %s", unit.Id, unit.State.String())
-	}
-	return true
 }
 
 func MustNewStruct(t *testing.T, contents map[string]interface{}) *structpb.Struct {

@@ -109,7 +109,7 @@ func ReadConfigFromFile() (ShipperRootConfig, error) {
 
 // ShipperConfigFromUnitConfig converts the configuration provided by Agent to the internal
 // configuration object used by the shipper.
-func ShipperConfigFromUnitConfig(level client.UnitLogLevel, rawConfig *proto.UnitExpectedConfig, grpcConfig ShipperClientConfig) (ShipperRootConfig, error) {
+func ShipperConfigFromUnitConfig(level client.UnitLogLevel, rawConfig *proto.UnitExpectedConfig) (ShipperRootConfig, error) {
 	cfgObject := DefaultConfig()
 
 	// set config based on the lowest log level
@@ -137,8 +137,6 @@ func ShipperConfigFromUnitConfig(level client.UnitLogLevel, rawConfig *proto.Uni
 	if err != nil {
 		return ShipperRootConfig{}, fmt.Errorf("error unpacking shipper config: %w", err)
 	}
-
-	cfgObject.Shipper.Server = grpcConfig
 
 	// output config is at the "root" level, so we need to unpack those manually
 	if cfgObject.Type == esKey {

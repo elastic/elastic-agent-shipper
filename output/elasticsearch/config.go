@@ -60,7 +60,7 @@ func (c *Config) Validate() error {
 // to the configuration for the go-elasticsearch client API.
 func (c Config) esConfig() elasticsearch.Config {
 	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12}
-	if c.Transport.TLS.VerificationMode == tlscommon.VerifyNone {
+	if c.Transport.TLS != nil && c.Transport.TLS.VerificationMode == tlscommon.VerifyNone {
 		// Unlike Beats, the shipper doesn't support the ability to verify the
 		// certificate but not the hostname, so any setting except VerifyNone
 		// falls back on full verification.

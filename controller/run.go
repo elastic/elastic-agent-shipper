@@ -11,13 +11,14 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"google.golang.org/grpc/credentials"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper/config"
+	"github.com/elastic/elastic-agent-shipper/grpcserver"
+	"github.com/elastic/elastic-agent-shipper/publisherserver"
 )
 
 // LoadAndRun loads the config object and runs the gRPC server
@@ -52,14 +53,17 @@ func RunUnmanaged(cfg config.ShipperRootConfig) error {
 		}
 	}
 	log := logp.L()
-	runner, err := NewOutputServer(cfg, creds, nil, nil)
+	runner := publisherserver.NewOutputServer()
+	err = runner.Start(cfg)
 	if err != nil {
 		return err
 	}
 
+	srv := grpcserver.NewGRPCServer(runner)
+
 	done := make(doneChan)
 	go func() {
-		err = runner.Start()
+		err = srv.Start(creds, cfg.Shipper.Server.Server)
 		done <- struct{}{}
 	}()
 
@@ -80,6 +84,7 @@ func RunUnmanaged(cfg config.ShipperRootConfig) error {
 	<-done
 
 	return err
+	//return nil
 }
 
 // RunManaged runs the shipper receiving configuration from the agent using the control protocol.
@@ -113,14 +118,6 @@ func runController(ctx context.Context, agentClient client.V2) error {
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 
-	// use a timer to "bounce" the shipper based on external changes
-	// useful since we require two units for the shipper to actually start, which can arrive at different times, or get updated with different states
-	// This also makes it a little easier to deal with multple events requiring
-	// a (re)start of the shipper backend, in which case we'll only restart once with the latest config.
-	bounceTime := 200 * time.Millisecond // give us enough time to get multiple units before the shipper takes any action
-	shipperSetTimer := time.NewTimer(bounceTime)
-	shipperSetTimer.Stop() // start with the timer off, reset when we get a change
-
 	// receive the units
 	for {
 		select {
@@ -131,33 +128,27 @@ func runController(ctx context.Context, agentClient client.V2) error {
 			case syscall.SIGHUP:
 				handler.log.Info("Received sighup, stopping")
 			}
-			handler.units.DeleteOutput()
-			shipperSetTimer.Reset(bounceTime)
+			handler.grpcServer.Stop()
+			handler.outputHandler.Close()
 			return nil
 		case <-ctx.Done():
 			handler.log.Info("Got context done")
-			handler.units.DeleteOutput()
-			shipperSetTimer.Reset(bounceTime)
+			handler.grpcServer.Stop()
+			handler.outputHandler.Close()
 			return nil
 		case change := <-agentClient.UnitChanges():
 			// Unsure of if we want to make some of these unit change operations parallel.
 			// Because we have to juggle state between two units, there's a lot of back-and-forth logic that can lead to races. Ditto with BounceShipper().
 			// for now, block while unit changes propigate instead of adding more mutexes.
-			restart := false
 			switch change.Type {
 			case client.UnitChangedAdded: // The agent is starting the shipper
-				restart = handler.handleUnitAdded(change.Unit)
+				handler.handleUnitAdded(change.Unit)
 			case client.UnitChangedModified: // config for a unit has changed
-				restart = handler.handleUnitUpdated(change.Unit)
+				handler.handleUnitUpdated(change.Unit)
 			case client.UnitChangedRemoved: // a unit has been stopoped and can now be removed.
-				restart = handler.handleUnitRemoved(change.Unit)
+				handler.handleUnitRemoved(change.Unit)
 			}
-			// tell the shipper to restart
-			if restart {
-				shipperSetTimer.Reset(bounceTime)
-			}
-		case <-shipperSetTimer.C:
-			handler.ReloadShipperServer()
+
 		}
 	}
 }

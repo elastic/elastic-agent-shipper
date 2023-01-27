@@ -64,34 +64,15 @@ func (c *UnitMap) UpdateUnit(unit *client.Unit) {
 	c.inputUnits[unitKey{ID: unit.ID(), Type: unit.Type()}] = current
 }
 
-// ShipperHasConfig determines if the shipper has the needed config to start
-func (c *UnitMap) ShipperHasConfig() bool {
+// AvailableUnitCount returns the count of input units
+// once https://github.com/elastic/elastic-agent-shipper/issues/225 is delt with, we probably won't need this,
+// as the primary use case for this is checking to see if the gRPC endpoint needs to be running.
+// Once the input has a dedicated unit, we can use that.
+func (c *UnitMap) AvailableUnitCount() int {
 	c.mut.Lock()
 	defer c.mut.Unlock()
-	return len(c.inputUnits) > 0 && c.outputUnit != nil
-}
 
-// ShipperConfig "bundles" the input and output config needed for the shipper to start.
-// TODO: once https://github.com/elastic/elastic-agent-shipper/issues/225 is delt with, we'll want a more elegant way to "bundle"
-// the two dedicated units, since nearly every sub-component cares about the distinction between the input status and output status
-func (c *UnitMap) ShipperConfig() (*client.Unit, ShipperUnit, bool) {
-	c.mut.Lock()
-	defer c.mut.Unlock()
-	if c.outputUnit == nil {
-		return nil, ShipperUnit{}, false
-	}
-	// doesn't actually matter which input we get the config from, they should all be the same.
-	newUnit := ShipperUnit{}
-	found := false
-	for _, u := range c.inputUnits {
-		newUnit = u
-		found = true
-	}
-	if !found {
-		return nil, ShipperUnit{}, false
-	}
-
-	return c.outputUnit, newUnit, true
+	return len(c.inputUnits)
 }
 
 // DeleteInput removes a unit, called after the Client sends a unit remove event

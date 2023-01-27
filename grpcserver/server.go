@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package server
+package grpcserver
 
 import (
 	"context"
@@ -37,11 +37,15 @@ type Publisher interface {
 	// TryPublish publishes the given event and returns its index.
 	// If the event cannot be published without blocking, TryPublish returns an error.
 	TryPublish(event *messages.Event) (queue.EntryID, error)
+
+	// IsInitialized reports if the queue can accept events
+	IsInitialized() bool
 }
 
 // ShipperServer contains all the gRPC operations for the shipper endpoints.
 type ShipperServer interface {
 	Close() error
+	SetStrictMode(bool)
 
 	pb.ProducerServer
 }
@@ -62,22 +66,24 @@ type shipperServer struct {
 }
 
 // NewShipperServer creates a new server instance for handling gRPC endpoints.
-func NewShipperServer(strictMode bool, publisher Publisher) (ShipperServer, error) {
+// publisher can be set to nil, in which case the SetOutput() method must be called.
+func NewShipperServer(publisher Publisher) (ShipperServer, error) {
+	log := logp.NewLogger("shipper-server")
 	if publisher == nil {
-		return nil, errors.New("publisher cannot be nil")
+		log.Debugf("gRPC endpoint has no output, will wait for config")
 	}
 
 	id, err := uuid.NewV4()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error generating shipper UUID: %w", err)
 	}
 
 	s := shipperServer{
 		uuid:       id.String(),
-		logger:     logp.NewLogger("shipper-server"),
+		logger:     log,
 		publisher:  publisher,
 		close:      &sync.Once{},
-		strictMode: strictMode,
+		strictMode: false,
 	}
 
 	s.ctx, s.stop = context.WithCancel(context.Background())
@@ -85,8 +91,19 @@ func NewShipperServer(strictMode bool, publisher Publisher) (ShipperServer, erro
 	return &s, nil
 }
 
+// SetStrictMode updates the strict mode setting for the server
+// A bit of a hack, but needed as this value comes from the output unit, not the input with the rest of the gRPC config.
+// TODO: can we make a change to get this from the input unit instead?
+func (serv *shipperServer) SetStrictMode(mode bool) {
+	serv.strictMode = mode
+}
+
 // PublishEvents is the server implementation of the gRPC PublishEvents call.
 func (serv *shipperServer) PublishEvents(ctx context.Context, req *messages.PublishRequest) (*messages.PublishReply, error) {
+	if !serv.publisher.IsInitialized() {
+		return nil, status.Error(codes.Unavailable, "shipper is initializing")
+	}
+
 	resp := &messages.PublishReply{
 		Uuid: serv.uuid,
 	}
@@ -150,6 +167,9 @@ func (serv *shipperServer) PublishEvents(ctx context.Context, req *messages.Publ
 
 // PublishEvents is the server implementation of the gRPC PersistedIndex call.
 func (serv *shipperServer) PersistedIndex(req *messages.PersistedIndexRequest, producer pb.Producer_PersistedIndexServer) error {
+	if !serv.publisher.IsInitialized() {
+		return status.Error(codes.Unavailable, "shipper is initializing")
+	}
 	serv.logger.Debug("new subscriber for persisted index change")
 	defer serv.logger.Debug("unsubscribed from persisted index change")
 
