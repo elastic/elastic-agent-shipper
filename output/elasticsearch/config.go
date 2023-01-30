@@ -45,8 +45,14 @@ type Config struct {
 	// The following parameters have no equivalent in the go-elasticsearch
 	// config, and need to be specified directly when the indexer is created
 	// instead of being returned in esConfig().
-	NumWorkers   int           `config:"num_workers"`
-	BatchSize    int           `config:"batch_size"`
+
+	// Defaults to runtime.NumCPU()
+	NumWorkers int `config:"num_workers"`
+
+	// Defaults to 5MB
+	BatchSize int `config:"batch_size"`
+
+	// Defaults to 30sec.
 	FlushTimeout time.Duration `config:"flush_timeout"`
 }
 
