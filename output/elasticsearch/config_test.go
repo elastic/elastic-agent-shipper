@@ -22,13 +22,8 @@ func TestValidConfig(t *testing.T) {
 }
 
 func TestInvalidConfig(t *testing.T) {
-	cfg := config.MustNewConfigFrom(`
-api_key: "test"
-username: "user"`)
-	_, err := readConfig(cfg)
-	if err == nil {
-		t.Fatalf("Valid configurations can't include both api key and username")
-	}
+	// TODO: Add a real test case here when we do enough config validation
+	// that an invalid outcome is possible.
 }
 
 func readConfig(cfg *config.C) (*Config, error) {
