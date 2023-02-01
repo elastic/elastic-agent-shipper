@@ -20,7 +20,6 @@ require (
 	github.com/elastic/go-ucfg v0.8.6 // indirect
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/magefile/mage v1.14.0
-	github.com/mitchellh/mapstructure v1.5.0
 	github.com/stretchr/testify v1.8.0
 	go.elastic.co/go-licence-detector v0.5.0
 	go.uber.org/zap v1.24.0
