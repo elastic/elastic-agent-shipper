@@ -7,11 +7,11 @@ package controller
 import (
 	"fmt"
 
-	"github.com/mitchellh/mapstructure"
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
+	libcfg "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper/config"
 	"github.com/elastic/elastic-agent-shipper/grpcserver"
@@ -132,7 +132,12 @@ func (c *clientHandler) addInput(unit *client.Unit) {
 	_, _, cfg := unit.Expected()
 	// decode the gRPC config used by the shipper
 	conn := config.ShipperClientConfig{}
-	err := mapstructure.Decode(cfg.Source.AsMap(), &conn)
+	cfgObj, err := libcfg.NewConfigFrom(cfg.Source.AsMap())
+	if err != nil {
+		c.reportError("error creating config object", err, unit)
+		return
+	}
+	err = cfgObj.Unpack(&conn)
 	if err != nil {
 		c.reportError("error unpacking input config", err, unit)
 		return

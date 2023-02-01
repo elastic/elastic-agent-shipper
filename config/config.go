@@ -43,15 +43,15 @@ func init() {
 
 // ShipperClientConfig is the shipper-relevant portion of the config received from input units
 type ShipperClientConfig struct {
-	Server string     `config:"server" mapstructure:"server"`
-	TLS    ShipperTLS `config:"ssl" mapstructure:"ssl"`
+	Server string     `config:"server"`
+	TLS    ShipperTLS `config:"ssl"`
 }
 
 // ShipperTLS is TLS-specific shipper client settings
 type ShipperTLS struct {
-	CAs  []string `config:"certificate_authorities" mapstructure:"certificate_authorities"`
-	Cert string   `config:"certificate" mapstructure:"certificate"`
-	Key  string   `config:"key" mapstructure:"key"`
+	CAs  []string `config:"certificate_authorities"`
+	Cert string   `config:"certificate"`
+	Key  string   `config:"key"`
 }
 
 // ShipperRootConfig defines the shipper config we get from elastic-agent's output unit
