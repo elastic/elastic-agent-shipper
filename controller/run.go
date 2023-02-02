@@ -137,9 +137,6 @@ func runController(ctx context.Context, agentClient client.V2) error {
 			handler.outputHandler.Close()
 			return nil
 		case change := <-agentClient.UnitChanges():
-			// Unsure of if we want to make some of these unit change operations parallel.
-			// Because we have to juggle state between two units, there's a lot of back-and-forth logic that can lead to races. Ditto with BounceShipper().
-			// for now, block while unit changes propigate instead of adding more mutexes.
 			switch change.Type {
 			case client.UnitChangedAdded: // The agent is starting the shipper
 				handler.handleUnitAdded(change.Unit)

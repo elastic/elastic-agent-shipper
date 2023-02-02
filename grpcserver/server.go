@@ -92,8 +92,6 @@ func NewShipperServer(publisher Publisher) (ShipperServer, error) {
 }
 
 // SetStrictMode updates the strict mode setting for the server
-// A bit of a hack, but needed as this value comes from the output unit, not the input with the rest of the gRPC config.
-// TODO: can we make a change to get this from the input unit instead?
 func (serv *shipperServer) SetStrictMode(mode bool) {
 	serv.strictMode = mode
 }

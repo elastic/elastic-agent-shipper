@@ -74,9 +74,14 @@ func (c *clientHandler) startShipper(unit *client.Unit) {
 }
 
 // called when we get a UnitUpdated for the output unit
-func (c *clientHandler) updateShipper(unit *client.Unit) {
+func (c *clientHandler) updateShipperOutput(unit *client.Unit) {
+	if unit.Type() != client.UnitTypeOutput {
+		c.log.Errorf("updateShipperOutput got a non-output unit of ID %s", unit.ID())
+		return
+	}
 	c.log.Debugf("updating output unit %s", unit.ID())
 	state, _, _ := unit.Expected()
+
 	c.units.SetOutput(unit)
 	if state == client.UnitStateHealthy { // config update, so restart
 		_ = unit.UpdateState(client.UnitStateStopping, "shipper is restarting", nil)
@@ -128,7 +133,6 @@ func (c *clientHandler) stopGRPC() {
 
 // start an individual input stream
 func (c *clientHandler) addInput(unit *client.Unit) {
-	// I assume that once we connect output processors, that will go somewhere here
 	_, _, cfg := unit.Expected()
 	// decode the gRPC config used by the shipper
 	conn := config.ShipperClientConfig{}
@@ -155,7 +159,6 @@ func (c *clientHandler) addInput(unit *client.Unit) {
 
 // called when we get a UnitUpdated for an input
 func (c *clientHandler) updateInput(unit *client.Unit) {
-	// I assume there will be more here once processors are added
 	c.log.Debugf("updating input unit %s", unit.ID())
 	state, _, _ := unit.Expected()
 
@@ -191,9 +194,17 @@ func (c *clientHandler) handleUnitAdded(unit *client.Unit) {
 func (c *clientHandler) handleUnitUpdated(unit *client.Unit) {
 	state, logLvl, _ := unit.Expected()
 	c.log.Debugf("Got unit updated for ID %s (%s/%s)", unit.ID(), state.String(), logLvl.String())
+	currentUnit := c.units.GetUnit(unit.ID(), unit.Type())
+	// check to see if only the log level needs updating
+	if onlyLogLevelUpdated(unit, currentUnit) {
+		c.log.Debugf("unit %s got update with only log level changing. Updating.", unit.ID())
+		logp.SetLevel(config.ZapFromUnitLogLevel(logLvl))
+		return
+	}
+
 	unitType := unit.Type()
 	if unitType == client.UnitTypeOutput {
-		c.updateShipper(unit)
+		c.updateShipperOutput(unit)
 	} else {
 		c.updateInput(unit)
 	}
@@ -203,12 +214,7 @@ func (c *clientHandler) handleUnitUpdated(unit *client.Unit) {
 func (c *clientHandler) handleUnitRemoved(unit *client.Unit) {
 	state, logLvl, _ := unit.Expected()
 	c.log.Debugf("Got unit removed for ID %s (%s/%s)", unit.ID(), state.String(), logLvl.String())
-	unitType := unit.Type()
-	if unitType == client.UnitTypeInput {
-		c.units.DeleteInput(unit)
-	} else {
-		c.units.DeleteOutput()
-	}
+	c.units.DeleteUnit(unit)
 	// until we have a dedicated unit for gRPC, use this as a sign to shut down the input
 	if c.units.AvailableUnitCount() == 0 {
 		c.stopGRPC()

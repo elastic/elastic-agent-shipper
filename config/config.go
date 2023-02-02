@@ -113,10 +113,11 @@ func ShipperConfigFromUnitConfig(level client.UnitLogLevel, rawConfig *proto.Uni
 	cfgObject := DefaultConfig()
 
 	// set config based on the lowest log level
-	lowestLevel := client.UnitLogLevelError
-	if level > lowestLevel {
+	zapLevel := ZapFromUnitLogLevel(level)
+
+	if logp.GetLevel() != zapLevel {
 		logp.L().Debugf("Got new log level: %s", level.String())
-		logp.SetLevel(ZapFromUnitLogLevel(level))
+		logp.SetLevel(zapLevel)
 	}
 
 	// Generate basic config object from the source
@@ -132,6 +133,10 @@ func ShipperConfigFromUnitConfig(level client.UnitLogLevel, rawConfig *proto.Uni
 	// We should merge config overwrites here from the -E flag,
 	// but they seem to step on the elasticsearch config,
 	// so for now, don't.
+	err = cfg.Merge(Overwrites)
+	if err != nil {
+		return ShipperRootConfig{}, fmt.Errorf("error merging CLI -E flags into config: %w", err)
+	}
 
 	err = cfg.Unpack(&cfgObject)
 	if err != nil {

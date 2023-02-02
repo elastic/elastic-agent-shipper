@@ -8,6 +8,8 @@ import (
 	"context"
 	"fmt"
 
+	gproto "google.golang.org/protobuf/proto"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	cfglib "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -45,6 +47,20 @@ func setLogging() error {
 		return fmt.Errorf("error setting up logging config: %w", err)
 	}
 	return nil
+}
+
+// check to see if a unit update only updates a unit level change
+// logic is: if the two units have idential configs _and_ different log levels, then true
+func onlyLogLevelUpdated(newUnit, currentUnit *client.Unit) bool {
+	if newUnit == nil || currentUnit == nil {
+		return false
+	}
+	_, currentLog, currentCfg := currentUnit.Expected()
+	_, newLog, newCfg := newUnit.Expected()
+	if gproto.Equal(currentCfg.Source, newCfg.Source) && newLog != currentLog {
+		return true
+	}
+	return false
 }
 
 // setPaths sets the global path variables
