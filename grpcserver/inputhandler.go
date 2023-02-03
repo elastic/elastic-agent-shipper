@@ -99,6 +99,13 @@ func (srv *InputHandler) Start(grpcTLS credentials.TransportCredentials, endpoin
 	return nil
 }
 
+// InitHasFailed reports an error elsewhere to the gRPC server
+func (srv *InputHandler) InitHasFailed(e string) {
+	if srv.Shipper != nil {
+		srv.Shipper.SetInitError(e)
+	}
+}
+
 // Stop stops the shipper gRPC endpoint
 func (srv *InputHandler) Stop() {
 	srv.startMutex.Lock()

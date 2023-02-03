@@ -14,6 +14,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	structpb "google.golang.org/protobuf/types/known/structpb"
@@ -24,145 +25,450 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 )
 
-func TestAgentControl(t *testing.T) {
-	unitOutputID := fmt.Sprintf("%s-output", mock.NewID())
-	unitInputID := fmt.Sprintf("%s-input", mock.NewID())
+func TestChangeOutputType(t *testing.T) {
+	token := mock.NewID()
+	var gotConfig, updated, newOutput, gotStopped, outIsReconfiguring bool
 
+	var mut sync.Mutex
+	_ = logp.DevelopmentSetup()
+
+	unitOut, unitIn := basicStartingUnits(t)
+	secondOutput := &proto.UnitExpectedConfig{
+		Source: MustNewStruct(t, map[string]interface{}{
+			"type":    "elasticsearch",
+			"enabled": "true",
+			"hosts":   []interface{}{"localhost:9200"},
+		})}
+
+	doneWaiter := &sync.WaitGroup{}
+	srvFunc := func(observed *proto.CheckinObserved) *proto.CheckinExpected {
+		mut.Lock()
+		defer mut.Unlock()
+		if observed.Token == token {
+			if unitsAreFailed(observed.Units) {
+				t.Logf("Got failed unit")
+				t.FailNow()
+			}
+			if gotStopped {
+				doneWaiter.Done()
+				return nil
+			}
+			// initial checkin
+			if len(observed.Units) == 0 || observed.Units[0].State == proto.State_STARTING {
+				t.Logf("starting initial checkin")
+				gotConfig = true
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{
+						unitOut,
+						unitIn,
+					},
+				}
+			} else if unitsAreState(t, proto.State_HEALTHY, observed.Units) && !updated {
+				t.Logf("Got unit state healthy, updating output")
+				updated = true
+
+				unitOut.ConfigStateIdx++
+				unitOut.Config = secondOutput
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{
+						unitOut,
+						unitIn,
+					},
+				}
+			} else if unitIsState(t, proto.State_CONFIGURING, unitOut.Id, observed.Units) && updated {
+				outIsReconfiguring = true
+				t.Logf("output is reconfiguring")
+
+			} else if unitsAreState(t, proto.State_HEALTHY, observed.Units) && updated {
+				t.Logf("units healthy after restart, stopping")
+				newOutput = true
+
+				unitOut.ConfigStateIdx++
+				unitOut.State = proto.State_STOPPED
+				unitIn.ConfigStateIdx++
+				unitIn.State = proto.State_STOPPED
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{
+						unitOut,
+						unitIn,
+					},
+				}
+			} else if unitsAreState(t, proto.State_STOPPED, observed.Units) {
+				gotStopped = true
+				t.Logf("Got unit state STOPPED, removing")
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{},
+				}
+			} else {
+				for _, unit := range observed.Units {
+					t.Logf("current state for %s is: %s", unit.Id, unit.Message)
+				}
+
+			}
+		}
+		return nil
+	}
+
+	runServerTest(t, srvFunc, doneWaiter, token)
+	assert.True(t, gotConfig, "initial config")
+	assert.True(t, updated, "unit was updated")
+	assert.True(t, newOutput, "unit got new output")
+	assert.True(t, outIsReconfiguring, "output reconfigured")
+	assert.True(t, gotStopped, "units stopped")
+}
+
+func TestAddingInputs(t *testing.T) {
+	token := mock.NewID()
+	var gotConfig, addedSecond, stoppedFirst, gotStopped, gotRestarted bool
+
+	var mut sync.Mutex
+	_ = logp.DevelopmentSetup()
+
+	unitOut, unitIn := basicStartingUnits(t)
+	secondInUnit := createUnitExpectedState(fmt.Sprintf("%s-input2", mock.NewID()), proto.UnitType_INPUT, &proto.UnitExpectedConfig{
+		Source: MustNewStruct(t, map[string]interface{}{
+			"logging": map[string]interface{}{
+				"level": "debug",
+			},
+			"server": fmt.Sprintf("/tmp/%s.sock", mock.NewID()),
+		},
+		),
+	})
+
+	doneWaiter := &sync.WaitGroup{}
+	t.Logf("Creating mock server")
+	srvFunc := func(observed *proto.CheckinObserved) *proto.CheckinExpected {
+		mut.Lock()
+		defer mut.Unlock()
+		if observed.Token == token {
+			if unitsAreFailed(observed.Units) {
+				t.Logf("Got failed unit")
+				t.FailNow()
+			}
+			if gotStopped {
+				doneWaiter.Done()
+			}
+			// initial checkin
+			if len(observed.Units) == 0 || observed.Units[0].State == proto.State_STARTING {
+				t.Logf("starting initial checkin")
+				gotConfig = true
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{
+						unitOut,
+						unitIn,
+					},
+				}
+			} else if unitsAreState(t, proto.State_HEALTHY, observed.Units) && !addedSecond {
+				t.Logf("Got unit state healthy, adding second input")
+				addedSecond = true
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{
+						unitOut,
+						unitIn,
+						secondInUnit,
+					},
+				}
+			} else if unitsAreState(t, proto.State_CONFIGURING, observed.Units) && (addedSecond || stoppedFirst) {
+				// Adding a second or removing an additional unit shouldn't result in any components restarting
+				gotRestarted = true
+				gotStopped = true
+				t.Logf("unit restarted after adding second input")
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{},
+				}
+			} else if unitsAreState(t, proto.State_HEALTHY, observed.Units) && addedSecond && !stoppedFirst {
+				// Stop the first unit. This should not effect the input/output
+				t.Logf("removing first input unit")
+				stoppedFirst = true
+				unitIn.State = proto.State_STOPPED
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{
+						unitOut,
+						unitIn,
+						secondInUnit,
+					},
+				}
+			} else if addedSecond && stoppedFirst && !unitsAreState(t, proto.State_STOPPED, observed.Units) {
+				// remove all units
+				t.Logf("stopping all units")
+				secondInUnit.State = proto.State_STOPPED
+				unitOut.State = proto.State_STOPPED
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{
+						unitOut,
+						unitIn,
+						secondInUnit,
+					},
+				}
+			} else if unitsAreState(t, proto.State_STOPPED, observed.Units) {
+				t.Logf("Got stopped, removing")
+				gotStopped = true
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{},
+				}
+			} else {
+				for _, unit := range observed.Units {
+					t.Logf("current state for %s is: %s", unit.Id, unit.Message)
+				}
+
+			}
+		}
+		return nil
+	}
+
+	runServerTest(t, srvFunc, doneWaiter, token)
+
+	assert.True(t, gotConfig, "config state")
+	assert.True(t, gotStopped, "stopped state")
+	assert.True(t, addedSecond, "added second unit")
+	assert.True(t, stoppedFirst, "stopped first unit")
+	assert.True(t, gotStopped, "units stopped")
+	assert.False(t, gotRestarted, "units restarted, they should not")
+
+}
+
+func TestBasicAgentControl(t *testing.T) {
 	token := mock.NewID()
 	var gotConfig, gotHealthy, gotStopped bool
 
 	var mut sync.Mutex
 	_ = logp.DevelopmentSetup()
 
-	doneWaiter := sync.WaitGroup{}
+	unitOut, unitIn := basicStartingUnits(t)
+
+	doneWaiter := &sync.WaitGroup{}
 	t.Logf("Creating mock server")
-	srv := mock.StubServerV2{
-		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
-			mut.Lock()
-			defer mut.Unlock()
-			if observed.Token == token {
-				if unitsAreFailed(observed.Units) {
-					t.Logf("Got failed unit")
-					t.FailNow()
-				}
-				if gotStopped {
-					doneWaiter.Done()
-				}
-				// initial checkin
-				if len(observed.Units) == 0 || observed.Units[0].State == proto.State_STARTING {
-					t.Logf("starting initial checkin")
-					gotConfig = true
-					return &proto.CheckinExpected{
-						Units: []*proto.UnitExpected{
-							{
-								Id:             unitOutputID,
-								Type:           proto.UnitType_OUTPUT,
-								ConfigStateIdx: 1,
-								State:          proto.State_HEALTHY,
-								LogLevel:       proto.UnitLogLevel_DEBUG,
-								Config: &proto.UnitExpectedConfig{
-									Source: MustNewStruct(t, map[string]interface{}{
-										"logging": map[string]interface{}{
-											"level": "debug",
-										},
-										"type":    "console",
-										"enabled": "true",
-									}),
-								},
-							},
-							{
-								Id:             unitInputID,
-								Type:           proto.UnitType_INPUT,
-								ConfigStateIdx: 1,
-								State:          proto.State_HEALTHY,
-								LogLevel:       proto.UnitLogLevel_DEBUG,
-								Config: &proto.UnitExpectedConfig{
-									Source: MustNewStruct(t, map[string]interface{}{
-										"logging": map[string]interface{}{
-											"level": "debug",
-										},
-										"server": fmt.Sprintf("/tmp/%s.sock", mock.NewID()),
-									},
-									),
-								},
-							},
-						},
-					}
-				} else if unitsAreState(t, proto.State_HEALTHY, observed.Units) {
-					t.Logf("Got unit state healthy, sending STOPPED")
-					gotHealthy = true
-					//shutdown
-					return &proto.CheckinExpected{
-						Units: []*proto.UnitExpected{
-							{
-								Id:             unitOutputID,
-								Type:           proto.UnitType_OUTPUT,
-								ConfigStateIdx: 2,
-								LogLevel:       proto.UnitLogLevel_DEBUG,
-								State:          proto.State_STOPPED,
-								Config:         &proto.UnitExpectedConfig{},
-							},
-							{
-								Id:             unitInputID,
-								Type:           proto.UnitType_INPUT,
-								ConfigStateIdx: 2,
-								State:          proto.State_STOPPED,
-								LogLevel:       proto.UnitLogLevel_DEBUG,
-								Config:         &proto.UnitExpectedConfig{},
-							},
-						},
-					}
-				} else if unitsAreState(t, proto.State_STOPPED, observed.Units) {
-					gotStopped = true
-					t.Logf("Got unit state STOPPED, removing")
-					return &proto.CheckinExpected{
-						Units: []*proto.UnitExpected{},
-					}
-				} else {
-					for _, unit := range observed.Units {
-						t.Logf("current state for %s is: %s", unit.Id, unit.Message)
-					}
 
-				}
+	srvFunc := func(observed *proto.CheckinObserved) *proto.CheckinExpected {
+		mut.Lock()
+		defer mut.Unlock()
+		if observed.Token == token {
+			if unitsAreFailed(observed.Units) {
+				t.Logf("Got failed unit")
+				t.FailNow()
 			}
+			if gotStopped {
+				doneWaiter.Done()
+			}
+			// initial checkin
+			if len(observed.Units) == 0 || observed.Units[0].State == proto.State_STARTING {
+				t.Logf("starting initial checkin")
+				gotConfig = true
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{
+						unitOut,
+						unitIn,
+					},
+				}
+			} else if unitsAreState(t, proto.State_HEALTHY, observed.Units) {
+				t.Logf("Got unit state healthy, sending STOPPED")
+				gotHealthy = true
+				//shutdown
+				unitIn.ConfigStateIdx++
+				unitIn.State = proto.State_STOPPED
 
-			//gotInvalid = true
-			return nil
-		},
+				unitOut.ConfigStateIdx++
+				unitOut.State = proto.State_STOPPED
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{
+						unitOut,
+						unitIn,
+					},
+				}
+			} else if unitsAreState(t, proto.State_STOPPED, observed.Units) {
+				gotStopped = true
+				t.Logf("Got unit state STOPPED, removing")
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{},
+				}
+			} else {
+				for _, unit := range observed.Units {
+					t.Logf("current state for %s is: %s", unit.Id, unit.Message)
+				}
+
+			}
+		}
+		return nil
+	}
+
+	runServerTest(t, srvFunc, doneWaiter, token)
+
+	assert.True(t, gotConfig, "config state")
+	assert.True(t, gotHealthy, "healthy state")
+	assert.True(t, gotStopped, "stopped state")
+
+}
+
+func TestUnitLogChange(t *testing.T) {
+	token := mock.NewID()
+	var gotConfig, gotHealthy, gotStopped, gotRestarted bool
+	var observedLogLevel zapcore.Level
+
+	var mut sync.Mutex
+	_ = logp.DevelopmentSetup()
+
+	unitOut, _ := basicStartingUnits(t)
+	unitOut.LogLevel = proto.UnitLogLevel_INFO
+
+	doneWaiter := &sync.WaitGroup{}
+	t.Logf("Creating mock server")
+
+	srvFunc := func(observed *proto.CheckinObserved) *proto.CheckinExpected {
+		mut.Lock()
+		defer mut.Unlock()
+		if observed.Token == token {
+			if unitsAreFailed(observed.Units) {
+				t.Logf("Got failed unit")
+				t.FailNow()
+			}
+			if gotStopped {
+				doneWaiter.Done()
+			}
+			// initial checkin
+			if len(observed.Units) == 0 || observed.Units[0].State == proto.State_STARTING {
+				t.Logf("starting initial checkin")
+				// set log level to info
+				logp.SetLevel(zapcore.InfoLevel)
+				gotConfig = true
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{
+						unitOut,
+					},
+				}
+			} else if unitsAreState(t, proto.State_HEALTHY, observed.Units) && !gotHealthy {
+				t.Logf("Got unit state healthy, changing log level")
+				gotHealthy = true
+				//shutdown
+				unitOut.ConfigStateIdx++
+				unitOut.LogLevel = proto.UnitLogLevel_DEBUG
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{
+						unitOut,
+					},
+				}
+			} else if unitsAreState(t, proto.State_CONFIGURING, observed.Units) && gotHealthy {
+				// we shouldn't restart on log level update, so this is a fail
+				gotRestarted = true
+				gotStopped = true
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{},
+				}
+			} else if unitsAreState(t, proto.State_HEALTHY, observed.Units) && gotHealthy {
+				// shut down
+				t.Logf("Got unit state healthy, stoppinng")
+				//check to see if log level has changed
+				observedLogLevel = logp.GetLevel()
+				unitOut.ConfigStateIdx++
+				unitOut.State = proto.State_STOPPED
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{
+						unitOut,
+					},
+				}
+			} else if unitsAreState(t, proto.State_STOPPED, observed.Units) {
+				gotStopped = true
+				//doneWaiter.Done()
+				t.Logf("Got unit state STOPPED, removing")
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{},
+				}
+			} else {
+				for _, unit := range observed.Units {
+					t.Logf("current state for %s is: %s", unit.Id, unit.Message)
+				}
+
+			}
+		}
+		return nil
+	}
+
+	runServerTest(t, srvFunc, doneWaiter, token)
+
+	assert.True(t, gotConfig, "config state")
+	assert.True(t, gotHealthy, "healthy state")
+	assert.True(t, gotStopped, "stopped state")
+	assert.False(t, gotRestarted, "units restarted")
+	assert.Equal(t, zapcore.DebugLevel, observedLogLevel, "not expected log level")
+
+}
+
+func runServerTest(t *testing.T, implFunc mock.StubServerCheckinV2, waitUntil *sync.WaitGroup, token string) {
+	_ = logp.DevelopmentSetup()
+
+	srv := mock.StubServerV2{
+		CheckinV2Impl: implFunc,
 		ActionImpl: func(response *proto.ActionResponse) error {
 
 			return nil
 		},
 		ActionsChan: make(chan *mock.PerformAction, 100),
-	} // end of srv declaration
+	}
 
 	require.NoError(t, srv.Start())
-	doneWaiter.Add(1)
+	waitUntil.Add(1)
 	defer srv.Stop()
 
 	t.Logf("creating client")
 	// connect with client
-	validClient := client.NewV2(fmt.Sprintf(":%d", srv.Port), token, client.VersionInfo{
-		Name:    "program",
-		Version: "v1.0.0",
-		Meta: map[string]string{
-			"key": "value",
-		},
-	}, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	validClient := createClient(token, srv.Port)
 
 	t.Logf("starting shipper controller")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	go func() {
-		doneWaiter.Wait()
+		waitUntil.Wait()
 		cancel()
 	}()
 
 	err := runController(ctx, validClient)
 	assert.NoError(t, err)
 
-	assert.True(t, gotConfig, "config state")
-	assert.True(t, gotHealthy, "healthy state")
-	assert.True(t, gotStopped, "stopped state")
+}
+
+func createClient(token string, port int) client.V2 {
+	validClient := client.NewV2(fmt.Sprintf(":%d", port), token, client.VersionInfo{
+		Name:    "program",
+		Version: "v1.0.0",
+		Meta: map[string]string{
+			"key": "value",
+		},
+	}, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	return validClient
+}
+
+func basicStartingUnits(t *testing.T) (*proto.UnitExpected, *proto.UnitExpected) {
+	unitOutputID := fmt.Sprintf("%s-output", mock.NewID())
+	unitInputID := fmt.Sprintf("%s-input", mock.NewID())
+	unitOut := createUnitExpectedState(unitOutputID, proto.UnitType_OUTPUT, &proto.UnitExpectedConfig{
+		Source: MustNewStruct(t, map[string]interface{}{
+			"logging": map[string]interface{}{
+				"level": "debug",
+			},
+			"type":    "console",
+			"enabled": "true",
+		}),
+	})
+	unitIn := createUnitExpectedState(unitInputID, proto.UnitType_INPUT, &proto.UnitExpectedConfig{
+		Source: MustNewStruct(t, map[string]interface{}{
+			"logging": map[string]interface{}{
+				"level": "debug",
+			},
+			"server": fmt.Sprintf("/tmp/%s.sock", mock.NewID()),
+		},
+		),
+	})
+
+	return unitOut, unitIn
+}
+
+func createUnitExpectedState(id string, unitType proto.UnitType, cfg *proto.UnitExpectedConfig) *proto.UnitExpected {
+	return &proto.UnitExpected{
+		Id:             id,
+		Type:           unitType,
+		ConfigStateIdx: 1,
+		State:          proto.State_HEALTHY,
+		LogLevel:       proto.UnitLogLevel_DEBUG,
+		Config:         cfg,
+	}
 }
 
 func unitsAreState(t *testing.T, expected proto.State, units []*proto.UnitObserved) bool {
@@ -173,6 +479,16 @@ func unitsAreState(t *testing.T, expected proto.State, units []*proto.UnitObserv
 		}
 	}
 	return true
+}
+
+func unitIsState(t *testing.T, expected proto.State, id string, units []*proto.UnitObserved) bool {
+	for _, unit := range units {
+		if unit.Id == id && unit.State == expected {
+			return true
+		}
+	}
+	t.Logf("unit %s was not state %s", id, expected.String())
+	return false
 }
 
 func unitsAreFailed(units []*proto.UnitObserved) bool {

@@ -46,6 +46,7 @@ type Publisher interface {
 type ShipperServer interface {
 	Close() error
 	SetStrictMode(bool)
+	SetInitError(msg string)
 
 	pb.ProducerServer
 }
@@ -61,6 +62,7 @@ type shipperServer struct {
 	stop  func()
 
 	strictMode bool
+	initErrMsg string
 
 	pb.UnimplementedProducerServer
 }
@@ -96,10 +98,18 @@ func (serv *shipperServer) SetStrictMode(mode bool) {
 	serv.strictMode = mode
 }
 
+// SetInitError sets an error message that will be reported if IsInitialized() is set to false
+// helpful for communicating errors in cases where the gRPC server is up, but something else has failed
+func (serv *shipperServer) SetInitError(msg string) {
+	serv.initErrMsg = msg
+}
+
 // PublishEvents is the server implementation of the gRPC PublishEvents call.
 func (serv *shipperServer) PublishEvents(ctx context.Context, req *messages.PublishRequest) (*messages.PublishReply, error) {
 	if !serv.publisher.IsInitialized() {
-		return nil, status.Error(codes.Unavailable, "shipper is initializing")
+		return nil, status.Error(codes.Unavailable, serv.initMessage())
+	} else if serv.initErrMsg != "" { // reset error message once we're done initializing
+		serv.initErrMsg = ""
 	}
 
 	resp := &messages.PublishReply{
@@ -166,7 +176,9 @@ func (serv *shipperServer) PublishEvents(ctx context.Context, req *messages.Publ
 // PublishEvents is the server implementation of the gRPC PersistedIndex call.
 func (serv *shipperServer) PersistedIndex(req *messages.PersistedIndexRequest, producer pb.Producer_PersistedIndexServer) error {
 	if !serv.publisher.IsInitialized() {
-		return status.Error(codes.Unavailable, "shipper is initializing")
+		return status.Error(codes.Unavailable, serv.initMessage())
+	} else if serv.initErrMsg != "" { // reset error message once we're done initializing
+		serv.initErrMsg = ""
 	}
 	serv.logger.Debug("new subscriber for persisted index change")
 	defer serv.logger.Debug("unsubscribed from persisted index change")
@@ -224,6 +236,13 @@ func (serv *shipperServer) Close() error {
 	})
 
 	return nil
+}
+
+func (serv *shipperServer) initMessage() string {
+	if serv.initErrMsg == "" {
+		return "shipper is initializing"
+	}
+	return serv.initErrMsg
 }
 
 func (serv *shipperServer) validateEvent(m *messages.Event) error {

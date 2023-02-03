@@ -100,7 +100,7 @@ func RunManaged(_ config.ShipperRootConfig) error {
 	return err
 }
 
-// runController is the main runloop for the shipper itself, and managed communication with the agent.
+// runController is the main runloop for the shipper itself, and managed communication with the agent. This is a blocking function
 func runController(ctx context.Context, agentClient client.V2) error {
 	log := logp.L()
 

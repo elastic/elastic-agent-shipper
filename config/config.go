@@ -131,12 +131,8 @@ func ShipperConfigFromUnitConfig(level client.UnitLogLevel, rawConfig *proto.Uni
 	}
 
 	// We should merge config overwrites here from the -E flag,
-	// but they seem to step on the elasticsearch config,
-	// so for now, don't.
-	err = cfg.Merge(Overwrites)
-	if err != nil {
-		return ShipperRootConfig{}, fmt.Errorf("error merging CLI -E flags into config: %w", err)
-	}
+	// but the 'path.*' variables set by elastic-agent conflict with the `path` flag in the elasticsearch settings
+	// see https://github.com/elastic/elastic-agent/issues/1729
 
 	err = cfg.Unpack(&cfgObject)
 	if err != nil {

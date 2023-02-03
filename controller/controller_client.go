@@ -62,12 +62,18 @@ func (c *clientHandler) startShipper(unit *client.Unit) {
 	cfg, err := config.ShipperConfigFromUnitConfig(level, unitConfig)
 	if err != nil {
 		c.reportError("error configuring shipper", err, unit)
+		if c.grpcServer != nil {
+			c.grpcServer.InitHasFailed("error configuring shipper")
+		}
 		return
 	}
 
 	err = c.outputHandler.Start(cfg)
 	if err != nil {
 		c.reportError("error starting output server shipper", err, unit)
+		if c.grpcServer != nil {
+			c.grpcServer.InitHasFailed("error starting output server shipper")
+		}
 		return
 	}
 	_ = unit.UpdateState(client.UnitStateHealthy, "outputs initialized", nil)
@@ -82,7 +88,7 @@ func (c *clientHandler) updateShipperOutput(unit *client.Unit) {
 	c.log.Debugf("updating output unit %s", unit.ID())
 	state, _, _ := unit.Expected()
 
-	c.units.SetOutput(unit)
+	c.units.UpdateUnit(unit)
 	if state == client.UnitStateHealthy { // config update, so restart
 		_ = unit.UpdateState(client.UnitStateStopping, "shipper is restarting", nil)
 		c.stopShipper()
@@ -110,6 +116,7 @@ func (c *clientHandler) startgRPC(unit *client.Unit, cfg config.ShipperClientCon
 	// 	}
 	// }
 
+	_ = unit.UpdateState(client.UnitStateConfiguring, "starting gRPC server", nil)
 	creds := insecure.NewCredentials() //:= credentials.NewTLS(&tls.Config{
 	// 	ClientAuth:     tls.RequireAndVerifyClientCert,
 	// 	ClientCAs:      certPool,
@@ -123,7 +130,7 @@ func (c *clientHandler) startgRPC(unit *client.Unit, cfg config.ShipperClientCon
 		return
 	}
 	c.log.Debugf("gRPC started")
-
+	_ = unit.UpdateState(client.UnitStateHealthy, "gRPC started", nil)
 }
 
 func (c *clientHandler) stopGRPC() {
@@ -146,11 +153,11 @@ func (c *clientHandler) addInput(unit *client.Unit) {
 		c.reportError("error unpacking input config", err, unit)
 		return
 	}
-	c.units.AddUnit(unit, conn)
+
 	c.log.Debugf("Got client %s with config: Server: %s", unit.ID(), conn.Server)
 	_ = unit.UpdateState(client.UnitStateHealthy, "healthy", nil)
 
-	// figure out if we need to initialize the gRPC endpoint
+	// figure out if we need to inistialize the gRPC endpoint
 	// TODO: this is another thing that will change with https://github.com/elastic/elastic-agent-shipper/issues/225,
 	// As we'll have a dedicated unit for the input, and we won't be using random input unit updates to see if we need to update the gRPC endpoint.
 	c.startgRPC(unit, conn)
@@ -180,9 +187,9 @@ func (c *clientHandler) updateInput(unit *client.Unit) {
 func (c *clientHandler) handleUnitAdded(unit *client.Unit) {
 	unitType := unit.Type()
 	state, logLvl, _ := unit.Expected()
-	c.log.Debugf("Got unit added for ID %s (%s/%s)", unit.ID(), state.String(), logLvl.String())
+	c.log.Infof("Got unit added for ID %s (%s/%s)", unit.ID(), state.String(), logLvl.String())
+	c.units.AddUnit(unit)
 	if unitType == client.UnitTypeOutput {
-		c.units.SetOutput(unit)
 		c.startShipper(unit)
 	}
 	if unitType == client.UnitTypeInput { // unit startup for inputs
@@ -192,13 +199,14 @@ func (c *clientHandler) handleUnitAdded(unit *client.Unit) {
 
 // handle the UnitChangedModified event from the V2 API
 func (c *clientHandler) handleUnitUpdated(unit *client.Unit) {
-	state, logLvl, _ := unit.Expected()
-	c.log.Debugf("Got unit updated for ID %s (%s/%s)", unit.ID(), state.String(), logLvl.String())
-	currentUnit := c.units.GetUnit(unit.ID(), unit.Type())
+	state, logLvl, cfg := unit.Expected()
+	c.log.Infof("Got unit updated for ID %s (%s/%s)", unit.ID(), state.String(), logLvl.String())
+	currentUnit := c.units.GetInputUnit(unit.ID(), unit.Type())
 	// check to see if only the log level needs updating
-	if onlyLogLevelUpdated(unit, currentUnit) {
-		c.log.Debugf("unit %s got update with only log level changing. Updating.", unit.ID())
+	if onlyLogLevelUpdated(cfg.Source.AsMap(), currentUnit.config, logLvl) {
+		c.log.Infof("unit %s got update with only log level changing. Updating to %s", unit.ID(), config.ZapFromUnitLogLevel(logLvl))
 		logp.SetLevel(config.ZapFromUnitLogLevel(logLvl))
+		_ = unit.UpdateState(client.UnitStateHealthy, "log level changed", nil)
 		return
 	}
 
@@ -223,6 +231,7 @@ func (c *clientHandler) handleUnitRemoved(unit *client.Unit) {
 			_ = out.UpdateState(client.UnitStateStopped, "gRPC server stopped", nil)
 		}
 	}
+	_ = unit.UpdateState(client.UnitStateStopped, "unit removed", nil)
 
 }
 
