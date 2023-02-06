@@ -147,6 +147,7 @@ func TestAddingInputs(t *testing.T) {
 			}
 			if gotStopped {
 				doneWaiter.Done()
+				return nil
 			}
 			// initial checkin
 			if len(observed.Units) == 0 || observed.Units[0].State == proto.State_STARTING {
@@ -249,6 +250,7 @@ func TestBasicAgentControl(t *testing.T) {
 			}
 			if gotStopped {
 				doneWaiter.Done()
+				return nil
 			}
 			// initial checkin
 			if len(observed.Units) == 0 || observed.Units[0].State == proto.State_STARTING {
@@ -323,6 +325,7 @@ func TestUnitLogChange(t *testing.T) {
 			}
 			if gotStopped {
 				doneWaiter.Done()
+				return nil
 			}
 			// initial checkin
 			if len(observed.Units) == 0 || observed.Units[0].State == proto.State_STARTING {
