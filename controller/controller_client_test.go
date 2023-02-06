@@ -50,7 +50,6 @@ func TestChangeOutputType(t *testing.T) {
 				t.FailNow()
 			}
 			if gotStopped {
-				doneWaiter.Done()
 				return nil
 			}
 			// initial checkin
@@ -95,6 +94,7 @@ func TestChangeOutputType(t *testing.T) {
 				}
 			} else if unitsAreState(t, proto.State_STOPPED, observed.Units) {
 				gotStopped = true
+				doneWaiter.Done()
 				t.Logf("Got unit state STOPPED, removing")
 				return &proto.CheckinExpected{
 					Units: []*proto.UnitExpected{},
@@ -146,7 +146,6 @@ func TestAddingInputs(t *testing.T) {
 				t.FailNow()
 			}
 			if gotStopped {
-				doneWaiter.Done()
 				return nil
 			}
 			// initial checkin
@@ -173,6 +172,7 @@ func TestAddingInputs(t *testing.T) {
 				// Adding a second or removing an additional unit shouldn't result in any components restarting
 				gotRestarted = true
 				gotStopped = true
+				doneWaiter.Done()
 				t.Logf("unit restarted after adding second input")
 				return &proto.CheckinExpected{
 					Units: []*proto.UnitExpected{},
@@ -204,6 +204,7 @@ func TestAddingInputs(t *testing.T) {
 			} else if unitsAreState(t, proto.State_STOPPED, observed.Units) {
 				t.Logf("Got stopped, removing")
 				gotStopped = true
+				doneWaiter.Done()
 				return &proto.CheckinExpected{
 					Units: []*proto.UnitExpected{},
 				}
@@ -249,7 +250,6 @@ func TestBasicAgentControl(t *testing.T) {
 				t.FailNow()
 			}
 			if gotStopped {
-				doneWaiter.Done()
 				return nil
 			}
 			// initial checkin
@@ -279,6 +279,7 @@ func TestBasicAgentControl(t *testing.T) {
 				}
 			} else if unitsAreState(t, proto.State_STOPPED, observed.Units) {
 				gotStopped = true
+				doneWaiter.Done()
 				t.Logf("Got unit state STOPPED, removing")
 				return &proto.CheckinExpected{
 					Units: []*proto.UnitExpected{},
