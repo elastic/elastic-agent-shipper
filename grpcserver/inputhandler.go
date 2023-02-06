@@ -36,7 +36,7 @@ func NewGRPCServer(publisher Publisher) *InputHandler {
 	return srv
 }
 
-// Start runs the shipper server according to the set configuration.
+// Start runs the shipper server according to the set configuration. This is a non-blocking call.
 func (srv *InputHandler) Start(grpcTLS credentials.TransportCredentials, endpoint string) error {
 	//TODO: only needed while we deal with the fact that we have our config coming from multiple input units
 	if srv.server != nil {
@@ -84,7 +84,7 @@ func (srv *InputHandler) Start(grpcTLS credentials.TransportCredentials, endpoin
 			srv.log.Errorf("gRPC server shut down with error: %s", err)
 		}
 	}()
-
+	srv.log.Debugf("gRPC started")
 	// Testing that the server is running and only then unlock the mutex.
 	// Otherwise if `Close` is called at the same time as `Start` it causes race condition.
 	defer srv.startMutex.Unlock()

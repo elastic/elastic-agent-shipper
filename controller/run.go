@@ -34,7 +34,7 @@ func LoadAndRun() error {
 	cfg, err := config.ReadConfigFromFile()
 	switch {
 	case err == nil:
-		return RunUnmanaged(cfg)
+		return RunUnmanaged(context.Background(), cfg)
 	case errors.Is(err, config.ErrConfigIsNotSet):
 		return RunManaged(cfg)
 	default:
@@ -43,7 +43,7 @@ func LoadAndRun() error {
 }
 
 // RunUnmanaged runs the shipper out of a local config file without using the control protocol.
-func RunUnmanaged(cfg config.ShipperRootConfig) error {
+func RunUnmanaged(ctx context.Context, cfg config.ShipperRootConfig) error {
 	var creds credentials.TransportCredentials
 	var err error
 	if cfg.Shipper.Server.TLS.Cert != "" && cfg.Shipper.Server.TLS.Key != "" {
@@ -56,32 +56,29 @@ func RunUnmanaged(cfg config.ShipperRootConfig) error {
 	runner := publisherserver.NewOutputServer()
 	err = runner.Start(cfg)
 	if err != nil {
-		return err
+		return fmt.Errorf("error starting publisher server: %w", err)
 	}
 
 	srv := grpcserver.NewGRPCServer(runner)
-
-	done := make(doneChan)
-	go func() {
-		err = srv.Start(creds, cfg.Shipper.Server.Server)
-		done <- struct{}{}
-	}()
+	err = srv.Start(creds, cfg.Shipper.Server.Server)
 
 	// On termination signals, gracefully stop the shipper
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 
-	sig := <-sigc
-	switch sig {
-	case syscall.SIGINT, syscall.SIGTERM:
-		log.Debug("Received sigterm/sigint, stopping")
-	case syscall.SIGHUP:
-		log.Debug("Received sighup, stopping")
+	select {
+	case sig := <-sigc:
+		switch sig {
+		case syscall.SIGINT, syscall.SIGTERM:
+			log.Debug("Received sigterm/sigint, stopping")
+		case syscall.SIGHUP:
+			log.Debug("Received sighup, stopping")
+		}
+	case <-ctx.Done():
+		log.Debug("got context done")
 	}
 
 	_ = runner.Close()
-
-	<-done
 
 	return err
 	//return nil
