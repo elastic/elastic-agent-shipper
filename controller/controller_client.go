@@ -106,7 +106,7 @@ func (c *clientHandler) updateShipperOutput(unit *client.Unit) {
 /////////
 */
 
-func (c *clientHandler) startgRPC(unit *client.Unit, cfg config.ShipperClientConfig) {
+func (c *clientHandler) startgRPC(unit *client.Unit, cfg config.ShipperConnectionConfig) {
 	//TODO: until we get TLS config fixed/figured out, run in insecure mode
 	// certPool := x509.NewCertPool()
 	// for _, cert := range cfg.Shipper.Server.TLS.CAs {
@@ -142,7 +142,7 @@ func (c *clientHandler) stopGRPC() {
 func (c *clientHandler) addInput(unit *client.Unit) {
 	_, _, cfg := unit.Expected()
 	// decode the gRPC config used by the shipper
-	conn := config.ShipperClientConfig{}
+	conn := config.ShipperConnectionConfig{}
 	cfgObj, err := libcfg.NewConfigFrom(cfg.Source.AsMap())
 	if err != nil {
 		c.reportError("error creating config object", err, unit)

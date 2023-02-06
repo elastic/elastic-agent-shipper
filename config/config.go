@@ -41,8 +41,8 @@ func init() {
 
 }
 
-// ShipperClientConfig is the shipper-relevant portion of the config received from input units
-type ShipperClientConfig struct {
+// ShipperConnectionConfig is the shipper-relevant portion of the config received from input units
+type ShipperConnectionConfig struct {
 	Server string     `config:"server"`
 	TLS    ShipperTLS `config:"ssl"`
 }
@@ -70,8 +70,8 @@ type ShipperConfig struct {
 	// be really handy for client developers on the debugging stage.
 	// Normally, it should be disabled during production use and enabled for testing.
 	// In production it is preferable to send events to the output if at all possible.
-	StrictMode bool                `config:"strict_mode"`
-	Server     ShipperClientConfig // server settings, set by the input unit
+	StrictMode bool                    `config:"strict_mode"`
+	Server     ShipperConnectionConfig // server settings, set by the input unit
 }
 
 // DefaultConfig returns a default config for the shipper
@@ -134,30 +134,31 @@ func ShipperConfigFromUnitConfig(level client.UnitLogLevel, rawConfig *proto.Uni
 	// but the 'path.*' variables set by elastic-agent conflict with the `path` flag in the elasticsearch settings
 	// see https://github.com/elastic/elastic-agent/issues/1729
 
+	// output config is at the "root" level, so we need to unpack those manually
 	err = cfg.Unpack(&cfgObject)
 	if err != nil {
 		return ShipperRootConfig{}, fmt.Errorf("error unpacking shipper config: %w", err)
 	}
-
-	// output config is at the "root" level, so we need to unpack those manually
-	if cfgObject.Type == esKey {
+	switch cfgObject.Type {
+	case esKey:
 		err = cfg.Unpack(&cfgObject.Shipper.Output.Elasticsearch)
 		if err != nil {
 			return ShipperRootConfig{}, fmt.Errorf("error reading elasticsearch output: %w", err)
 		}
-	} else if cfgObject.Type == kafaKey {
+	case kafaKey:
 		err = cfg.Unpack(&cfgObject.Shipper.Output.Kafka)
 		if err != nil {
 			return ShipperRootConfig{}, fmt.Errorf("error reading elasticsearch output: %w", err)
 		}
-	} else if cfgObject.Type == consoleKey {
+	case consoleKey:
 		err = cfg.Unpack(&cfgObject.Shipper.Output.Console)
 		if err != nil {
 			return ShipperRootConfig{}, fmt.Errorf("error reading console output: %w", err)
 		}
-	} else {
+	default:
 		return ShipperRootConfig{}, fmt.Errorf("error, could not find output for output key '%s'", cfgObject.Type)
 	}
+
 	return cfgObject, nil
 }
 
