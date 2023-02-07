@@ -18,8 +18,6 @@ import (
 	"github.com/elastic/elastic-agent-shipper/publisherserver"
 )
 
-type doneChan chan struct{}
-
 // A little helper for managing the state of the main runloop
 type clientHandler struct {
 	// hashmap of units we get
@@ -225,11 +223,10 @@ func (c *clientHandler) handleUnitRemoved(unit *client.Unit) {
 	c.units.DeleteUnit(unit)
 	// until we have a dedicated unit for gRPC, use this as a sign to shut down the input
 	if c.units.AvailableUnitCount() == 0 {
+		c.log.Debugf("All input units are removed, stopping gRPC")
 		c.stopGRPC()
-		out := c.units.GetOutput()
-		if out != nil {
-			_ = out.UpdateState(client.UnitStateStopped, "gRPC server stopped", nil)
-		}
+		_ = unit.UpdateState(client.UnitStateStopped, "gRPC server stopped", nil)
+
 	}
 	_ = unit.UpdateState(client.UnitStateStopped, "unit removed", nil)
 

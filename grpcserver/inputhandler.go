@@ -57,10 +57,6 @@ func (srv *InputHandler) Start(grpcTLS credentials.TransportCredentials, endpoin
 	pb.RegisterProducerServer(srv.server, srv.Shipper)
 
 	srv.startMutex.Lock()
-	if srv.server == nil {
-		srv.startMutex.Unlock()
-		return fmt.Errorf("failed to start a server runner that was previously closed")
-	}
 
 	// paranoid checking, make sure we have the base directory.
 	dir := filepath.Dir(listenAddr)

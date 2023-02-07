@@ -41,9 +41,9 @@ func (c *UnitMap) AddUnit(unit *client.Unit) {
 	_, _, cfg := unit.Expected()
 	if unit.Type() == client.UnitTypeOutput {
 		c.outputUnit = ShipperUnit{Unit: unit, config: cfg.Source.AsMap()}
+	} else {
+		c.inputUnits[unit.ID()] = ShipperUnit{Unit: unit, config: cfg.Source.AsMap()}
 	}
-
-	c.inputUnits[unit.ID()] = ShipperUnit{Unit: unit, config: cfg.Source.AsMap()}
 
 }
 

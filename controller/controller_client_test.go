@@ -8,6 +8,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"net"
 	"sync"
 	"testing"
 	"time"
@@ -24,6 +25,186 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
 )
+
+func TestRemoveOutput(t *testing.T) {
+	token := mock.NewID()
+	var gotConfig, stoppingOutput, restartedOutput, outputHealthy, testStopped bool
+
+	var mut sync.Mutex
+	_ = logp.DevelopmentSetup()
+
+	unitOut, unitIn := basicStartingUnits(t)
+	doneWaiter := &sync.WaitGroup{}
+	srvFunc := func(observed *proto.CheckinObserved) *proto.CheckinExpected {
+		mut.Lock()
+		defer mut.Unlock()
+		if observed.Token == token {
+			if unitsAreFailed(observed.Units) {
+				t.Logf("Got failed unit")
+				t.FailNow()
+			}
+			if testStopped {
+				return nil
+			}
+			// initial checkin
+			if len(observed.Units) == 0 || observed.Units[0].State == proto.State_STARTING {
+				t.Logf("starting initial checkin")
+				gotConfig = true
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{
+						unitOut,
+						unitIn,
+					},
+				}
+			} else if unitsAreState(t, proto.State_HEALTHY, observed.Units) && !restartedOutput {
+				t.Logf("Got unit state healthy, stopping output")
+				stoppingOutput = true
+
+				unitOut.ConfigStateIdx++
+				unitOut.State = proto.State_STOPPED
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{
+						unitOut,
+						unitIn,
+					},
+				}
+			} else if unitIsState(t, proto.State_STOPPED, unitOut.Id, observed.Units) && unitIsState(t, proto.State_HEALTHY, unitIn.Id, observed.Units) {
+				t.Logf("output has stopped, input is still healthy, restarting")
+				restartedOutput = true
+				unitOut.ConfigStateIdx++
+				unitOut.State = proto.State_HEALTHY
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{
+						unitIn,
+						unitOut,
+					},
+				}
+			} else if unitsAreState(t, proto.State_HEALTHY, observed.Units) && restartedOutput {
+				t.Logf("output has restarted, is healthy")
+				outputHealthy = true
+				testStopped = true
+				doneWaiter.Done()
+			} else {
+				for _, unit := range observed.Units {
+					t.Logf("current state for %s is: %s", unit.Id, unit.Message)
+				}
+
+			}
+		}
+		return nil
+	}
+
+	runServerTest(t, srvFunc, doneWaiter, token)
+	assert.True(t, gotConfig, "initial config")
+	assert.True(t, stoppingOutput, "initial input stopped")
+	assert.True(t, restartedOutput, "gRPC input has stopped")
+	assert.True(t, outputHealthy, "input restarted")
+	assert.True(t, testStopped, "test has shut down")
+
+}
+
+func TestStopAllInputs(t *testing.T) {
+	token := mock.NewID()
+	var gotConfig, stopped, grpcStopped, newInput, testStopped, inputRemoved bool
+
+	var mut sync.Mutex
+	_ = logp.DevelopmentSetup()
+
+	unitOut, unitIn := basicStartingUnits(t)
+	portAddr, _ := unitIn.Config.Source.AsMap()["server"].(string)
+
+	doneWaiter := &sync.WaitGroup{}
+	srvFunc := func(observed *proto.CheckinObserved) *proto.CheckinExpected {
+		mut.Lock()
+		defer mut.Unlock()
+		if observed.Token == token {
+			if unitsAreFailed(observed.Units) {
+				t.Logf("Got failed unit")
+				t.FailNow()
+			}
+			if testStopped {
+				return nil
+			}
+			// initial checkin
+			if len(observed.Units) == 0 || observed.Units[0].State == proto.State_STARTING {
+				t.Logf("starting initial checkin")
+				gotConfig = true
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{
+						unitOut,
+						unitIn,
+					},
+				}
+			} else if unitsAreState(t, proto.State_HEALTHY, observed.Units) && !stopped {
+				t.Logf("Got unit state healthy, stopping input")
+				stopped = true
+
+				unitIn.ConfigStateIdx++
+				unitIn.State = proto.State_STOPPED
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{
+						unitOut,
+						unitIn,
+					},
+				}
+			} else if unitIsState(t, proto.State_STOPPED, unitIn.Id, observed.Units) && stopped && !grpcStopped {
+				t.Logf("input unit has stopped, removing")
+				inputRemoved = true
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{
+						unitOut,
+					},
+				}
+			} else if !unitIsState(t, proto.State_HEALTHY, unitIn.Id, observed.Units) && stopped && inputRemoved && !grpcStopped {
+				t.Logf("output has been marked as stopped; checking to see if gRPC has stopped")
+				time.Sleep(time.Millisecond * 300)
+				con, err := net.Dial("unix", portAddr)
+				if err != nil {
+					grpcStopped = true
+				} else {
+					_ = con.Close()
+					doneWaiter.Done()
+					testStopped = true
+					t.Fatalf("socket is still open after outputs have closed")
+				}
+
+			} else if unitsAreState(t, proto.State_HEALTHY, observed.Units) && grpcStopped && !newInput {
+				t.Logf("input has stopped, starting again")
+				newInput = true
+				unitIn.ConfigStateIdx++
+				unitIn.State = proto.State_HEALTHY
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{
+						unitOut,
+						unitIn,
+					},
+				}
+			} else if unitsAreState(t, proto.State_HEALTHY, observed.Units) && newInput {
+				t.Logf("Units have restarted, stopping")
+				doneWaiter.Done()
+				testStopped = true
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{},
+				}
+			} else {
+				for _, unit := range observed.Units {
+					t.Logf("current state for %s is: %s", unit.Id, unit.Message)
+				}
+
+			}
+		}
+		return nil
+	}
+
+	runServerTest(t, srvFunc, doneWaiter, token)
+	assert.True(t, gotConfig, "initial config")
+	assert.True(t, stopped, "initial input stopped")
+	assert.True(t, grpcStopped, "gRPC input has stopped")
+	assert.True(t, newInput, "input restarted")
+	assert.True(t, testStopped, "test has shut down")
+	assert.True(t, inputRemoved, "input unit removed")
+
+}
 
 func TestChangeOutputType(t *testing.T) {
 	token := mock.NewID()

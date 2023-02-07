@@ -131,7 +131,9 @@ func runController(ctx context.Context, agentClient client.V2) error {
 		case <-ctx.Done():
 			handler.log.Info("Got context done")
 			handler.grpcServer.Stop()
+			handler.log.Debugf("stopped input after context done")
 			handler.outputHandler.Close()
+			handler.log.Debugf("stopped pipeline after context done")
 			return nil
 		case change := <-agentClient.UnitChanges():
 			switch change.Type {
