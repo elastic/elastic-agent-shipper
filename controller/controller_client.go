@@ -155,7 +155,7 @@ func (c *clientHandler) addInput(unit *client.Unit) {
 	c.log.Debugf("Got client %s with config: Server: %s", unit.ID(), conn.Server)
 	_ = unit.UpdateState(client.UnitStateHealthy, "healthy", nil)
 
-	// figure out if we need to inistialize the gRPC endpoint
+	// figure out if we need to initialize the gRPC endpoint
 	// TODO: this is another thing that will change with https://github.com/elastic/elastic-agent-shipper/issues/225,
 	// As we'll have a dedicated unit for the input, and we won't be using random input unit updates to see if we need to update the gRPC endpoint.
 	c.startgRPC(unit, conn)
@@ -199,7 +199,7 @@ func (c *clientHandler) handleUnitAdded(unit *client.Unit) {
 func (c *clientHandler) handleUnitUpdated(unit *client.Unit) {
 	state, logLvl, cfg := unit.Expected()
 	c.log.Infof("Got unit updated for ID %s (%s/%s)", unit.ID(), state.String(), logLvl.String())
-	currentUnit := c.units.GetInputUnit(unit.ID(), unit.Type())
+	currentUnit := c.units.GetUnit(unit.ID(), unit.Type())
 	// check to see if only the log level needs updating
 	if onlyLogLevelUpdated(cfg.Source.AsMap(), currentUnit.config, logLvl) {
 		c.log.Infof("unit %s got update with only log level changing. Updating to %s", unit.ID(), config.ZapFromUnitLogLevel(logLvl))

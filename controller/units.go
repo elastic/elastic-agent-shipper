@@ -23,7 +23,7 @@ type ShipperUnit struct {
 	Unit *client.Unit
 	// When we get an updated unit, we don't actually get a "new" unit event, just a pointer to the same unit, which is updated under the hood
 	// which means anything in the parent unitMap hashmap is also updated.
-	// if we want to compare configs, log levels, etc, we need to save it off
+	// if we want to compare configs, log levels, etc, we need to save off the values themselves, and not just keep around the pointer to the unit object.
 	config map[string]interface{}
 }
 
@@ -87,8 +87,8 @@ func (c *UnitMap) DeleteUnit(unit *client.Unit) {
 	}
 }
 
-// GetInputUnit is another convenience method for fetching a given unit
-func (c *UnitMap) GetInputUnit(id string, unitType client.UnitType) ShipperUnit {
+// GetUnit is another convenience method for fetching a given unit
+func (c *UnitMap) GetUnit(id string, unitType client.UnitType) ShipperUnit {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 	if unitType == client.UnitTypeOutput {

@@ -70,12 +70,12 @@ func RunUnmanaged(ctx context.Context, cfg config.ShipperRootConfig) error {
 	case sig := <-sigc:
 		switch sig {
 		case syscall.SIGINT, syscall.SIGTERM:
-			log.Debug("Received sigterm/sigint, stopping")
+			log.Info("Received sigterm/sigint, stopping")
 		case syscall.SIGHUP:
-			log.Debug("Received sighup, stopping")
+			log.Info("Received sighup, stopping")
 		}
 	case <-ctx.Done():
-		log.Debug("got context done")
+		log.Infow("got context done", "error", ctx.Err())
 	}
 
 	_ = runner.Close()
