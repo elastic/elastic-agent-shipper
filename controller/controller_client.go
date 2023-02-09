@@ -5,284 +5,264 @@
 package controller
 
 import (
-	"context"
 	"fmt"
-	"os"
-	"os/signal"
-	"sync"
-	"sync/atomic"
-	"syscall"
+
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
+	libcfg "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper/config"
+	"github.com/elastic/elastic-agent-shipper/grpcserver"
+	"github.com/elastic/elastic-agent-shipper/publisherserver"
 )
-
-type doneChan chan struct{}
 
 // A little helper for managing the state of the main runloop
 type clientHandler struct {
-	// tells the shipper server to begin shutdown
-	shutdownInit doneChan
-	// Tells the controller that the shipper backend has gracefully shut down.
-	shutdownComplete sync.WaitGroup
+	// hashmap of units we get
+	units *UnitMap
+	log   *logp.Logger
 
-	unitsMut sync.Mutex
-	units    map[string]*client.Unit
-
-	// the unit ID for the shipper itself
-	shipperOutputID string
-
-	shipperIsStopping uint32
-
-	log *logp.Logger
+	// handlers for input and output components
+	grpcServer    *grpcserver.InputHandler
+	outputHandler *publisherserver.ServerRunner
 }
 
 func newClientHandler() clientHandler {
-	return clientHandler{
-		shutdownInit:      make(doneChan, 1),
-		log:               logp.L(),
-		units:             make(map[string]*client.Unit),
-		shipperIsStopping: 0,
+	handler := clientHandler{
+		log:           logp.L(),
+		units:         NewUnitMap(),
+		outputHandler: publisherserver.NewOutputServer(),
 	}
+	handler.grpcServer = grpcserver.NewGRPCServer(handler.outputHandler)
+	return handler
 }
 
-// Run starts the gRPC server
-func (c *clientHandler) Run(cfg config.ShipperConfig, unit *client.Unit) (err error) {
-	_ = unit.UpdateState(client.UnitStateConfiguring, "Initialising shipper server", nil)
-	runner, err := NewServerRunner(cfg)
-	if err != nil {
-		return err
-	}
-	unit.RegisterDiagnosticHook("queue", "queue metrics", "", "application/json", runner.monitoring.DiagnosticsCallback())
-	handleShutdown(func() { _ = runner.Close() }, c.shutdownInit)
+/*
+//////////
+////////// Shipper/output Handlers
+/////////
+*/
 
-	// This will get sent after the server has shutdown, signaling to the runloop that it can stop.
-	// The shipper has no queues connected right now, but once it does, this function can't run until
-	// after the queues have emptied and/or shutdown. We'll presumably have a better idea of how this
-	// will work once we have queues connected here.
-	defer func() {
-		c.log.Debugf("shipper has completed shutdown, stopping")
-		c.shutdownComplete.Done()
-	}()
-	c.shutdownComplete.Add(1)
-
-	_ = unit.UpdateState(client.UnitStateHealthy, "Shipper Running", nil)
-	return runner.Start()
-}
-
-func (c *clientHandler) addUnit(unit *client.Unit) {
-	c.unitsMut.Lock()
-	c.units[unit.ID()] = unit
-	c.unitsMut.Unlock()
-}
-
-func (c *clientHandler) getUnit(ID string) *client.Unit {
-	c.unitsMut.Lock()
-	defer c.unitsMut.Unlock()
-	return c.units[ID]
-
-}
-
-func (c *clientHandler) deleteUnit(unit *client.Unit) {
-	c.unitsMut.Lock()
-	delete(c.units, unit.ID())
-	c.unitsMut.Unlock()
-}
-
-// We'll need to track the client ID that's used for the shipper backend itself.
-func (c *clientHandler) setShipperUnitID(unit *client.Unit) {
-	c.shipperOutputID = unit.ID()
-}
-
-// async stop of the shipper's GRPC server, and anything else it needs to manually shutdown
+// close the runner connection. Called from BounceShipper
 func (c *clientHandler) stopShipper() {
-	c.log.Debugf("Stopping Shipper")
-
-	c.shutdownInit <- struct{}{}
+	err := c.outputHandler.Close()
+	if err != nil {
+		c.log.Errorf("error stopping shipper: %s", err)
+	}
 }
 
-// initialize the startup of the shipper grpc server and backend
 func (c *clientHandler) startShipper(unit *client.Unit) {
-	c.log.Debugf("Starting Shipper")
-	atomic.CompareAndSwapUint32(&c.shipperIsStopping, 1, 0)
-
-	// deciding to omit some of these error checks, as the client update state will only return an error if it has a JSON payload to unmarshall
 	_ = unit.UpdateState(client.UnitStateConfiguring, "reading shipper config", nil)
-
-	// Assuming that if we got here from UnitChangedAdded, we don't need to care about the expected state?
 	_, level, unitConfig := unit.Expected()
+
 	cfg, err := config.ShipperConfigFromUnitConfig(level, unitConfig)
 	if err != nil {
-		c.log.Errorf("error unpacking config from agent: %s", err)
-		_ = unit.UpdateState(client.UnitStateFailed, err.Error(), nil)
+		c.reportError("error configuring shipper", err, unit)
+		if c.grpcServer != nil {
+			c.grpcServer.InitHasFailed("error configuring shipper")
+		}
 		return
 	}
 
-	err = logp.Configure(cfg.Log)
+	err = c.outputHandler.Start(cfg)
 	if err != nil {
-		c.log.Errorf("error unpacking config from agent: %s", err)
-		_ = unit.UpdateState(client.UnitStateFailed, err.Error(), nil)
+		c.reportError("error starting output server shipper", err, unit)
+		if c.grpcServer != nil {
+			c.grpcServer.InitHasFailed("error starting output server shipper")
+		}
 		return
 	}
+	_ = unit.UpdateState(client.UnitStateHealthy, "outputs initialized", nil)
+}
 
-	// reset the local logger
-	c.log = logp.L()
+// called when we get a UnitUpdated for the output unit
+func (c *clientHandler) updateShipperOutput(unit *client.Unit) {
+	if unit.Type() != client.UnitTypeOutput {
+		c.log.Errorf("updateShipperOutput got a non-output unit of ID %s", unit.ID())
+		return
+	}
+	c.log.Debugf("updating output unit %s", unit.ID())
+	state, _, _ := unit.Expected()
 
-	err = c.Run(cfg, unit)
+	c.units.UpdateUnit(unit)
+	if state == client.UnitStateHealthy { // config update, so restart
+		_ = unit.UpdateState(client.UnitStateStopping, "shipper is restarting", nil)
+		c.stopShipper()
+		c.startShipper(unit)
+	} else if state == client.UnitStateStopped { // shut down
+		_ = unit.UpdateState(client.UnitStateStopping, "shipper is stopping", nil)
+		c.stopShipper()
+		_ = unit.UpdateState(client.UnitStateStopped, "shipper is stopped", nil)
+	}
+}
+
+/*
+//////////
+////////// Input Handlers
+/////////
+*/
+
+func (c *clientHandler) startgRPC(unit *client.Unit, cfg config.ShipperConnectionConfig) {
+	//TODO: until we get TLS config fixed/figured out, run in insecure mode
+	// certPool := x509.NewCertPool()
+	// for _, cert := range cfg.Shipper.Server.TLS.CAs {
+	// 	if ok := certPool.AppendCertsFromPEM([]byte(cert)); !ok {
+	// 		c.reportError("error appending cert obtained from input in shipper startup", err, outUnit)
+	// 		return
+	// 	}
+	// }
+
+	_ = unit.UpdateState(client.UnitStateConfiguring, "starting gRPC server", nil)
+	creds := insecure.NewCredentials() //:= credentials.NewTLS(&tls.Config{
+	// 	ClientAuth:     tls.RequireAndVerifyClientCert,
+	// 	ClientCAs:      certPool,
+	// 	GetCertificate: c.getCertificate,
+	// 	MinVersion:     tls.VersionTLS12,
+	// })
+
+	err := c.grpcServer.Start(creds, cfg.Server)
 	if err != nil {
-		c.log.Errorf("error running shipper: %s", err)
-		_ = unit.UpdateState(client.UnitStateFailed, err.Error(), nil)
+		c.reportError("failed to start grpc server", err, unit)
 		return
 	}
+	c.log.Debugf("gRPC started")
+	_ = unit.UpdateState(client.UnitStateHealthy, "gRPC started", nil)
+}
+
+func (c *clientHandler) stopGRPC() {
+	c.grpcServer.Stop()
+	c.log.Debugf("gRPC server stopped")
 }
 
 // start an individual input stream
-func (c *clientHandler) startStream(unit *client.Unit) {
-	// when we have individual input streams, that'll go here.
-	c.log.Debugf("Got unit stream for processor: %s", unit.ID())
+func (c *clientHandler) addInput(unit *client.Unit) {
+	_, _, cfg := unit.Expected()
+	// decode the gRPC config used by the shipper
+	conn := config.ShipperConnectionConfig{}
+	cfgObj, err := libcfg.NewConfigFrom(cfg.Source.AsMap())
+	if err != nil {
+		c.reportError("error creating config object", err, unit)
+		return
+	}
+	err = cfgObj.Unpack(&conn)
+	if err != nil {
+		c.reportError("error unpacking input config", err, unit)
+		return
+	}
+
+	c.log.Debugf("Got client %s with config: Server: %s", unit.ID(), conn.Server)
 	_ = unit.UpdateState(client.UnitStateHealthy, "healthy", nil)
+
+	// figure out if we need to initialize the gRPC endpoint
+	// TODO: this is another thing that will change with https://github.com/elastic/elastic-agent-shipper/issues/225,
+	// As we'll have a dedicated unit for the input, and we won't be using random input unit updates to see if we need to update the gRPC endpoint.
+	c.startgRPC(unit, conn)
 
 }
 
-// update an individual input stream
-func (c *clientHandler) updateStream(unit *client.Unit) {
-	// when we have individual input streams, that'll go here.
-	c.log.Debugf("Got unit input update for processor: %s", unit.ID())
-	_ = unit.UpdateState(client.UnitStateConfiguring, "updating", nil)
-	_ = unit.UpdateState(client.UnitStateHealthy, "healthy", nil)
+// called when we get a UnitUpdated for an input
+func (c *clientHandler) updateInput(unit *client.Unit) {
+	c.log.Debugf("updating input unit %s", unit.ID())
+	state, _, _ := unit.Expected()
+
+	// For now, assume the gRPC config is static, don't update the server when we get input updates
+	c.units.UpdateUnit(unit)
+	if state == client.UnitStateStopped {
+		_ = unit.UpdateState(client.UnitStateStopped, "unit has stopped", nil)
+	}
 
 }
+
+/*
+//////////
+////////// Generic event Handlers, called from the V2 listener runloop
+/////////
+*/
 
 // handle the UnitChangedAdded event from the V2 API
 func (c *clientHandler) handleUnitAdded(unit *client.Unit) {
-	c.addUnit(unit)
 	unitType := unit.Type()
-
-	if unitType == client.UnitTypeOutput { // unit startup for the shipper itself
-		c.setShipperUnitID(unit)
-		go c.startShipper(unit)
+	state, logLvl, _ := unit.Expected()
+	c.log.Infof("Got unit added for ID %s (%s/%s)", unit.ID(), state.String(), logLvl.String())
+	c.units.AddUnit(unit)
+	if unitType == client.UnitTypeOutput {
+		c.startShipper(unit)
 	}
-	if unitType == client.UnitTypeInput { // unit startup for streams? Processors? Queue?
-		go c.startStream(unit)
+	if unitType == client.UnitTypeInput { // unit startup for inputs
+		c.addInput(unit)
 	}
 }
 
 // handle the UnitChangedModified event from the V2 API
 func (c *clientHandler) handleUnitUpdated(unit *client.Unit) {
-	c.log.Debugf("Got Unit Modified: %s", unit.ID())
-	unitType := unit.Type()
-
-	if unitType == client.UnitTypeOutput {
-		state, _, _ := unit.Expected()
-		if state == client.UnitStateStopped {
-			c.shutdown(unit)
-		}
-	} else {
-		c.updateStream(unit)
-	}
-}
-
-// a blocking call that will wait for the shipper components to gracefully shutdown, then send the unit update
-func (c *clientHandler) shutdown(shipperUnit *client.Unit) {
-	swapped := atomic.CompareAndSwapUint32(&c.shipperIsStopping, 0, 1)
-	if !swapped {
+	state, logLvl, cfg := unit.Expected()
+	c.log.Infof("Got unit updated for ID %s (%s/%s)", unit.ID(), state.String(), logLvl.String())
+	currentUnit := c.units.GetUnit(unit.ID(), unit.Type())
+	// check to see if only the log level needs updating. Only update if we have an output unit, since we're basically getting copies of input units,
+	// so a log level change for an input might not be for us.
+	if onlyLogLevelUpdated(cfg.Source.AsMap(), currentUnit.config, logLvl) && unit.Type() == client.UnitTypeOutput {
+		c.log.Infof("unit %s got update with only log level changing. Updating to %s", unit.ID(), config.ZapFromUnitLogLevel(logLvl))
+		logp.SetLevel(config.ZapFromUnitLogLevel(logLvl))
+		_ = unit.UpdateState(client.UnitStateHealthy, "log level changed", nil)
 		return
 	}
-	_ = shipperUnit.UpdateState(client.UnitStateStopping, "shutting down shipper output", nil)
-	c.stopShipper()
-	// The server has successfully shut down
-	// In theory we want this to block, as we should wait for queues & outputs to empty.
-	c.shutdownComplete.Wait()
-	c.log.Debugf("Shutdown complete, sending STOPPPED")
-	_ = shipperUnit.UpdateState(client.UnitStateStopped, "Stopped shipper output", nil)
-}
 
-// runController is the main runloop for the shipper itself, and managed communication with the agent.
-func runController(ctx context.Context, agentClient client.V2) error {
-	log := logp.L()
-
-	err := agentClient.Start(ctx)
-	if err != nil {
-		return fmt.Errorf("error starting connection to client")
-	}
-
-	log.Debugf("Starting error reporter")
-	go reportErrors(ctx, agentClient)
-
-	log.Debugf("Started client, waiting")
-
-	handler := newClientHandler()
-
-	// receive the units
-	for {
-		select {
-		case <-ctx.Done():
-			handler.log.Debugf("Got context done")
-			shipperUnit := handler.getUnit(handler.shipperOutputID)
-			handler.shutdown(shipperUnit)
-			// If we get context done, just hard-stop
-			return nil
-
-		case change := <-agentClient.UnitChanges():
-
-			switch change.Type {
-			case client.UnitChangedAdded: // The agent is starting the shipper, or we added a new processor
-				go handler.handleUnitAdded(change.Unit)
-			case client.UnitChangedModified: // config for a unit has changed
-				go handler.handleUnitUpdated(change.Unit)
-			case client.UnitChangedRemoved: // a unit has been stopoped and can now be removed.
-				handler.deleteUnit(change.Unit)
-				// for now, consider a remove of the shipper unit to be our sign to shut down.
-				// Take care, as we won't get this until we've sent a STOPPED to the agent
-				// TODO: we should have a timeout so we can shutdown without getting a REMOVED event
-				if change.Unit.Type() == client.UnitTypeOutput {
-					handler.log.Debugf("shipper unit removed, ending.")
-					return nil
-				}
-
-			}
-		}
+	unitType := unit.Type()
+	if unitType == client.UnitTypeOutput {
+		c.updateShipperOutput(unit)
+	} else {
+		c.updateInput(unit)
 	}
 }
 
-// I am not net sure how this should work or what it should do, but we need to read from that error channel
-func reportErrors(ctx context.Context, agentClient client.V2) {
-	log := logp.L()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case err := <-agentClient.Errors():
-			log.Errorf("Got error from controller: %s", err)
-		}
+// handle the UnitChangedRemoved event from the V2 API
+func (c *clientHandler) handleUnitRemoved(unit *client.Unit) {
+	state, logLvl, _ := unit.Expected()
+	c.log.Debugf("Got unit removed for ID %s (%s/%s)", unit.ID(), state.String(), logLvl.String())
+	c.units.DeleteUnit(unit)
+	// until we have a dedicated unit for gRPC, use this as a sign to shut down the input
+	if c.units.AvailableUnitCount() == 0 {
+		c.log.Debugf("All input units are removed, stopping gRPC")
+		c.stopGRPC()
+		_ = unit.UpdateState(client.UnitStateStopped, "gRPC server stopped", nil)
+
 	}
+	_ = unit.UpdateState(client.UnitStateStopped, "unit removed", nil)
+
 }
 
-// handle shutdown of the shipper
-func handleShutdown(shutdownFunc func(), externalSignal doneChan) {
-	log := logp.L()
+/*
+//////////
+////////// Helpers
+/////////
+*/
 
-	// On termination signals, gracefully stop the shipper
-	sigc := make(chan os.Signal, 1)
-	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+// used for the tls GetCertificate function in TLS
+// Ideally, will be removed
 
-	go func() {
-		select {
-		case <-externalSignal:
-			log.Debugf("Shutting down from agent controller")
-			shutdownFunc()
-			return
-		case sig := <-sigc:
-			switch sig {
-			case syscall.SIGINT, syscall.SIGTERM:
-				log.Debug("Received sigterm/sigint, stopping")
-			case syscall.SIGHUP:
-				log.Debug("Received sighup, stopping")
-			}
-			shutdownFunc()
-			return
-		}
-	}()
+// func (c *clientHandler) getCertificate(chi *tls.ClientHelloInfo) (*tls.Certificate, error) {
+// 	unit, found := c.units.GetUnitByServer(chi.ServerName)
+// 	if !found {
+// 		return nil, fmt.Errorf("No TLS connection info found for server %s", chi.ServerName)
+// 	}
+
+// 	if unit.Conn.TLS.Cert == "" || unit.Conn.TLS.Key == "" {
+// 		return nil, fmt.Errorf("no TLS config for server %s", chi.ServerName)
+// 	}
+
+// 	cert, err := tls.X509KeyPair([]byte(unit.Conn.TLS.Cert), []byte(unit.Conn.TLS.Key))
+// 	if err != nil {
+// 		return nil, fmt.Errorf("error creating keypair for input: %s", err)
+// 	}
+// 	c.log.Debugf("%s has cert %#v", chi.ServerName, unit.Conn.TLS)
+// 	return &cert, nil
+// }
+
+// helper for reporting errors across the logger and the state reporter
+func (c *clientHandler) reportError(errorMsg string, err error, unit *client.Unit) {
+	wrapped := fmt.Sprintf("%s: %s", errorMsg, err)
+	c.log.Errorf(wrapped)
+	_ = unit.UpdateState(client.UnitStateFailed, wrapped, nil)
 }

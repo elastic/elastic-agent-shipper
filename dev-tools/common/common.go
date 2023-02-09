@@ -7,7 +7,7 @@ package common
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -46,17 +46,19 @@ func CreateDir(file string) string {
 	return file
 }
 
+// InstallGoTestTools installs any go packages needed for testing
 func InstallGoTestTools() {
 	gotool.Install(gotool.Install.Package("gotest.tools/gotestsum")) //nolint:errcheck //not required
 }
 
+// MakeCommand creates new CLI exec structure
 func MakeCommand(ctx context.Context, env map[string]string, cmd string, args ...string) *exec.Cmd {
 	c := exec.CommandContext(ctx, cmd, args...)
 	c.Env = os.Environ()
 	for k, v := range env {
 		c.Env = append(c.Env, k+"="+v)
 	}
-	c.Stdout = ioutil.Discard
+	c.Stdout = io.Discard
 	if mg.Verbose() {
 		c.Stdout = os.Stdout
 	}
@@ -66,6 +68,7 @@ func MakeCommand(ctx context.Context, env map[string]string, cmd string, args ..
 	return c
 }
 
+// EnvOrDefault wraps Getenv with logic to handle bool variables
 func EnvOrDefault(buildEnv string, defaultValue string) string {
 	if val := os.Getenv(buildEnv); val != "" {
 		boolVal, err := strconv.ParseBool(val)
@@ -77,6 +80,7 @@ func EnvOrDefault(buildEnv string, defaultValue string) string {
 	return defaultValue
 }
 
+// BoolEnvOrFalse checks if a bool environment variable is set
 func BoolEnvOrFalse(buildEnv string) bool {
 	if val := os.Getenv(buildEnv); val != "" {
 		boolVal, err := strconv.ParseBool(val)

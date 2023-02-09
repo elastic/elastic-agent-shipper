@@ -1,5 +1,5 @@
 ---
-name: golangci-lint
+name: OpenTelemetry Export Trace
 
 on:
   workflow_run:

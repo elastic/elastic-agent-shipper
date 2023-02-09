@@ -130,8 +130,11 @@ output:
     #username: "elastic"
     #password: "password"
 
-    # These options may be convenient for local testing:
-    #allow_older_versions: true
+    #num_workers: 3
+    #batch_size: 10000000
+    #flush_timeout: 30s
+
+    # This option may be convenient for local testing:
     #ssl.verification_mode: none
 
   kafka:

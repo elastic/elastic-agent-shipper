@@ -14,17 +14,18 @@ require (
 	github.com/eapache/go-resiliency v1.2.0
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220810153818-dd118efed5a5
 	github.com/elastic/elastic-agent-client/v7 v7.0.1
-	github.com/elastic/elastic-agent-shipper-client v0.4.0
+	github.com/elastic/elastic-agent-shipper-client v0.4.1-0.20221028153110-a7eedbe6bd6c
 	github.com/elastic/go-elasticsearch/v8 v8.2.0
 	github.com/elastic/go-lumber v0.1.1
-	github.com/elastic/go-ucfg v0.8.6
+	github.com/elastic/go-ucfg v0.8.6 // indirect
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/magefile/mage v1.14.0
-	github.com/stretchr/testify v1.7.1
+	github.com/stretchr/testify v1.8.0
 	go.elastic.co/go-licence-detector v0.5.0
+	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa
 	golang.org/x/net v0.0.0-20220809184613-07c6da5e1ced
-	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
+	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
 	gotest.tools/gotestsum v1.7.0
 )
 
@@ -80,9 +81,8 @@ require (
 	go.elastic.co/apm/v2 v2.1.0 // indirect
 	go.elastic.co/ecszap v1.0.1 // indirect
 	go.elastic.co/fastjson v1.1.0 // indirect
-	go.uber.org/atomic v1.9.0 // indirect
-	go.uber.org/multierr v1.8.0 // indirect
-	go.uber.org/zap v1.22.0 // indirect
+	go.uber.org/atomic v1.10.0 // indirect
+	go.uber.org/multierr v1.9.0 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect

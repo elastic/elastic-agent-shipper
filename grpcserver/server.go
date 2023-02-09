@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package server
+package grpcserver
 
 import (
 	"context"
@@ -37,11 +37,16 @@ type Publisher interface {
 	// TryPublish publishes the given event and returns its index.
 	// If the event cannot be published without blocking, TryPublish returns an error.
 	TryPublish(event *messages.Event) (queue.EntryID, error)
+
+	// IsInitialized reports if the queue can accept events
+	IsInitialized() bool
 }
 
 // ShipperServer contains all the gRPC operations for the shipper endpoints.
 type ShipperServer interface {
 	Close() error
+	SetStrictMode(bool)
+	SetInitError(msg string)
 
 	pb.ProducerServer
 }
@@ -56,28 +61,31 @@ type shipperServer struct {
 	ctx   context.Context
 	stop  func()
 
-	cfg Config
+	strictMode bool
+	initErrMsg string
 
 	pb.UnimplementedProducerServer
 }
 
 // NewShipperServer creates a new server instance for handling gRPC endpoints.
-func NewShipperServer(cfg Config, publisher Publisher) (ShipperServer, error) {
+// publisher can be set to nil, in which case the SetOutput() method must be called.
+func NewShipperServer(publisher Publisher) (ShipperServer, error) {
+	log := logp.NewLogger("shipper-server")
 	if publisher == nil {
-		return nil, errors.New("publisher cannot be nil")
+		log.Debugf("gRPC endpoint has no output, will wait for config")
 	}
 
 	id, err := uuid.NewV4()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error generating shipper UUID: %w", err)
 	}
 
 	s := shipperServer{
-		uuid:      id.String(),
-		logger:    logp.NewLogger("shipper-server"),
-		publisher: publisher,
-		close:     &sync.Once{},
-		cfg:       cfg,
+		uuid:       id.String(),
+		logger:     log,
+		publisher:  publisher,
+		close:      &sync.Once{},
+		strictMode: false,
 	}
 
 	s.ctx, s.stop = context.WithCancel(context.Background())
@@ -85,8 +93,25 @@ func NewShipperServer(cfg Config, publisher Publisher) (ShipperServer, error) {
 	return &s, nil
 }
 
+// SetStrictMode updates the strict mode setting for the server
+func (serv *shipperServer) SetStrictMode(mode bool) {
+	serv.strictMode = mode
+}
+
+// SetInitError sets an error message that will be reported if IsInitialized() is set to false
+// helpful for communicating errors in cases where the gRPC server is up, but something else has failed
+func (serv *shipperServer) SetInitError(msg string) {
+	serv.initErrMsg = msg
+}
+
 // PublishEvents is the server implementation of the gRPC PublishEvents call.
 func (serv *shipperServer) PublishEvents(ctx context.Context, req *messages.PublishRequest) (*messages.PublishReply, error) {
+	if !serv.publisher.IsInitialized() {
+		return nil, status.Error(codes.Unavailable, serv.initMessage())
+	} else if serv.initErrMsg != "" { // reset error message once we're done initializing
+		serv.initErrMsg = ""
+	}
+
 	resp := &messages.PublishReply{
 		Uuid: serv.uuid,
 	}
@@ -101,7 +126,7 @@ func (serv *shipperServer) PublishEvents(ctx context.Context, req *messages.Publ
 		return nil, status.Error(codes.InvalidArgument, "publish request must contain at least one event")
 	}
 
-	if serv.cfg.StrictMode {
+	if serv.strictMode {
 		for _, e := range req.Events {
 			err := serv.validateEvent(e)
 			if err != nil {
@@ -150,6 +175,11 @@ func (serv *shipperServer) PublishEvents(ctx context.Context, req *messages.Publ
 
 // PublishEvents is the server implementation of the gRPC PersistedIndex call.
 func (serv *shipperServer) PersistedIndex(req *messages.PersistedIndexRequest, producer pb.Producer_PersistedIndexServer) error {
+	if !serv.publisher.IsInitialized() {
+		return status.Error(codes.Unavailable, serv.initMessage())
+	} else if serv.initErrMsg != "" { // reset error message once we're done initializing
+		serv.initErrMsg = ""
+	}
 	serv.logger.Debug("new subscriber for persisted index change")
 	defer serv.logger.Debug("unsubscribed from persisted index change")
 
@@ -206,6 +236,13 @@ func (serv *shipperServer) Close() error {
 	})
 
 	return nil
+}
+
+func (serv *shipperServer) initMessage() string {
+	if serv.initErrMsg == "" {
+		return "shipper is initializing"
+	}
+	return serv.initErrMsg
 }
 
 func (serv *shipperServer) validateEvent(m *messages.Event) error {
