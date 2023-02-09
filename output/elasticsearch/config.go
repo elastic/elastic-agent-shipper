@@ -58,6 +58,7 @@ type Config struct {
 	DegradedTimeout time.Duration `config:"degraded_timeout"`
 }
 
+// Backoff represents connection backoff settings
 type Backoff struct {
 	Init time.Duration
 	Max  time.Duration
@@ -74,6 +75,7 @@ func (b Backoff) delayTime(attempt int) time.Duration {
 	return result
 }
 
+// Validate validates the ES config
 func (c *Config) Validate() error {
 	/*if c.APIKey != "" && (c.Username != "" || c.Password != "") {
 		return fmt.Errorf("cannot set both api_key and username/password")

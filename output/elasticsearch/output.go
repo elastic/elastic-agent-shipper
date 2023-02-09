@@ -32,7 +32,11 @@ type ElasticSearchOutput struct {
 	wg            sync.WaitGroup
 }
 
+// NewElasticSearch creates a new elasticsearch output
 func NewElasticSearch(config *Config, reportCallback WatchReporter, queue *queue.Queue) *ElasticSearchOutput {
+	if config.DegradedTimeout == 0 {
+		config.DegradedTimeout = time.Second * 30
+	}
 	out := &ElasticSearchOutput{
 		logger:        logp.NewLogger("elasticsearch-output"),
 		config:        config,
@@ -100,6 +104,7 @@ func (es *ElasticSearchOutput) Start() error {
 			for _, event := range events {
 				serialized, err := serializeEvent(event)
 				if err != nil {
+					es.healthWatcher.Fail(err.Error())
 					es.logger.Errorf("failed to serialize event: %v", err)
 					continue
 				}
@@ -123,6 +128,7 @@ func (es *ElasticSearchOutput) Start() error {
 					},
 				)
 				if err != nil {
+					es.healthWatcher.Fail(err.Error())
 					es.logger.Errorf("couldn't add to bulk index request: %v", err)
 					// This event couldn't be attempted, so mark it as finished.
 				}

@@ -20,10 +20,10 @@ import (
 
 func createOutputHealthReporter(unit *client.Unit) elasticsearch.WatchReporter {
 	return func(state elasticsearch.WatchState, msg string) {
-		if state == elasticsearch.WATCH_DEGRADED {
-			unit.UpdateState(client.UnitStateDegraded, fmt.Sprintf("elasticsearch has failed with: %s", msg), nil)
+		if state == elasticsearch.WatchDegraded {
+			_ = unit.UpdateState(client.UnitStateDegraded, fmt.Sprintf("elasticsearch has failed with: %s", msg), nil)
 		} else {
-			unit.UpdateState(client.UnitStateHealthy, "elasticsearch has recovered", nil)
+			_ = unit.UpdateState(client.UnitStateHealthy, "elasticsearch has recovered", nil)
 		}
 	}
 }

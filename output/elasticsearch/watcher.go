@@ -6,6 +6,7 @@ package elasticsearch
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -13,8 +14,11 @@ import (
 // WatchState represents the state of the output at the time the WatchReporter callback was made
 type WatchState string
 
-var WATCH_DEGRADED WatchState = "degraded"
-var WATCH_RECOVERED WatchState = "recovered"
+// WatchDegraded corresponds to a degraded state
+var WatchDegraded WatchState = "degraded"
+
+// WatchRecovered corresponds to a recovered state
+var WatchRecovered WatchState = "recovered"
 
 // WatchReporter is a callback that the watcher will call whenever the output has reached a degraded state, or recovered from a degraded state
 type WatchReporter func(state WatchState, msg string)
@@ -41,6 +45,7 @@ func newHealthWatcher(reporter WatchReporter, failureInterval time.Duration) ESH
 	}
 }
 
+// Fail updates the time and error message of the last known failure
 func (hw *ESHeathWatcher) Fail(msg string) {
 	hw.mut.Lock()
 	defer hw.mut.Unlock()
@@ -48,6 +53,7 @@ func (hw *ESHeathWatcher) Fail(msg string) {
 	hw.lastFailMessage = msg
 }
 
+// Success updates the last known successful ES call
 func (hw *ESHeathWatcher) Success() {
 	hw.mut.Lock()
 	defer hw.mut.Unlock()
@@ -63,18 +69,19 @@ func (hw *ESHeathWatcher) Watch(ctx context.Context) {
 		default:
 		}
 		hw.mut.Lock()
+
 		// if the last success was > failure interval, and a failure was more recent, then report
-		if time.Now().Sub(hw.lastSuccess) > hw.failureInterval && hw.lastFailure.After(hw.lastSuccess) && !hw.didFail {
+		if time.Since(hw.lastSuccess) > hw.failureInterval && hw.lastFailure.After(hw.lastSuccess) && !hw.didFail {
 			hw.didFail = true
 			if hw.reporter != nil {
-				hw.reporter(WATCH_DEGRADED, hw.lastFailMessage)
+				hw.reporter(WatchDegraded, fmt.Sprintf("Degraded: %s", hw.lastFailMessage))
 			}
 
 		}
-		if time.Now().Sub(hw.lastSuccess) < hw.failureInterval && hw.didFail {
+		if hw.lastSuccess.After(hw.lastFailure) && hw.didFail {
 			hw.didFail = false
 			if hw.reporter != nil {
-				hw.reporter(WATCH_RECOVERED, "ES is sending events")
+				hw.reporter(WatchRecovered, "ES is sending events")
 			}
 		}
 		hw.mut.Unlock()

@@ -30,7 +30,7 @@ func TestInvalidConfig(t *testing.T) {
 
 func TestWatcherPeriodWithNoEvents(t *testing.T) {
 	report := func(state WatchState, s string) {
-		if state == WATCH_DEGRADED {
+		if state == WatchDegraded {
 			t.Logf("got: %s, should not have failed", s)
 			t.Fail()
 		}
@@ -48,7 +48,7 @@ func TestWatcherWithFail(t *testing.T) {
 	gotFail := false
 	reportFail := func(state WatchState, s string) {
 		t.Logf("got: %s", s)
-		if state == WATCH_DEGRADED {
+		if state == WatchDegraded {
 			gotFail = true
 		}
 
@@ -72,10 +72,10 @@ func TestWatcherWithFailAndSuccess(t *testing.T) {
 	gotSuccess := false
 	reportMethod := func(state WatchState, s string) {
 		t.Logf("got: %s", s)
-		if state == WATCH_DEGRADED {
+		if state == WatchDegraded {
 			gotFail = true
 		}
-		if state == WATCH_RECOVERED {
+		if state == WatchRecovered {
 			gotSuccess = true
 		}
 	}

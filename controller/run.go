@@ -57,7 +57,7 @@ func RunUnmanaged(ctx context.Context, cfg config.ShipperRootConfig) error {
 	runner := publisherserver.NewOutputServer()
 	// reporter for ES health status
 	reportFunc := func(state elasticsearch.WatchState, msg string) {
-		if state == elasticsearch.WATCH_DEGRADED {
+		if state == elasticsearch.WatchDegraded {
 			log.Errorf("output is degraded: %s", msg)
 		} else {
 			log.Info("output has recovered")
