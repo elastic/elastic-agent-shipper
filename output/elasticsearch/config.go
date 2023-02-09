@@ -55,7 +55,7 @@ type Config struct {
 	// Defaults to 30sec.
 	FlushTimeout time.Duration `config:"flush_timeout"`
 
-	degradedTimeout time.Duration `config:"degraded_timeout"`
+	DegradedTimeout time.Duration `config:"degraded_timeout"`
 }
 
 type Backoff struct {

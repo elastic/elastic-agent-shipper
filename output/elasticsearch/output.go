@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"sync"
+	"time"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
@@ -126,9 +127,6 @@ func (es *ElasticSearchOutput) Start() error {
 	bi, err := esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
 		Index:         "elastic-agent-shipper-test",
 		Client:        client,
-		NumWorkers:    1,
-		FlushBytes:    1e+8, // 20MB
-		FlushInterval: 30 * time.Second,
 		Timeout:       healthTimeout,
 		NumWorkers:    es.config.NumWorkers,
 		FlushBytes:    es.config.BatchSize,
@@ -183,11 +181,8 @@ func (es *ElasticSearchOutput) Start() error {
 						},
 						OnFailure: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem, err error) {
 							// TODO: update metrics
-<<<<<<< HEAD
 							es.healthWatcher.Fail()
-=======
 							es.logger.Debugf("Failed to add items: %#v", res.Error.Cause.Reason)
->>>>>>> upstream/main
 							batch.Done(1)
 
 						},
