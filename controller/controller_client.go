@@ -200,8 +200,9 @@ func (c *clientHandler) handleUnitUpdated(unit *client.Unit) {
 	state, logLvl, cfg := unit.Expected()
 	c.log.Infof("Got unit updated for ID %s (%s/%s)", unit.ID(), state.String(), logLvl.String())
 	currentUnit := c.units.GetUnit(unit.ID(), unit.Type())
-	// check to see if only the log level needs updating
-	if onlyLogLevelUpdated(cfg.Source.AsMap(), currentUnit.config, logLvl) {
+	// check to see if only the log level needs updating. Only update if we have an output unit, since we're basically getting copies of input units,
+	// so a log level change for an input might not be for us.
+	if onlyLogLevelUpdated(cfg.Source.AsMap(), currentUnit.config, logLvl) && unit.Type() == client.UnitTypeOutput {
 		c.log.Infof("unit %s got update with only log level changing. Updating to %s", unit.ID(), config.ZapFromUnitLogLevel(logLvl))
 		logp.SetLevel(config.ZapFromUnitLogLevel(logLvl))
 		_ = unit.UpdateState(client.UnitStateHealthy, "log level changed", nil)
