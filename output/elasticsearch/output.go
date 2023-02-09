@@ -24,17 +24,81 @@ type ElasticSearchOutput struct {
 
 	queue *queue.Queue
 
-	client      *elasticsearch.Client
-	bulkIndexer esutil.BulkIndexer
-
-	wg sync.WaitGroup
+	client        *elasticsearch.Client
+	bulkIndexer   esutil.BulkIndexer
+	healthWatcher ESHeathWatcher
+	watchCancel   context.CancelFunc
+	wg            sync.WaitGroup
 }
 
-func NewElasticSearch(config *Config, queue *queue.Queue) *ElasticSearchOutput {
+// ESHeathWatcher monitors the ES connection and notifies if a failure persists for more than seconds
+type ESHeathWatcher struct {
+	reportFail      func(string)
+	reportHealthy   func(string)
+	lastSuccess     time.Time
+	lastFailure     time.Time
+	didFail         bool
+	failureInterval time.Duration
+	waitInterval    time.Duration
+
+	mut sync.Mutex
+}
+
+func newHealthWatcher(reportFail, reportHealthy func(string), failureInterval time.Duration) ESHeathWatcher {
+	return ESHeathWatcher{
+		reportFail:      reportFail,
+		reportHealthy:   reportHealthy,
+		didFail:         false,
+		failureInterval: failureInterval,
+		waitInterval:    time.Second,
+	}
+}
+
+func (hw *ESHeathWatcher) Fail() {
+	hw.mut.Lock()
+	defer hw.mut.Unlock()
+	hw.lastFailure = time.Now()
+}
+
+func (hw *ESHeathWatcher) Success() {
+	hw.mut.Lock()
+	defer hw.mut.Unlock()
+	hw.lastSuccess = time.Now()
+}
+
+func (hw *ESHeathWatcher) Watch(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			break
+		default:
+		}
+		hw.mut.Lock()
+		// if the last success was > failure interval, and a failure was more recent, then report
+		if time.Now().Sub(hw.lastSuccess) > hw.failureInterval && hw.lastFailure.After(hw.lastSuccess) && !hw.didFail {
+			hw.didFail = true
+			if hw.reportFail != nil {
+				hw.reportFail("elasticsearch is degraded")
+			}
+
+		}
+		if time.Now().Sub(hw.lastSuccess) < hw.failureInterval && hw.didFail {
+			hw.didFail = false
+			if hw.reportHealthy != nil {
+				hw.reportHealthy("ES is sending events")
+			}
+		}
+		hw.mut.Unlock()
+		time.Sleep(hw.waitInterval)
+	}
+}
+
+func NewElasticSearch(config *Config, reportDegradedCallback, reportRecoveredCallback func(string), queue *queue.Queue) *ElasticSearchOutput {
 	out := &ElasticSearchOutput{
-		logger: logp.NewLogger("elasticsearch-output"),
-		config: config,
-		queue:  queue,
+		logger:        logp.NewLogger("elasticsearch-output"),
+		config:        config,
+		queue:         queue,
+		healthWatcher: newHealthWatcher(reportDegradedCallback, reportRecoveredCallback, config.DegradedTimeout),
 	}
 
 	return out
@@ -47,23 +111,33 @@ func serializeEvent(event *messages.Event) ([]byte, error) {
 	return json.Marshal(event)
 }
 
+func (es *ElasticSearchOutput) connWatch() {
+	es.logger.Warnf("ES is unreachable for 30s")
+}
+
 func (es *ElasticSearchOutput) Start() error {
 	client, err := elasticsearch.NewClient(es.config.esConfig())
 	if err != nil {
 		return err
 	}
+	healthTimeout := time.Second * 30
 	bi, err := esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
 		Index:         "elastic-agent-shipper-test",
 		Client:        client,
 		NumWorkers:    1,
 		FlushBytes:    1e+8, // 20MB
 		FlushInterval: 30 * time.Second,
+		Timeout:       healthTimeout,
 	})
 	if err != nil {
 		return err
 	}
 	es.client = client
 	es.bulkIndexer = bi
+
+	ctx, cancel := context.WithCancel(context.Background())
+	es.watchCancel = cancel
+	go es.healthWatcher.Watch(ctx)
 
 	es.wg.Add(1)
 	go func() {
@@ -98,18 +172,20 @@ func (es *ElasticSearchOutput) Start() error {
 						Body:   bytes.NewReader(serialized),
 						OnSuccess: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem) {
 							// TODO: update metrics
+							es.healthWatcher.Success()
 							batch.Done(1)
 						},
 						OnFailure: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem, err error) {
 							// TODO: update metrics
+							es.healthWatcher.Fail()
 							batch.Done(1)
+
 						},
 					},
 				)
 				if err != nil {
 					es.logger.Errorf("couldn't add to bulk index request: %v", err)
 					// This event couldn't be attempted, so mark it as finished.
-					batch.Done(1)
 				}
 			}
 		}
@@ -126,5 +202,8 @@ func (es *ElasticSearchOutput) Start() error {
 // success or failure. This doesn't stop the output loop by itself, so make sure
 // you only call it when the queue is closed.
 func (es *ElasticSearchOutput) Wait() {
+	if es.watchCancel != nil {
+		es.watchCancel()
+	}
 	es.wg.Wait()
 }

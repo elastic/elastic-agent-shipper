@@ -39,6 +39,7 @@ type Config struct {
 	Backoff            Backoff           `config:"backoff"`
 	NonIndexablePolicy *config.Namespace `config:"non_indexable_policy"`
 	AllowOlderVersion  bool              `config:"allow_older_versions"`
+	DegradedTimeout    time.Duration     `config:"degraded_timeput"`
 
 	Transport httpcommon.HTTPTransportSettings `config:",inline"`
 }
