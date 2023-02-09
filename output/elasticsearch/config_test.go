@@ -29,11 +29,13 @@ func TestInvalidConfig(t *testing.T) {
 }
 
 func TestWatcherPeriodWithNoEvents(t *testing.T) {
-	report := func(s string) {
-		t.Logf("got: %s, should not have failed", s)
-		t.Fail()
+	report := func(state WatchState, s string) {
+		if state == WATCH_DEGRADED {
+			t.Logf("got: %s, should not have failed", s)
+			t.Fail()
+		}
 	}
-	watcher := ESHeathWatcher{failureInterval: time.Second, reportFail: report, waitInterval: time.Millisecond * 100}
+	watcher := ESHeathWatcher{failureInterval: time.Second, reporter: report, waitInterval: time.Millisecond * 100}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	go watcher.Watch(ctx)
@@ -44,11 +46,14 @@ func TestWatcherPeriodWithNoEvents(t *testing.T) {
 
 func TestWatcherWithFail(t *testing.T) {
 	gotFail := false
-	reportFail := func(s string) {
+	reportFail := func(state WatchState, s string) {
 		t.Logf("got: %s", s)
-		gotFail = true
+		if state == WATCH_DEGRADED {
+			gotFail = true
+		}
+
 	}
-	watcher := ESHeathWatcher{failureInterval: time.Millisecond * 400, reportFail: reportFail, waitInterval: time.Millisecond * 100}
+	watcher := ESHeathWatcher{failureInterval: time.Millisecond * 400, reporter: reportFail, waitInterval: time.Millisecond * 100}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
@@ -56,7 +61,7 @@ func TestWatcherWithFail(t *testing.T) {
 
 	watcher.Success()
 	time.Sleep(time.Millisecond * 100)
-	watcher.Fail()
+	watcher.Fail("simulated failure")
 	// should fail
 	time.Sleep(time.Millisecond * 600)
 	assert.True(t, gotFail, "watcher should report a failure")
@@ -65,16 +70,17 @@ func TestWatcherWithFail(t *testing.T) {
 func TestWatcherWithFailAndSuccess(t *testing.T) {
 	gotFail := false
 	gotSuccess := false
-	reportFail := func(s string) {
+	reportMethod := func(state WatchState, s string) {
 		t.Logf("got: %s", s)
-		gotFail = true
-	}
-	reportSuccess := func(s string) {
-		t.Logf("got: %s", s)
-		gotSuccess = true
+		if state == WATCH_DEGRADED {
+			gotFail = true
+		}
+		if state == WATCH_RECOVERED {
+			gotSuccess = true
+		}
 	}
 
-	watcher := ESHeathWatcher{failureInterval: time.Millisecond * 400, reportFail: reportFail, reportHealthy: reportSuccess, waitInterval: time.Millisecond * 100}
+	watcher := ESHeathWatcher{failureInterval: time.Millisecond * 400, reporter: reportMethod, waitInterval: time.Millisecond * 100}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
@@ -82,7 +88,7 @@ func TestWatcherWithFailAndSuccess(t *testing.T) {
 
 	watcher.Success()
 	time.Sleep(time.Millisecond * 100)
-	watcher.Fail()
+	watcher.Fail("simulated failure")
 	// should fail
 	time.Sleep(time.Millisecond * 600)
 	// report success

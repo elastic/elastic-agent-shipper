@@ -32,74 +32,12 @@ type ElasticSearchOutput struct {
 	wg            sync.WaitGroup
 }
 
-// ESHeathWatcher monitors the ES connection and notifies if a failure persists for more than seconds
-type ESHeathWatcher struct {
-	reportFail      func(string)
-	reportHealthy   func(string)
-	lastSuccess     time.Time
-	lastFailure     time.Time
-	didFail         bool
-	failureInterval time.Duration
-	waitInterval    time.Duration
-
-	mut sync.Mutex
-}
-
-func newHealthWatcher(reportFail, reportHealthy func(string), failureInterval time.Duration) ESHeathWatcher {
-	return ESHeathWatcher{
-		reportFail:      reportFail,
-		reportHealthy:   reportHealthy,
-		didFail:         false,
-		failureInterval: failureInterval,
-		waitInterval:    time.Second,
-	}
-}
-
-func (hw *ESHeathWatcher) Fail() {
-	hw.mut.Lock()
-	defer hw.mut.Unlock()
-	hw.lastFailure = time.Now()
-}
-
-func (hw *ESHeathWatcher) Success() {
-	hw.mut.Lock()
-	defer hw.mut.Unlock()
-	hw.lastSuccess = time.Now()
-}
-
-func (hw *ESHeathWatcher) Watch(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			break
-		default:
-		}
-		hw.mut.Lock()
-		// if the last success was > failure interval, and a failure was more recent, then report
-		if time.Now().Sub(hw.lastSuccess) > hw.failureInterval && hw.lastFailure.After(hw.lastSuccess) && !hw.didFail {
-			hw.didFail = true
-			if hw.reportFail != nil {
-				hw.reportFail("elasticsearch is degraded")
-			}
-
-		}
-		if time.Now().Sub(hw.lastSuccess) < hw.failureInterval && hw.didFail {
-			hw.didFail = false
-			if hw.reportHealthy != nil {
-				hw.reportHealthy("ES is sending events")
-			}
-		}
-		hw.mut.Unlock()
-		time.Sleep(hw.waitInterval)
-	}
-}
-
-func NewElasticSearch(config *Config, reportDegradedCallback, reportRecoveredCallback func(string), queue *queue.Queue) *ElasticSearchOutput {
+func NewElasticSearch(config *Config, reportCallback WatchReporter, queue *queue.Queue) *ElasticSearchOutput {
 	out := &ElasticSearchOutput{
 		logger:        logp.NewLogger("elasticsearch-output"),
 		config:        config,
 		queue:         queue,
-		healthWatcher: newHealthWatcher(reportDegradedCallback, reportRecoveredCallback, config.DegradedTimeout),
+		healthWatcher: newHealthWatcher(reportCallback, config.DegradedTimeout),
 	}
 
 	return out
@@ -110,10 +48,6 @@ func serializeEvent(event *messages.Event) ([]byte, error) {
 	// right place for ECS. This just translates the protobuf structure
 	// directly to json.
 	return json.Marshal(event)
-}
-
-func (es *ElasticSearchOutput) connWatch() {
-	es.logger.Warnf("ES is unreachable for 30s")
 }
 
 // Start the elasticsearch output
@@ -181,7 +115,7 @@ func (es *ElasticSearchOutput) Start() error {
 						},
 						OnFailure: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem, err error) {
 							// TODO: update metrics
-							es.healthWatcher.Fail()
+							es.healthWatcher.Fail(res.Error.Cause.Reason)
 							es.logger.Debugf("Failed to add items: %#v", res.Error.Cause.Reason)
 							batch.Done(1)
 

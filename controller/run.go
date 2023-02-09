@@ -18,6 +18,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper/config"
 	"github.com/elastic/elastic-agent-shipper/grpcserver"
+	"github.com/elastic/elastic-agent-shipper/output/elasticsearch"
 	"github.com/elastic/elastic-agent-shipper/publisherserver"
 )
 
@@ -54,7 +55,16 @@ func RunUnmanaged(ctx context.Context, cfg config.ShipperRootConfig) error {
 	}
 	log := logp.L()
 	runner := publisherserver.NewOutputServer()
-	err = runner.Start(cfg)
+	// reporter for ES health status
+	reportFunc := func(state elasticsearch.WatchState, msg string) {
+		if state == elasticsearch.WATCH_DEGRADED {
+			log.Errorf("output is degraded: %s", msg)
+		} else {
+			log.Info("output has recovered")
+		}
+	}
+
+	err = runner.Start(cfg, reportFunc)
 	if err != nil {
 		return fmt.Errorf("error starting publisher server: %w", err)
 	}
