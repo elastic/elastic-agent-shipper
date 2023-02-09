@@ -3,7 +3,7 @@
 // you may not use this file except in compliance with the Elastic License.
 //go:build !integration
 
-package server
+package grpcserver
 
 import (
 	"context"
@@ -57,7 +57,7 @@ func TestPublish(t *testing.T) {
 	publisher := &publisherMock{
 		persistedIndex: 42,
 	}
-	shipper, err := NewShipperServer(DefaultConfig(), publisher)
+	shipper, err := NewShipperServer(publisher)
 	defer func() { _ = shipper.Close() }()
 	require.NoError(t, err)
 	client, stop := startServer(t, ctx, shipper)
@@ -208,11 +208,8 @@ func TestPublish(t *testing.T) {
 
 		publisher.q = make([]*messages.Event, 0, len(cases))
 
-		cfg := Config{
-			StrictMode: true, // so we can test the validation
-		}
-
-		strictShipper, err := NewShipperServer(cfg, publisher)
+		strictShipper, err := NewShipperServer(publisher)
+		strictShipper.SetStrictMode(true)
 		defer func() { _ = strictShipper.Close() }()
 		require.NoError(t, err)
 		strictClient, stop := startServer(t, ctx, strictShipper)
@@ -251,7 +248,7 @@ func TestPersistedIndex(t *testing.T) {
 	publisher := &publisherMock{persistedIndex: 42}
 
 	t.Run("server should send updates to the clients", func(t *testing.T) {
-		shipper, err := NewShipperServer(DefaultConfig(), publisher)
+		shipper, err := NewShipperServer(publisher)
 		defer func() { _ = shipper.Close() }()
 		require.NoError(t, err)
 		client, stop := startServer(t, ctx, shipper)
@@ -277,7 +274,7 @@ func TestPersistedIndex(t *testing.T) {
 	})
 
 	t.Run("server should properly shutdown", func(t *testing.T) {
-		shipper, err := NewShipperServer(DefaultConfig(), publisher)
+		shipper, err := NewShipperServer(publisher)
 		require.NoError(t, err)
 		client, stop := startServer(t, ctx, shipper)
 		defer stop()
@@ -407,4 +404,8 @@ func (p *publisherMock) TryPublish(event *messages.Event) (queue.EntryID, error)
 
 func (p *publisherMock) PersistedIndex() (queue.EntryID, error) {
 	return p.persistedIndex, nil
+}
+
+func (p *publisherMock) IsInitialized() bool {
+	return true
 }

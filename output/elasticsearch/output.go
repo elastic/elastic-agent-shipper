@@ -17,6 +17,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v8/esutil"
 )
 
+// ElasticSearchOutput handles the Elasticsearch output connection
 type ElasticSearchOutput struct {
 	logger *logp.Logger
 	config *Config
@@ -29,6 +30,7 @@ type ElasticSearchOutput struct {
 	wg sync.WaitGroup
 }
 
+// NewElasticSearch creates a new ES output
 func NewElasticSearch(config *Config, queue *queue.Queue) *ElasticSearchOutput {
 	out := &ElasticSearchOutput{
 		logger: logp.NewLogger("elasticsearch-output"),
@@ -46,7 +48,9 @@ func serializeEvent(event *messages.Event) ([]byte, error) {
 	return json.Marshal(event)
 }
 
+// Start the elasticsearch output
 func (es *ElasticSearchOutput) Start() error {
+	es.logger.Debugf("Starting elasticsearch output")
 	client, err := elasticsearch.NewClient(es.config.esConfig())
 	if err != nil {
 		return err
@@ -84,6 +88,7 @@ func (es *ElasticSearchOutput) Start() error {
 			batch.CompletionCallback = es.wg.Done
 
 			events := batch.Events()
+			es.logger.Debugf("Output got batch of %d events", len(events))
 			for _, event := range events {
 				serialized, err := serializeEvent(event)
 				if err != nil {
@@ -101,6 +106,7 @@ func (es *ElasticSearchOutput) Start() error {
 						},
 						OnFailure: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem, err error) {
 							// TODO: update metrics
+							es.logger.Debugf("Failed to add items: %#v", res.Error.Cause.Reason)
 							batch.Done(1)
 						},
 					},
