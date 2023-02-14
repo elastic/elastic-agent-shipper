@@ -72,7 +72,7 @@ func (es *ElasticSearchOutput) Start() error {
 	go func() {
 		defer es.wg.Done()
 		for {
-			batch, err := es.queue.Get(1000)
+			batch, err := es.queue.Get(100)
 			// Once an output receives a batch, it is responsible for
 			// it until all events have been either successfully sent or
 			// discarded after failure.
