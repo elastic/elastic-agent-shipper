@@ -15,7 +15,7 @@ require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220810153818-dd118efed5a5
 	github.com/elastic/elastic-agent-client/v7 v7.0.1
 	github.com/elastic/elastic-agent-shipper-client v0.4.1-0.20221028153110-a7eedbe6bd6c
-	github.com/elastic/go-elasticsearch/v8 v8.2.0
+	github.com/elastic/go-elasticsearch/v8 v8.6.0
 	github.com/elastic/go-lumber v0.1.1
 	github.com/elastic/go-ucfg v0.8.6 // indirect
 	github.com/gofrs/uuid v4.2.0+incompatible
@@ -38,7 +38,6 @@ require (
 	github.com/eapache/go-xerial-snappy v0.0.0-20180814174437-776d5712da21 // indirect
 	github.com/eapache/queue v1.1.0 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.1.0 // indirect
-	github.com/elastic/go-elasticsearch v0.0.0 // indirect
 	github.com/elastic/go-licenser v0.4.1 // indirect
 	github.com/elastic/go-structform v0.0.10 // indirect
 	github.com/elastic/go-sysinfo v1.8.1 // indirect
