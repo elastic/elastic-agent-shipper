@@ -15,7 +15,18 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp/configure"
 	"github.com/elastic/elastic-agent-libs/paths"
 	"github.com/elastic/elastic-agent-shipper/config"
+	"github.com/elastic/elastic-agent-shipper/output/elasticsearch"
 )
+
+func createOutputHealthReporter(unit *client.Unit) elasticsearch.WatchReporter {
+	return func(state elasticsearch.WatchState, msg string) {
+		if state == elasticsearch.WatchDegraded {
+			_ = unit.UpdateState(client.UnitStateDegraded, fmt.Sprintf("elasticsearch has failed with: %s", msg), nil)
+		} else {
+			_ = unit.UpdateState(client.UnitStateHealthy, "elasticsearch has recovered", nil)
+		}
+	}
+}
 
 // I am not net sure how this should work or what it should do, but we need to read from that error channel
 func reportErrors(ctx context.Context, agentClient client.V2) {
