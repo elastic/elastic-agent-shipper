@@ -23,8 +23,8 @@ var WatchRecovered WatchState = "recovered"
 // WatchReporter is a callback that the watcher will call whenever the output has reached a degraded state, or recovered from a degraded state
 type WatchReporter func(state WatchState, msg string)
 
-// ESHeathWatcher monitors the ES connection and notifies if a failure persists for more than seconds
-type ESHeathWatcher struct {
+// ESHealthWatcher monitors the ES connection and notifies if a failure persists for more than seconds
+type ESHealthWatcher struct {
 	reporter        WatchReporter
 	lastSuccess     time.Time
 	lastFailure     time.Time
@@ -36,8 +36,8 @@ type ESHeathWatcher struct {
 	mut sync.Mutex
 }
 
-func newHealthWatcher(reporter WatchReporter, failureInterval time.Duration) ESHeathWatcher {
-	return ESHeathWatcher{
+func newHealthWatcher(reporter WatchReporter, failureInterval time.Duration) ESHealthWatcher {
+	return ESHealthWatcher{
 		reporter:        reporter,
 		didFail:         false,
 		failureInterval: failureInterval,
@@ -46,7 +46,7 @@ func newHealthWatcher(reporter WatchReporter, failureInterval time.Duration) ESH
 }
 
 // Fail updates the time and error message of the last known failure
-func (hw *ESHeathWatcher) Fail(msg string) {
+func (hw *ESHealthWatcher) Fail(msg string) {
 	hw.mut.Lock()
 	defer hw.mut.Unlock()
 	hw.lastFailure = time.Now()
@@ -54,14 +54,14 @@ func (hw *ESHeathWatcher) Fail(msg string) {
 }
 
 // Success updates the last known successful ES call
-func (hw *ESHeathWatcher) Success() {
+func (hw *ESHealthWatcher) Success() {
 	hw.mut.Lock()
 	defer hw.mut.Unlock()
 	hw.lastSuccess = time.Now()
 }
 
 // Watch starts a blocking loop and will report if there has been a failure for longer than a given period
-func (hw *ESHeathWatcher) Watch(ctx context.Context) {
+func (hw *ESHealthWatcher) Watch(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():

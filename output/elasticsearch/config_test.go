@@ -35,13 +35,13 @@ func TestWatcherPeriodWithNoEvents(t *testing.T) {
 			t.Fail()
 		}
 	}
-	watcher := ESHeathWatcher{failureInterval: time.Second, reporter: report, waitInterval: time.Millisecond * 100}
+	watcher := ESHealthWatcher{failureInterval: time.Millisecond * 10, reporter: report, waitInterval: time.Millisecond * 5}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	go watcher.Watch(ctx)
 	watcher.Success()
 	// should not report failure if it's just been a long period without any events
-	time.Sleep(time.Second * 1)
+	time.Sleep(time.Millisecond * 100)
 }
 
 func TestWatcherWithFail(t *testing.T) {
@@ -53,17 +53,17 @@ func TestWatcherWithFail(t *testing.T) {
 		}
 
 	}
-	watcher := ESHeathWatcher{failureInterval: time.Millisecond * 400, reporter: reportFail, waitInterval: time.Millisecond * 100}
+	watcher := ESHealthWatcher{failureInterval: time.Millisecond * 10, reporter: reportFail, waitInterval: time.Millisecond * 5}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
 	go watcher.Watch(ctx)
 
 	watcher.Success()
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 10)
 	watcher.Fail("simulated failure")
 	// should fail
-	time.Sleep(time.Millisecond * 600)
+	time.Sleep(time.Millisecond * 15)
 	assert.True(t, gotFail, "watcher should report a failure")
 }
 
@@ -80,20 +80,20 @@ func TestWatcherWithFailAndSuccess(t *testing.T) {
 		}
 	}
 
-	watcher := ESHeathWatcher{failureInterval: time.Millisecond * 400, reporter: reportMethod, waitInterval: time.Millisecond * 100}
+	watcher := ESHealthWatcher{failureInterval: time.Millisecond * 10, reporter: reportMethod, waitInterval: time.Millisecond * 2}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
 	go watcher.Watch(ctx)
 
 	watcher.Success()
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 10)
 	watcher.Fail("simulated failure")
 	// should fail
-	time.Sleep(time.Millisecond * 600)
+	time.Sleep(time.Millisecond * 15)
 	// report success
 	watcher.Success()
-	time.Sleep(time.Millisecond * 500)
+	time.Sleep(time.Millisecond * 15)
 
 	assert.True(t, gotFail, "watcher should report a failure")
 	assert.True(t, gotSuccess, "watcher should report a healthy status")

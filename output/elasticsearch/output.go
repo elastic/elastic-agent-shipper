@@ -27,7 +27,7 @@ type ElasticSearchOutput struct {
 
 	client        *elasticsearch.Client
 	bulkIndexer   esutil.BulkIndexer
-	healthWatcher ESHeathWatcher
+	healthWatcher ESHealthWatcher
 	watchCancel   context.CancelFunc
 	wg            sync.WaitGroup
 }
@@ -131,6 +131,7 @@ func (es *ElasticSearchOutput) Start() error {
 					es.healthWatcher.Fail(err.Error())
 					es.logger.Errorf("couldn't add to bulk index request: %v", err)
 					// This event couldn't be attempted, so mark it as finished.
+					batch.Done(1)
 				}
 			}
 		}
