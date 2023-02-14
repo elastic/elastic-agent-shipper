@@ -23,7 +23,7 @@ var WatchRecovered WatchState = "recovered"
 // WatchReporter is a callback that the watcher will call whenever the output has reached a degraded state, or recovered from a degraded state
 type WatchReporter func(state WatchState, msg string)
 
-// ESHealthWatcher monitors the ES connection and notifies if a failure persists for more than seconds
+// ESHealthWatcher monitors the ES connection and notifies if a failure persists for more than failureInterval seconds
 type ESHealthWatcher struct {
 	reporter        WatchReporter
 	lastSuccess     time.Time
@@ -66,7 +66,8 @@ func (hw *ESHealthWatcher) Watch(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case <-time.After(hw.waitInterval):
+
 		}
 		hw.mut.Lock()
 
@@ -85,6 +86,6 @@ func (hw *ESHealthWatcher) Watch(ctx context.Context) {
 			}
 		}
 		hw.mut.Unlock()
-		time.Sleep(hw.waitInterval)
+		//time.Sleep(hw.waitInterval)
 	}
 }
