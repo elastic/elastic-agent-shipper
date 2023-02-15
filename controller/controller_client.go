@@ -66,7 +66,7 @@ func (c *clientHandler) startShipper(unit *client.Unit) {
 		return
 	}
 
-	err = c.outputHandler.Start(cfg)
+	err = c.outputHandler.Start(cfg, createOutputHealthReporter(unit))
 	if err != nil {
 		c.reportError("error starting output server shipper", err, unit)
 		if c.grpcServer != nil {

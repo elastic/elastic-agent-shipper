@@ -51,7 +51,7 @@ func NewOutputServer() *ServerRunner {
 
 // Start initializes the shipper server with the provided config.
 // This is a non-blocking call
-func (r *ServerRunner) Start(cfg config.ShipperRootConfig) error {
+func (r *ServerRunner) Start(cfg config.ShipperRootConfig, reportCallback elasticsearch.WatchReporter) error {
 	r.log.Debugf("initializing the queue...")
 	var err error
 	r.queue, err = queue.New(cfg.Shipper.Queue)
@@ -74,7 +74,7 @@ func (r *ServerRunner) Start(cfg config.ShipperRootConfig) error {
 
 	r.log.Debugf("initializing the output...")
 
-	r.out, err = outputFromConfig(cfg.Shipper.Output, r.queue)
+	r.out, err = outputFromConfig(cfg.Shipper.Output, r.queue, reportCallback)
 	if err != nil {
 		return fmt.Errorf("error generating output config: %w", err)
 	}
@@ -159,9 +159,9 @@ func (r *ServerRunner) TryPublish(event *messages.Event) (queue.EntryID, error) 
 	return r.queue.TryPublish(event)
 }
 
-func outputFromConfig(config output.Config, queue *queue.Queue) (Output, error) {
+func outputFromConfig(config output.Config, queue *queue.Queue, reporter elasticsearch.WatchReporter) (Output, error) {
 	if config.Elasticsearch != nil {
-		return elasticsearch.NewElasticSearch(config.Elasticsearch, queue), nil
+		return elasticsearch.NewElasticSearch(config.Elasticsearch, reporter, queue), nil
 	}
 	if config.Kafka != nil {
 		return kafka.NewKafka(config.Kafka, queue), nil
