@@ -7,8 +7,10 @@ package elasticsearch
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"fmt"
 	"sync"
+
+	"go.elastic.co/fastjson"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
@@ -35,7 +37,6 @@ func NewElasticSearch(config *Config, queue *queue.Queue) *ElasticSearchOutput {
 		config: config,
 		queue:  queue,
 	}
-
 	return out
 }
 
@@ -43,7 +44,12 @@ func serializeEvent(event *messages.Event) ([]byte, error) {
 	// TODO: we need to preprocessing the raw protobuf to get fields in the
 	// right place for ECS. This just translates the protobuf structure
 	// directly to json.
-	return json.Marshal(event)
+	jsonWriter := &fastjson.Writer{}
+	err := fastjson.Marshal(jsonWriter, event.GetFields())
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling event to json: %w", err)
+	}
+	return jsonWriter.Bytes(), nil
 }
 
 func (es *ElasticSearchOutput) Start() error {
