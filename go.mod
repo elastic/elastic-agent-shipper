@@ -3,7 +3,7 @@ module github.com/elastic/elastic-agent-shipper
 go 1.17
 
 require (
-	github.com/elastic/elastic-agent-libs v0.2.16
+	github.com/elastic/elastic-agent-libs v0.3.0
 	github.com/spf13/cobra v1.3.0
 	google.golang.org/genproto v0.0.0-20220810155839-1856144b1d9c // indirect
 	google.golang.org/grpc v1.48.0
@@ -14,7 +14,7 @@ require (
 	github.com/eapache/go-resiliency v1.2.0
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220810153818-dd118efed5a5
 	github.com/elastic/elastic-agent-client/v7 v7.0.1
-	github.com/elastic/elastic-agent-shipper-client v0.4.1-0.20221028153110-a7eedbe6bd6c
+	github.com/elastic/elastic-agent-shipper-client v0.5.0
 	github.com/elastic/go-elasticsearch/v8 v8.2.0
 	github.com/elastic/go-lumber v0.1.1
 	github.com/elastic/go-ucfg v0.8.6 // indirect
@@ -80,7 +80,6 @@ require (
 	go.elastic.co/apm/module/apmhttp/v2 v2.0.0 // indirect
 	go.elastic.co/apm/v2 v2.1.0 // indirect
 	go.elastic.co/ecszap v1.0.1 // indirect
-	go.elastic.co/fastjson v1.1.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
@@ -98,7 +97,10 @@ require (
 	howett.net/plist v1.0.0 // indirect
 )
 
-require github.com/Shopify/sarama v1.27.0
+require (
+	github.com/Shopify/sarama v1.27.0
+	go.elastic.co/fastjson v1.1.0
+)
 
 replace (
 	github.com/Shopify/sarama => github.com/elastic/sarama v1.19.1-0.20220310193331-ebc2b0d8eef3
