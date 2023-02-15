@@ -208,7 +208,7 @@ func TestStopAllInputs(t *testing.T) {
 
 func TestChangeOutputType(t *testing.T) {
 	token := mock.NewID()
-	var gotConfig, updated, newOutput, gotStopped, outIsReconfiguring bool
+	var gotConfig, updated, newOutput, gotStopped, outGotConfiguring bool
 
 	var mut sync.Mutex
 	_ = logp.DevelopmentSetup()
@@ -256,10 +256,10 @@ func TestChangeOutputType(t *testing.T) {
 					},
 				}
 			} else if unitIsState(t, proto.State_CONFIGURING, unitOut.Id, observed.Units) && updated {
-				outIsReconfiguring = true
+				outGotConfiguring = true
 				t.Logf("output is reconfiguring")
 
-			} else if unitsAreState(t, proto.State_HEALTHY, observed.Units) && updated {
+			} else if unitsAreState(t, proto.State_HEALTHY, observed.Units) && updated && outGotConfiguring {
 				t.Logf("units healthy after restart, stopping")
 				newOutput = true
 
@@ -294,7 +294,7 @@ func TestChangeOutputType(t *testing.T) {
 	assert.True(t, gotConfig, "initial config")
 	assert.True(t, updated, "unit was updated")
 	assert.True(t, newOutput, "unit got new output")
-	assert.True(t, outIsReconfiguring, "output reconfigured")
+	assert.True(t, outGotConfiguring, "output reconfigured")
 	assert.True(t, gotStopped, "units stopped")
 }
 
