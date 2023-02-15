@@ -71,6 +71,9 @@ func RunUnmanaged(ctx context.Context, cfg config.ShipperRootConfig) error {
 
 	srv := grpcserver.NewGRPCServer(runner)
 	err = srv.Start(creds, cfg.Shipper.Server.Server)
+	if err != nil {
+		return fmt.Errorf("error starting grpc server: %w", err)
+	}
 
 	// On termination signals, gracefully stop the shipper
 	sigc := make(chan os.Signal, 1)

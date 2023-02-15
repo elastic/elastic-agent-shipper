@@ -49,6 +49,11 @@ func TestUnmanaged(t *testing.T) {
 			break
 		}
 	}
+	// remove the file now that we know it's there
+	defer func() {
+		_ = os.Remove(serverAddr)
+	}()
+
 	// basic test, make sure output is running
 	con, err := net.Dial("unix", serverAddr)
 	require.NoError(t, err)
