@@ -11,12 +11,13 @@ import (
 	"sync"
 	"time"
 
+	"go.elastic.co/fastjson"
+
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 	"github.com/elastic/elastic-agent-shipper/queue"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esutil"
-	"go.elastic.co/fastjson"
 )
 
 // ElasticSearchOutput handles the Elasticsearch output connection

@@ -8,10 +8,11 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/helpers"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
-	"github.com/stretchr/testify/require"
 )
 
 func TestOutputMarshal(t *testing.T) {
