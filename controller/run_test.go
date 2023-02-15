@@ -6,14 +6,12 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/gofrs/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -23,7 +21,7 @@ import (
 
 func TestUnmanaged(t *testing.T) {
 	_ = logp.DevelopmentSetup()
-	serverAddr := filepath.Join(os.TempDir(), fmt.Sprintf("test-unmanaged-%s.sock", uuid.Must(uuid.NewV4()).String()))
+	serverAddr := filepath.Join(os.TempDir(), "test-unmanaged-shipper.sock")
 	cfg := config.DefaultConfig()
 	cfg.Type = "console"
 	cfg.Shipper.Output.Console = &output.ConsoleConfig{Enabled: true}
@@ -40,12 +38,23 @@ func TestUnmanaged(t *testing.T) {
 		require.NoError(t, err)
 	}()
 	// wait a bit for the components to start
-	time.Sleep(time.Millisecond * 300)
+	for {
+		select {
+		case <-ctx.Done():
+			t.Fatalf("timed out waiting for unix socket")
+		default:
+		}
+		_, err := os.Stat(serverAddr)
+		if !os.IsNotExist(err) {
+			break
+		}
+	}
 	// basic test, make sure output is running
 	con, err := net.Dial("unix", serverAddr)
+	require.NoError(t, err)
 	defer func() {
 		_ = con.Close()
 	}()
-	require.NoError(t, err)
+
 	cancel()
 }
