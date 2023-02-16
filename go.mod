@@ -14,8 +14,8 @@ require (
 	github.com/eapache/go-resiliency v1.2.0
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220810153818-dd118efed5a5
 	github.com/elastic/elastic-agent-client/v7 v7.0.1
-	github.com/elastic/go-elasticsearch/v8 v8.6.0
 	github.com/elastic/elastic-agent-shipper-client v0.5.0
+	github.com/elastic/go-elasticsearch/v8 v8.6.0
 	github.com/elastic/go-lumber v0.1.1
 	github.com/elastic/go-ucfg v0.8.6 // indirect
 	github.com/gofrs/uuid v4.2.0+incompatible
