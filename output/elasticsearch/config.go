@@ -53,13 +53,16 @@ type Config struct {
 	// Defaults to 30sec.
 	FlushTimeout time.Duration `config:"flush_timeout"`
 
+	// The following are internal parameters of the output that are not used
+	// by go-elasticsearch:
+
 	DegradedTimeout time.Duration `config:"degraded_timeout"`
 }
 
 // Backoff represents connection backoff settings
 type Backoff struct {
-	Init time.Duration
-	Max  time.Duration
+	Init time.Duration `config:"init"`
+	Max  time.Duration `config:"max"`
 }
 
 func (b Backoff) delayTime(attempt int) time.Duration {
