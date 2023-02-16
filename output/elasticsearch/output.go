@@ -114,10 +114,17 @@ func (es *ElasticSearchOutput) Start() error {
 					es.logger.Errorf("failed to serialize event: %v", err)
 					continue
 				}
+				var rawIndex string
+				// If the event metadata contains a raw_index field, attach
+				// that to the indexer item to override the global default.
+				if indexField := event.GetMetadata().GetData()["raw_index"]; indexField != nil {
+					rawIndex = indexField.GetStringValue()
+				}
 				err = bi.Add(
 					context.Background(),
 					esutil.BulkIndexerItem{
 						Action: "index",
+						Index:  rawIndex,
 						Body:   bytes.NewReader(serialized),
 						OnSuccess: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem) {
 							// TODO: update metrics
