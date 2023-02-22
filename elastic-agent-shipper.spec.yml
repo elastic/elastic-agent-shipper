@@ -18,4 +18,4 @@ shippers:
     command: &command
       args:
         - "-E"
-        - "logging.level=debug"
+        - "logging.level=info"
