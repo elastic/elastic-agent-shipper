@@ -6,9 +6,7 @@ package controller
 
 import (
 	"context"
-	"net"
-	"os"
-	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,19 +15,16 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper/config"
 	"github.com/elastic/elastic-agent-shipper/output"
+	"github.com/elastic/elastic-agent-shipper/tools"
 )
 
 func TestUnmanaged(t *testing.T) {
 	_ = logp.DevelopmentSetup()
-	serverAddr := filepath.Join(os.TempDir(), "test-unmanaged-shipper.sock")
+	serverAddr := tools.GenerateTestAddr(t.TempDir())
 	cfg := config.DefaultConfig()
 	cfg.Type = "console"
 	cfg.Shipper.Output.Console = &output.ConsoleConfig{Enabled: true}
 	cfg.Shipper.Server.Server = serverAddr
-
-	defer func() {
-		_ = os.Remove(serverAddr)
-	}()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 
@@ -41,25 +36,16 @@ func TestUnmanaged(t *testing.T) {
 	for {
 		select {
 		case <-ctx.Done():
-			t.Fatalf("timed out waiting for unix socket")
+			t.Fatalf("timed out trying to dial %s", serverAddr)
 		default:
 		}
-		_, err := os.Stat(serverAddr)
-		if !os.IsNotExist(err) {
-			break
+		con, err := tools.DialTestAddr(serverAddr)
+		if err != nil && (strings.Contains(err.Error(), "connection refused") || strings.Contains(err.Error(), "no such file") || strings.Contains(err.Error(), "cannot find the file")) {
+			continue
 		}
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = con.Close() })
+		break
 	}
-	// remove the file now that we know it's there
-	defer func() {
-		_ = os.Remove(serverAddr)
-	}()
-
-	// basic test, make sure output is running
-	con, err := net.Dial("unix", serverAddr)
-	require.NoError(t, err)
-	defer func() {
-		_ = con.Close()
-	}()
-
 	cancel()
 }

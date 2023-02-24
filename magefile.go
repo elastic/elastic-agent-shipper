@@ -46,6 +46,7 @@ var Aliases = map[string]interface{}{
 	"package":                               Package.Artifacts,
 	"unitTest":                              Test.Unit,
 	"integrationTest":                       Test.Integration,
+	"test":                                  Test.All,
 	"release-manager-dependencies":          Dependencies.Generate,
 	"release-manager-dependencies-snapshot": Dependencies.Snapshot,
 	"release-manager-dependencies-release":  Dependencies.Release,
@@ -132,7 +133,6 @@ func (Build) Binary() error {
 		return fmt.Errorf("Build failed on %s: %w", platform, err)
 	}
 	return CheckBinaries(platform, env["DEFAULT_VERSION"])
-
 }
 
 // TEST
@@ -140,7 +140,7 @@ func (Build) Binary() error {
 // Test namespace contains all the task for testing the projects.
 type Test mg.Namespace
 
-// All runs all the tests.
+// All runs all the unit and integration tests (use alias `mage test`).
 func (Test) All() {
 	mg.SerialDeps(Test.Unit, Test.Integration)
 }
@@ -148,7 +148,10 @@ func (Test) All() {
 // Integration runs all the integration tests (use alias `mage integrationTest`).
 func (Test) Integration(ctx context.Context) error {
 	platform := runtime.GOOS + "/" + runtime.GOARCH
-	version := tools.DefaultBeatVersion
+	version, err := fullVersion()
+	if err != nil {
+		return fmt.Errorf("error getting full version: %w", err)
+	}
 	os.Setenv("PLATFORMS", platform)
 	mg.Deps(Build.Binary)
 	binary, err := absoluteBinaryPath(version, platform)
@@ -162,11 +165,11 @@ func (Test) Integration(ctx context.Context) error {
 // Unit runs all the unit tests (use alias `mage unitTest`).
 func (Test) Unit(ctx context.Context) error {
 	testCoverage := devtools.BoolEnvOrFalse("TEST_COVERAGE")
-	//mg.Deps(Build.Binary, Build.TestBinaries)
+	// mg.Deps(Build.Binary, Build.TestBinaries)
 	return devtools.GoUnitTest(ctx, testCoverage)
 }
 
-//CHECKS
+// CHECKS
 
 // Lint runs the linter, equivalent running to 'golangci-lint run ./...'
 func Lint() error {
@@ -252,7 +255,7 @@ type Dependencies mg.Namespace
 // Generate creates a list of dependencies in a form of csv file.
 func (Dependencies) Generate() {
 	dependenciesDir := filepath.Join("build", "distributions", "reports")
-	err := os.MkdirAll(dependenciesDir, 0755)
+	err := os.MkdirAll(dependenciesDir, 0o755)
 	if err != nil {
 		panic(err)
 	}
@@ -320,7 +323,7 @@ func (Package) Artifacts() {
 	}
 
 	archivePath := filepath.Join("build", "distributions")
-	if err := os.MkdirAll(archivePath, 0755); err != nil {
+	if err := os.MkdirAll(archivePath, 0o755); err != nil {
 		panic(err)
 	}
 
@@ -378,7 +381,7 @@ func (Package) Artifacts() {
 
 		shaFile := archiveFullPath + ".sha512"
 		content := fmt.Sprintf("%x  %s\n", h.Sum(nil), archiveFileName)
-		if err := ioutil.WriteFile(shaFile, []byte(content), 0644); err != nil {
+		if err := ioutil.WriteFile(shaFile, []byte(content), 0o644); err != nil {
 			panic(fmt.Errorf("failed writing hash for archive %q: %w", archiveFileName, err))
 		}
 
@@ -515,7 +518,7 @@ func binaryName(path, version, platform string) string {
 }
 
 func execName(platform string) string {
-	var execName = devtools.ProjectName
+	execName := devtools.ProjectName
 	if strings.Contains(platform, "windows") {
 		execName += ".exe"
 	}
