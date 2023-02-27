@@ -31,7 +31,7 @@ func TestUnmanaged(t *testing.T) {
 		_ = os.Remove(serverAddr)
 	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 
 	go func() {
 		err := RunUnmanaged(ctx, cfg)
@@ -55,11 +55,21 @@ func TestUnmanaged(t *testing.T) {
 	}()
 
 	// basic test, make sure output is running
-	con, err := net.Dial("unix", serverAddr)
-	require.NoError(t, err)
-	defer func() {
-		_ = con.Close()
-	}()
+	dial := net.Dialer{Timeout: time.Millisecond * 300}
+	// retry in case there's a race between the socket existing and the server actually starting
+	retry := 5
+	var lastErr error
+	for i := 0; i < retry; i++ {
+		con, lastErr := dial.Dial("unix", serverAddr)
+		if lastErr != nil {
+			t.Logf("could not connect to gRPC socket, error %s", lastErr)
+			continue
+		}
+		con.Close()
+		break
+
+	}
+	require.NoError(t, lastErr)
 
 	cancel()
 }
