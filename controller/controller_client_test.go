@@ -506,7 +506,6 @@ func TestUnitLogChange(t *testing.T) {
 				t.FailNow()
 			}
 			if gotStopped {
-				doneWaiter.Done()
 				return nil
 			}
 			// initial checkin
@@ -540,7 +539,7 @@ func TestUnitLogChange(t *testing.T) {
 				}
 			} else if unitsAreState(t, proto.State_HEALTHY, observed.Units) && gotHealthy {
 				// shut down
-				t.Logf("Got unit state healthy, stoppinng")
+				t.Logf("Got unit state healthy, stopping")
 				//check to see if log level has changed
 				observedLogLevel = logp.GetLevel()
 				unitOut.ConfigStateIdx++
@@ -552,7 +551,7 @@ func TestUnitLogChange(t *testing.T) {
 				}
 			} else if unitsAreState(t, proto.State_STOPPED, observed.Units) {
 				gotStopped = true
-				//doneWaiter.Done()
+				doneWaiter.Done()
 				t.Logf("Got unit state STOPPED, removing")
 				return &proto.CheckinExpected{
 					Units: []*proto.UnitExpected{},
