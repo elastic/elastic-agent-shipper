@@ -133,8 +133,9 @@ func (es *ElasticSearchOutput) Start() error {
 						},
 						OnFailure: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem, err error) {
 							// TODO: update metrics
-							es.healthWatcher.Fail(res.Error.Cause.Reason)
-							es.logger.Debugf("Failed to add items: %#v", res.Error.Cause.Reason)
+							errMsg := fmt.Sprintf("err: %s cause: %s", res.Error.Reason, res.Error.Cause.Reason)
+							es.healthWatcher.Fail(errMsg)
+							es.logger.Debugf("Failed to add items: %#v", errMsg)
 							batch.Done(1)
 
 						},
