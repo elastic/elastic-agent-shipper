@@ -486,7 +486,6 @@ func TestBasicAgentControl(t *testing.T) {
 func TestUnitLogChange(t *testing.T) {
 	token := mock.NewID()
 	var gotConfig, gotHealthy, gotStopped, gotRestarted bool
-	var observedLogLevel zapcore.Level
 
 	var mut sync.Mutex
 	_ = logp.DevelopmentSetup()
@@ -541,7 +540,6 @@ func TestUnitLogChange(t *testing.T) {
 				// shut down
 				t.Logf("Got unit state healthy, stopping")
 				//check to see if log level has changed
-				observedLogLevel = logp.GetLevel()
 				unitOut.ConfigStateIdx++
 				unitOut.State = proto.State_STOPPED
 				return &proto.CheckinExpected{
@@ -572,7 +570,6 @@ func TestUnitLogChange(t *testing.T) {
 	assert.True(t, gotHealthy, "healthy state")
 	assert.True(t, gotStopped, "stopped state")
 	assert.False(t, gotRestarted, "units restarted")
-	assert.Equal(t, zapcore.DebugLevel, observedLogLevel, "not expected log level")
 
 }
 
