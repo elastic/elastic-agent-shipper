@@ -18,6 +18,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/elastic-agent-shipper-client/pkg/helpers"
 )
 
 type partitionBuilder func(*logp.Logger, *config.C) (func() partitioner, error)
@@ -238,7 +239,7 @@ func makeFieldsHashPartitioner(log *logp.Logger, fields []string, dropFail bool)
 			var err error
 
 			for _, field := range fields {
-				err = hashFieldValue(hasher, mapstrForStruct(msg.data.Fields), field)
+				err = hashFieldValue(hasher, helpers.AsMap(msg.data.Fields), field)
 				if err != nil {
 					break
 				}

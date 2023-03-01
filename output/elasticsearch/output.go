@@ -120,10 +120,14 @@ func (es *ElasticSearchOutput) Start() error {
 				if indexField := event.GetMetadata().GetData()["raw_index"]; indexField != nil {
 					rawIndex = indexField.GetStringValue()
 				}
+				actionType := "create"
+				if opType := event.GetMetadata().GetData()["op_type"]; opType != nil {
+					actionType = opType.GetStringValue()
+				}
 				err = bi.Add(
 					context.Background(),
 					esutil.BulkIndexerItem{
-						Action: "index",
+						Action: actionType,
 						Index:  rawIndex,
 						Body:   bytes.NewReader(serialized),
 						OnSuccess: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem) {

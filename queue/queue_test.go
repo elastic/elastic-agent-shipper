@@ -126,7 +126,7 @@ func TestQueueTypes(t *testing.T) {
 				data := events[i].GetFields().GetData()
 				testField, prs := data["message"]
 				assert.True(t, prs)
-				v := testField.GetNumberValue()
+				v := testField.GetInt64Value()
 				tracker[int(v)] = true
 			}
 			got = got + len(events)
@@ -149,8 +149,8 @@ func makeEvent(msg int) *messages.Event {
 		Fields: &messages.Struct{
 			Data: map[string]*messages.Value{
 				"message": {
-					Kind: &messages.Value_NumberValue{
-						NumberValue: float64(msg),
+					Kind: &messages.Value_Int64Value{
+						Int64Value: int64(msg),
 					},
 				},
 			},
