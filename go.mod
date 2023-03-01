@@ -1,9 +1,13 @@
 module github.com/elastic/elastic-agent-shipper
 
-go 1.17
+go 1.19
 
 require (
+<<<<<<< HEAD
 	github.com/elastic/elastic-agent-libs v0.2.16
+=======
+	github.com/elastic/elastic-agent-libs v0.3.3
+>>>>>>> cc3d73c ([updatecli][shell] Bump version to 1.19 (#235))
 	github.com/spf13/cobra v1.3.0
 	google.golang.org/genproto v0.0.0-20220810155839-1856144b1d9c // indirect
 	google.golang.org/grpc v1.48.0
