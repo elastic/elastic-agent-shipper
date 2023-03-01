@@ -10,10 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent-shipper-client/pkg/helpers"
 	"github.com/stretchr/testify/require"
 	"go.elastic.co/fastjson"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/elastic/elastic-agent-shipper-client/pkg/helpers"
 )
 
 func TestEventMarshal(t *testing.T) {
