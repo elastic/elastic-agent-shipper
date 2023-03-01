@@ -7,6 +7,7 @@ package elasticsearch
 import (
 	"crypto/tls"
 	"net/http"
+	"runtime"
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
@@ -18,33 +19,30 @@ import (
 // Currently these are identical to the parameters in the Beats Elasticsearch
 // output, however this is subject to change as we approach official release.
 type Config struct {
-	Enabled  bool     `config:"enabled"`
+	Enabled bool `config:"enabled"`
+
+	// The following parameters map more-or-less directly to values in the
+	// go-elasticsearch config, and are converted in the esConfig()
+	// helper:
+
 	Hosts    []string `config:"hosts"`
 	Username string   `config:"username"`
 	Password string   `config:"password"`
 
-	Backoff    Backoff `config:"backoff"`
-	MaxRetries int     `config:"max_retries"`
+	// Default: {init: 1sec, max: 60sec}
+	Backoff Backoff `config:"backoff"`
+
+	// Default: 3
+	MaxRetries int `config:"max_retries"`
+
+	// Default: 502, 503, 504.
+	RetryOnHTTPStatus []int `config:"retry_on_http_status"`
 
 	Transport httpcommon.HTTPTransportSettings `config:",inline"`
 
-	// The following configuration flags are copied from the equivalent Beats
-	// configuration, but are commented out because they are not yet active/implemented:
-	//Protocol           string            `config:"protocol"`
-	//Path               string            `config:"path"`
-	//Params             map[string]string `config:"parameters"`
-	//Headers            map[string]string `config:"headers"`
-	//APIKey             string            `config:"api_key"`
-	//LoadBalance        bool              `config:"loadbalance"`
-	//CompressionLevel   int               `config:"compression_level" validate:"min=0, max=9"`
-	//EscapeHTML         bool              `config:"escape_html"`
-	//Kerberos           *kerberos.Config  `config:"kerberos"`
-	//NonIndexablePolicy *config.Namespace `config:"non_indexable_policy"`
-	//AllowOlderVersion  bool              `config:"allow_older_versions"`
-
 	// The following parameters have no equivalent in the go-elasticsearch
 	// config, and need to be specified directly when the indexer is created
-	// instead of being returned in esConfig().
+	// instead of being returned in esConfig():
 
 	// Defaults to runtime.NumCPU()
 	NumWorkers int `config:"num_workers"`
@@ -54,11 +52,17 @@ type Config struct {
 
 	// Defaults to 30sec.
 	FlushTimeout time.Duration `config:"flush_timeout"`
+
+	// The following are internal parameters of the output that are not used
+	// by go-elasticsearch:
+
+	DegradedTimeout time.Duration `config:"degraded_timeout"`
 }
 
+// Backoff represents connection backoff settings
 type Backoff struct {
-	Init time.Duration
-	Max  time.Duration
+	Init time.Duration `config:"init"`
+	Max  time.Duration `config:"max"`
 }
 
 func (b Backoff) delayTime(attempt int) time.Duration {
@@ -72,6 +76,7 @@ func (b Backoff) delayTime(attempt int) time.Duration {
 	return result
 }
 
+// Validate validates the ES config
 func (c *Config) Validate() error {
 	/*if c.APIKey != "" && (c.Username != "" || c.Password != "") {
 		return fmt.Errorf("cannot set both api_key and username/password")
@@ -80,22 +85,49 @@ func (c *Config) Validate() error {
 	return nil
 }
 
+func (c Config) addDefaults() Config {
+	if c.Backoff.Init == 0 {
+		c.Backoff.Init = 1 * time.Second
+	}
+	if c.Backoff.Max == 0 {
+		c.Backoff.Max = 60 * time.Second
+	}
+	if len(c.RetryOnHTTPStatus) == 0 {
+		c.RetryOnHTTPStatus = []int{502, 503, 504}
+	}
+	if c.MaxRetries == 0 {
+		c.MaxRetries = 3
+	}
+	if c.NumWorkers == 0 {
+		c.NumWorkers = runtime.NumCPU()
+	}
+	if c.BatchSize == 0 {
+		c.BatchSize = 5 * (1 << 20) // 5MB
+	}
+	if c.FlushTimeout == 0 {
+		c.FlushTimeout = 30 * time.Second
+	}
+	return c
+}
+
 // esConfig converts the configuration for the elasticsearch shipper output
 // to the configuration for the go-elasticsearch client API.
 func (c Config) esConfig() elasticsearch.Config {
+	c = c.addDefaults()
 	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12}
-	if c.Transport.TLS.VerificationMode == tlscommon.VerifyNone {
+	if c.Transport.TLS != nil && c.Transport.TLS.VerificationMode == tlscommon.VerifyNone {
 		// Unlike Beats, the shipper doesn't support the ability to verify the
 		// certificate but not the hostname, so any setting except VerifyNone
 		// falls back on full verification.
 		tlsConfig.InsecureSkipVerify = true
 	}
 	cfg := elasticsearch.Config{
-		Addresses:    c.Hosts,
-		Username:     c.Username,
-		Password:     c.Password,
-		RetryBackoff: c.Backoff.delayTime,
-		MaxRetries:   c.MaxRetries,
+		Addresses:     c.Hosts,
+		Username:      c.Username,
+		Password:      c.Password,
+		RetryBackoff:  c.Backoff.delayTime,
+		MaxRetries:    c.MaxRetries,
+		RetryOnStatus: c.RetryOnHTTPStatus,
 		Transport: &http.Transport{
 			TLSClientConfig: tlsConfig,
 		},

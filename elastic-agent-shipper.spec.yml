@@ -1,8 +1,8 @@
 version: 2
-outputs:
-  - name: elasticsearch
-    description: Elasticsearch
-    platforms: &platforms
+shippers:
+  - name: shipper
+    description: "Elastic Agent Shipper"
+    platforms:
       - linux/amd64
       - linux/arm64
       - darwin/amd64
@@ -10,5 +10,12 @@ outputs:
       - windows/amd64
       - container/amd64
       - container/arm64
-    command: {}
-  
+    outputs:
+      - elasticsearch
+      - kafka
+      - logstash
+      - redis
+    command: &command
+      args:
+        - "-E"
+        - "logging.level=info"

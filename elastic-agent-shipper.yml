@@ -134,6 +134,11 @@ output:
     #batch_size: 10000000
     #flush_timeout: 30s
 
+    #retry_on_http_status: [502, 503, 504]
+    #max_retries: 5
+    #backoff.init: 1s
+    #backoff.max: 60s
+
     # This option may be convenient for local testing:
     #ssl.verification_mode: none
 

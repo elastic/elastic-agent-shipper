@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -107,7 +106,7 @@ func GoUnitTest(ctx context.Context, testCoverage bool) error {
 		codecovReport = strings.TrimSuffix(covFile,
 			filepath.Ext(covFile)) + "-cov.xml"
 
-		coverage, err := ioutil.ReadFile(covFile)
+		coverage, err := os.ReadFile(covFile)
 		if err != nil {
 			return fmt.Errorf("failed to read code coverage report: %w", err)
 		}
