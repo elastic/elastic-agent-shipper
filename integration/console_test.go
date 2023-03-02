@@ -6,51 +6,49 @@
 package integration
 
 import (
+	"path/filepath"
 	"testing"
 
-	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
+	"github.com/elastic/elastic-agent-shipper/tools"
 )
 
 func TestServerStarts(t *testing.T) {
+	path := t.TempDir()
+	socket := tools.GenerateTestAddr(path)
 	config := `
-server:
-  strict_mode: false
-  port: 50052
-  tls: false
-logging:
-  level: debug
-  selectors: ["*"]
-  to_stderr: true
-output:
-  console:
-    enabled: true
+type: console
+shipper:
+  server:
+    server: ` + socket + `
+  output:
+    console:
+      enabled: true
 `
 	env := NewTestingEnvironment(t, config)
 	t.Cleanup(func() { env.Stop() })
 
-	found := env.WaitUntil("stderr", "gRPC server is ready and is listening on")
+	found := env.WaitUntil("stderr", "gRPC started")
 
 	if !found {
-		env.Fatalf("Test executable failed to start.")
+		env.Fatalf("test executable failed to start")
 	}
 }
 
 func TestServerFailsToStart(t *testing.T) {
+	path := t.TempDir()
+	socket := tools.GenerateTestAddr(path)
 	config := `
-server:
-  strict_mode: false
-  port: 50052
-  tls: not_boolean
-logging:
-  level: debug
-  selectors: ["*"]
-  to_stderr: true
-output:
-  console:
-    enabled: true
+type: console
+shipper:
+  server:
+    server: ` + socket + `
+  output:
+    console:
+      enabled: not_a_boolean
 `
-
 	env := NewTestingEnvironment(t, config)
 	t.Cleanup(func() { env.Stop() })
 
@@ -62,35 +60,32 @@ output:
 }
 
 func TestPublishMessage(t *testing.T) {
+	path := t.TempDir()
+	socket := tools.GenerateTestAddr(path)
 	config := `
-server:
-  strict_mode: false
-  port: 50052
-  tls: false
-logging:
-  level: debug
-  selectors: ["*"]
-  to_stderr: true
-output:
-  console:
-    enabled: true
+type: console
+shipper:
+  server:
+    server: ` + socket + `
+  output:
+    console:
+      enabled: true
 `
-
 	env := NewTestingEnvironment(t, config)
 	t.Cleanup(func() { env.Stop() })
 
-	found := env.WaitUntil("stderr", "gRPC server is ready and is listening on")
+	found := env.WaitUntil("stderr", "gRPC started")
 
 	if !found {
-		env.Fatalf("Test executable failed to start")
+		env.Fatalf("test executable failed to start")
 	}
 
 	found = env.Contains("stderr", "Initializing disk queue at path")
 	if found {
-		env.Fatalf("Memory queue configured but disk queue started")
+		env.Fatalf("memory queue configured but disk queue started")
 	}
 
-	client := env.NewClient("localhost:50052")
+	client := env.NewClient(socket)
 	unique := "UniqueStringToLookForInOutput"
 	events, err := createEvents([]string{unique})
 	require.NoErrorf(t, err, "error creating events: %s\n", err)
@@ -103,46 +98,42 @@ output:
 	found = env.WaitUntil("stdout", unique)
 
 	if !found {
-		env.Fatalf("Event wasn't published")
+		env.Fatalf("event wasn't published")
 	}
 }
 
 func TestPublishDiskQueue(t *testing.T) {
-	queue_path := t.TempDir()
-
+	path := t.TempDir()
+	socket := tools.GenerateTestAddr(path)
+	queue_path := filepath.Join(path, "queue")
 	config := `
-server:
-  strict_mode: false
-  port: 50052
-  tls: false
-logging:
-  level: debug
-  selectors: ["*"]
-  to_stderr: true
-output:
-  console:
-    enabled: true
-queue:
-  disk:
-    path: ` + queue_path + `
-    max_size: 10G
+type: console
+shipper:
+  server:
+    server: ` + socket + `
+  output:
+    console:
+      enabled: true
+  queue:
+    disk:
+      path: ` + queue_path + `
+      max_size: 10G
 `
-
 	env := NewTestingEnvironment(t, config)
 	t.Cleanup(func() { env.Stop() })
 
-	found := env.WaitUntil("stderr", "gRPC server is ready and is listening on")
+	found := env.WaitUntil("stderr", "gRPC started")
 
 	if !found {
-		env.Fatalf("Test executable failed to start")
+		env.Fatalf("test executable failed to start")
 	}
 
 	found = env.Contains("stderr", "Initializing disk queue at path")
 	if !found {
-		env.Fatalf("Disk queue configured but not started")
+		env.Fatalf("disk queue configured but not started")
 	}
 
-	client := env.NewClient("localhost:50052")
+	client := env.NewClient(socket)
 	unique := "UniqueStringToLookForInOutput"
 	events, err := createEvents([]string{unique})
 	require.NoErrorf(t, err, "error creating events: %s\n", err)
@@ -155,48 +146,45 @@ queue:
 	found = env.WaitUntil("stdout", unique)
 
 	if !found {
-		env.Fatalf("Event wasn't published")
+		env.Fatalf("event wasn't published")
 	}
 }
 
-func TestPublishCompressEncryptedDiskQueue(t *testing.T) {
-	queue_path := t.TempDir()
-
+func TestPubCompEncDiskQueue(t *testing.T) {
+	path := t.TempDir()
+	socket := tools.GenerateTestAddr(path)
+	queue_path := filepath.Join(path, "queue")
 	config := `
-server:
-  strict_mode: false
-  port: 50052
-  tls: false
-logging:
-  level: debug
-  selectors: ["*"]
-  to_stderr: true
-output:
-  console:
-    enabled: true
-queue:
-  disk:
-    path: ` + queue_path + `
-    max_size: 10G
-    use_compression: true
-    encryption_password: secret
+type: console
+shipper:
+  server:
+    server: ` + socket + `
+  output:
+    console:
+      enabled: true
+  queue:
+    disk:
+      path: ` + queue_path + `
+      max_size: 10G
+      use_compression: true
+      encryption_password: secret
 `
 
 	env := NewTestingEnvironment(t, config)
 	t.Cleanup(func() { env.Stop() })
 
-	found := env.WaitUntil("stderr", "gRPC server is ready and is listening on")
+	found := env.WaitUntil("stderr", "gRPC started")
 
 	if !found {
-		env.Fatalf("Test executable failed to start")
+		env.Fatalf("test executable failed to start")
 	}
 
 	found = env.Contains("stderr", "Initializing disk queue at path")
 	if !found {
-		env.Fatalf("Disk queue configured but not started")
+		env.Fatalf("disk queue configured but not started")
 	}
 
-	client := env.NewClient("localhost:50052")
+	client := env.NewClient(socket)
 	unique := "UniqueStringToLookForInOutput"
 	events, err := createEvents([]string{unique})
 	require.NoErrorf(t, err, "error creating events: %s\n", err)
@@ -209,6 +197,6 @@ queue:
 	found = env.WaitUntil("stdout", unique)
 
 	if !found {
-		env.Fatalf("Event wasn't published")
+		env.Fatalf("event wasn't published")
 	}
 }

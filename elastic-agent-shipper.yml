@@ -1,154 +1,219 @@
 # ========================= Shipper Configuration File ========================
 
-# ================================== General ==================================
+# type refers to the type of output, can be console, elasticsearch, kafka or logstash
+type: console
 
-server:
+shipper:
+# ================================== General ==================================
   # StrictMode means that every incoming event will be validated against the list of required
   # fields. This introduces some additional overhead but can be really handy for client developers
   # on the debugging stage. Normally, it should be disabled during production use and enabled for
   # testing. In production it is preferable to send events to the output if at all possible.
   strict_mode: false
-  # The gRPC port that the shipper will listen on.
-  port: 50052
-  # Whether to use TLS for gRPC communication or not.
-  tls: false
-  # A path to a TLS certifcate.
-  # cert:
-  # A path to a TLS keyfile.
-  # key:
 
-# ================================== Logging ==================================
-
-logging:
-  # Sets log level. The default log level is info.
-  # Available log levels are: error, warning, info, debug
-  level: debug
-  # Enable debug output for selected components. To enable all selectors use ["*"]
-  # Other available selectors are "beat", "publisher", "service"
-  # Multiple selectors can be chained.
-  selectors: ["*"]
-  # Send all logging output to stderr. The default is false.
-  to_stderr: true
+  server:
+    # The gRPC socket the shipper service will listen on.
+    server: unix:///tmp/grpc.socket
+    # TLS setting for gRPC socket
+    # ssl: 
+    #   # list of certificate authorities to trust
+    #   certificate_authorities:
+    #     - |
+    #        -----BEGIN CERTIFICATE-----
+    #        MIIDCjCCAfKgAwIBAgITJ706Mu2wJlKckpIvkWxEHvEyijANBgkqhkiG9w0BAQsF
+    #        ADAUMRIwEAYDVQQDDAlsb2NhbGhvc3QwIBcNMTkwNzIyMTkyOTA0WhgPMjExOTA2
+    #        MjgxOTI5MDRaMBQxEjAQBgNVBAMMCWxvY2FsaG9zdDCCASIwDQYJKoZIhvcNAQEB
+    #        BQADggEPADCCAQoCggEBANce58Y/JykI58iyOXpxGfw0/gMvF0hUQAcUrSMxEO6n
+    #        fZRA49b4OV4SwWmA3395uL2eB2NB8y8qdQ9muXUdPBWE4l9rMZ6gmfu90N5B5uEl
+    #        94NcfBfYOKi1fJQ9i7WKhTjlRkMCgBkWPkUokvBZFRt8RtF7zI77BSEorHGQCk9t
+    #        /D7BS0GJyfVEhftbWcFEAG3VRcoMhF7kUzYwp+qESoriFRYLeDWv68ZOvG7eoWnP
+    #        PsvZStEVEimjvK5NSESEQa9xWyJOmlOKXhkdymtcUd/nXnx6UTCFgnkgzSdTWV41
+    #        CI6B6aJ9svCTI2QuoIq2HxX/ix7OvW1huVmcyHVxyUECAwEAAaNTMFEwHQYDVR0O
+    #        BBYEFPwN1OceFGm9v6ux8G+DZ3TUDYxqMB8GA1UdIwQYMBaAFPwN1OceFGm9v6ux
+    #        8G+DZ3TUDYxqMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAG5D
+    #        874A4YI7YUwOVsVAdbWtgp1d0zKcPRR+r2OdSbTAV5/gcS3jgBJ3i1BN34JuDVFw
+    #        3DeJSYT3nxy2Y56lLnxDeF8CUTUtVQx3CuGkRg1ouGAHpO/6OqOhwLLorEmxi7tA
+    #        H2O8mtT0poX5AnOAhzVy7QW0D/k4WaoLyckM5hUa6RtvgvLxOwA0U+VGurCDoctu
+    #        8F4QOgTAWyh8EZIwaKCliFRSynDpv3JTUwtfZkxo6K6nce1RhCWFAsMvDZL8Dgc0
+    #        yvgJ38BRsFOtkRuAGSf6ZUwTO8JJRRIFnpUzXflAnGivK9M13D5GEQMmIl6U9Pvk
+    #        sxSmbIUfc2SGJGCJD4I=
+    #        -----END CERTIFICATE-----
+    #   # certificate for gRPC listening socket
+    #   certificate: |
+    #     -----BEGIN CERTIFICATE-----
+    #     MIIDCjCCAfKgAwIBAgITJ706Mu2wJlKckpIvkWxEHvEyijANBgkqhkiG9w0BAQsF
+    #     ADAUMRIwEAYDVQQDDAlsb2NhbGhvc3QwIBcNMTkwNzIyMTkyOTA0WhgPMjExOTA2
+    #     MjgxOTI5MDRaMBQxEjAQBgNVBAMMCWxvY2FsaG9zdDCCASIwDQYJKoZIhvcNAQEB
+    #     BQADggEPADCCAQoCggEBANce58Y/JykI58iyOXpxGfw0/gMvF0hUQAcUrSMxEO6n
+    #     fZRA49b4OV4SwWmA3395uL2eB2NB8y8qdQ9muXUdPBWE4l9rMZ6gmfu90N5B5uEl
+    #     94NcfBfYOKi1fJQ9i7WKhTjlRkMCgBkWPkUokvBZFRt8RtF7zI77BSEorHGQCk9t
+    #     /D7BS0GJyfVEhftbWcFEAG3VRcoMhF7kUzYwp+qESoriFRYLeDWv68ZOvG7eoWnP
+    #     PsvZStEVEimjvK5NSESEQa9xWyJOmlOKXhkdymtcUd/nXnx6UTCFgnkgzSdTWV41
+    #     CI6B6aJ9svCTI2QuoIq2HxX/ix7OvW1huVmcyHVxyUECAwEAAaNTMFEwHQYDVR0O
+    #     BBYEFPwN1OceFGm9v6ux8G+DZ3TUDYxqMB8GA1UdIwQYMBaAFPwN1OceFGm9v6ux
+    #     8G+DZ3TUDYxqMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAG5D
+    #     874A4YI7YUwOVsVAdbWtgp1d0zKcPRR+r2OdSbTAV5/gcS3jgBJ3i1BN34JuDVFw
+    #     3DeJSYT3nxy2Y56lLnxDeF8CUTUtVQx3CuGkRg1ouGAHpO/6OqOhwLLorEmxi7tA
+    #     H2O8mtT0poX5AnOAhzVy7QW0D/k4WaoLyckM5hUa6RtvgvLxOwA0U+VGurCDoctu
+    #     8F4QOgTAWyh8EZIwaKCliFRSynDpv3JTUwtfZkxo6K6nce1RhCWFAsMvDZL8Dgc0
+    #     yvgJ38BRsFOtkRuAGSf6ZUwTO8JJRRIFnpUzXflAnGivK9M13D5GEQMmIl6U9Pvk
+    #     sxSmbIUfc2SGJGCJD4I=
+    #     -----END CERTIFICATE-----
+    #   # key for gRPC listening socket
+    #   key: |
+    #     -----BEGIN PRIVATE KEY-----
+    #     MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDXHufGPycpCOfI
+    #     sjl6cRn8NP4DLxdIVEAHFK0jMRDup32UQOPW+DleEsFpgN9/ebi9ngdjQfMvKnUP
+    #     Zrl1HTwVhOJfazGeoJn7vdDeQebhJfeDXHwX2DiotXyUPYu1ioU45UZDAoAZFj5F
+    #     KJLwWRUbfEbRe8yO+wUhKKxxkApPbfw+wUtBicn1RIX7W1nBRABt1UXKDIRe5FM2
+    #     MKfqhEqK4hUWC3g1r+vGTrxu3qFpzz7L2UrRFRIpo7yuTUhEhEGvcVsiTppTil4Z
+    #     HcprXFHf5158elEwhYJ5IM0nU1leNQiOgemifbLwkyNkLqCKth8V/4sezr1tYblZ
+    #     nMh1cclBAgMBAAECggEBAKdP5jyOicqknoG9/G564RcDsDyRt64NuO7I6hBg7SZx
+    #     Jn7UKWDdFuFP/RYtoabn6QOxkVVlydp5Typ3Xu7zmfOyss479Q/HIXxmmbkD0Kp0
+    #     eRm2KN3y0b6FySsS40KDRjKGQCuGGlNotW3crMw6vOvvsLTlcKgUHF054UVCHoK/
+    #     Piz7igkDU7NjvJeha53vXL4hIjb10UtJNaGPxIyFLYRZdRPyyBJX7Yt3w8dgz8WM
+    #     epOPu0dq3bUrY3WQXcxKZo6sQjE1h7kdl4TNji5jaFlvD01Y8LnyG0oThOzf0tve
+    #     Gaw+kuy17gTGZGMIfGVcdeb+SlioXMAAfOps+mNIwTECgYEA/gTO8W0hgYpOQJzn
+    #     BpWkic3LAoBXWNpvsQkkC3uba8Fcps7iiEzotXGfwYcb5Ewf5O3Lrz1EwLj7GTW8
+    #     VNhB3gb7bGOvuwI/6vYk2/dwo84bwW9qRWP5hqPhNZ2AWl8kxmZgHns6WTTxpkRU
+    #     zrfZ5eUrBDWjRU2R8uppgRImsxMCgYEA2MxuL/C/Ko0d7XsSX1kM4JHJiGpQDvb5
+    #     GUrlKjP/qVyUysNF92B9xAZZHxxfPWpdfGGBynhw7X6s+YeIoxTzFPZVV9hlkpAA
+    #     5igma0n8ZpZEqzttjVdpOQZK8o/Oni/Q2S10WGftQOOGw5Is8+LY30XnLvHBJhO7
+    #     TKMurJ4KCNsCgYAe5TDSVmaj3dGEtFC5EUxQ4nHVnQyCpxa8npL+vor5wSvmsfUF
+    #     hO0s3GQE4sz2qHecnXuPldEd66HGwC1m2GKygYDk/v7prO1fQ47aHi9aDQB9N3Li
+    #     e7Vmtdn3bm+lDjtn0h3Qt0YygWj+wwLZnazn9EaWHXv9OuEMfYxVgYKpdwKBgEze
+    #     Zy8+WDm5IWRjn8cI5wT1DBT/RPWZYgcyxABrwXmGZwdhp3wnzU/kxFLAl5BKF22T
+    #     kRZ+D+RVZvVutebE9c937BiilJkb0AXLNJwT9pdVLnHcN2LHHHronUhV7vetkop+
+    #     kGMMLlY0lkLfoGq1AxpfSbIea9KZam6o6VKxEnPDAoGAFDCJm+ZtsJK9nE5GEMav
+    #     NHy+PwkYsHhbrPl4dgStTNXLenJLIJ+Ke0Pcld4ZPfYdSyu/Tv4rNswZBNpNsW9K
+    #     0NwJlyMBfayoPNcJKXrH/csJY7hbKviAHr1eYy9/8OL0dHf85FV+9uY5YndLcsDc
+    #     nygO9KTJuUiBrLr0AHEnqko=
+    #     -----END PRIVATE KEY-----
 
 # ================================== Monitoring ==================================
 
-monitoring:
-  # Whether metrics reporting is enabled.
-  enabled: true
-  # Metrics reporting interval.
-  interval: 5s
-  # Whether to report metrics periodically in the logs.
-  log: true
-  # exposes metrics using http
-  http:
-    # enables the http endpoint
+  monitoring:
+    # Whether metrics reporting is enabled.
     enabled: true
-    # The HTTP endpoint will bind to this hostname, IP address, unix socket or named pipe.
-    # When using IP addresses, it is recommended to only use localhost.
-    host: "localhost"
-    # Port on which the HTTP endpoint will bind. Default is 0 meaning feature is disabled.
-    port: 8282
-    # Name of the reported metrics object
-    name: "queue"
+    # Metrics reporting interval.
+    interval: 5s
+    # Whether to report metrics periodically in the logs.
+    log: true
+    # exposes metrics using http
+    http:
+      # enables the http endpoint
+      enabled: true
+      # The HTTP endpoint will bind to this hostname, IP address, unix socket or named pipe.
+      # When using IP addresses, it is recommended to only use localhost.
+      host: "localhost"
+      # Port on which the HTTP endpoint will bind. Default is 0 meaning feature is disabled.
+      port: 8282
+      # Name of the reported metrics object
+      name: "queue"
 
 # ================================== Queue ====================================
 
 # Internal queue configuration for buffering events to be published.
-#queue:
-  # Queue type by name (default 'mem')
-  # The memory queue will present all available events to the output, the moment the output is ready
-  # to serve another batch of events.
-  #mem:
-    # Max number of events the queue can buffer.
-    #events: 4096
+  queue:
+    # Queue type by name (default 'mem')
+    # The memory queue will present all available events to the output, the moment the output is ready
+    # to serve another batch of events.
+    mem:
+      # Max number of events the queue can buffer.
+      #events: 4096
 
-    # Hints the minimum number of events stored in the queue,
-    # before providing a batch of events to the outputs.
-    # The default value is set to 2048.
-    # A value of 0 ensures events are immediately available
-    # to be sent to the outputs.
-    #flush.min_events: 256
+      # Hints the minimum number of events stored in the queue,
+      # before providing a batch of events to the outputs.
+      # The default value is set to 2048.
+      # A value of 0 ensures events are immediately available
+      # to be sent to the outputs.
+      #flush.min_events: 256
 
-    # Maximum duration after which events are available to the outputs,
-    # if the number of events stored in the queue is < `flush.min_events`.
-    #flush.timeout: 5ms
+      # Maximum duration after which events are available to the outputs,
+      # if the number of events stored in the queue is < `flush.min_events`.
+      #flush.timeout: 5ms
 
-  # The disk queue stores incoming events on disk until the output is
-  # ready for them. This allows a higher event limit than the memory-only
-  # queue and lets pending events persist through a restart.
-  #disk:
-    # The directory path to store the queue's data.
-    #path: "path/to/diskqueue"
+    # The disk queue stores incoming events on disk until the output is
+    # ready for them. This allows a higher event limit than the memory-only
+    # queue and lets pending events persist through a restart.
+    #disk:
+      # The directory path to store the queue's data.
+      #path: "path/to/diskqueue"
 
-    # The maximum space the queue should occupy on disk. Depending on
-    # input settings, events that exceed this limit are delayed (if
-    # persistent, like a log file) or discarded (if ephemeral, like a
-    # UDP packet).
-    #max_size: 10GB
+      # The maximum space the queue should occupy on disk. Depending on
+      # input settings, events that exceed this limit are delayed (if
+      # persistent, like a log file) or discarded (if ephemeral, like a
+      # UDP packet).
+      #max_size: 10GB
 
-    # The maximum size of a single queue data file. Data in the queue is
-    # stored in smaller segments that are deleted after all their events
-    # have been processed.
-    #segment_size: 1GB
+      # The maximum size of a single queue data file. Data in the queue is
+      # stored in smaller segments that are deleted after all their events
+      # have been processed.
+      #segment_size: 1GB
 
-    # The number of events to read from disk to memory while waiting for
-    # the output to request them.
-    #read_ahead: 512
+      # The number of events to read from disk to memory while waiting for
+      # the output to request them.
+      #read_ahead: 512
 
-    # The number of events to accept from inputs while waiting for them
-    # to be written to disk. If event data arrives faster than it
-    # can be written to disk, this setting prevents it from overflowing
-    # main memory.
-    #write_ahead: 2048
+      # The number of events to accept from inputs while waiting for them
+      # to be written to disk. If event data arrives faster than it
+      # can be written to disk, this setting prevents it from overflowing
+      # main memory.
+      #write_ahead: 2048
 
-    # The duration to wait before retrying when the queue encounters a disk
-    # write error.
-    #retry_interval: 1s
+      # The duration to wait before retrying when the queue encounters a disk
+      # write error.
+      #retry_interval: 1s
 
-    # The maximum length of time to wait before retrying on a disk write
-    # error. If the queue encounters repeated errors, it will double the
-    # length of its retry interval each time, up to this maximum.
-    #max_retry_interval: 30s
+      # The maximum length of time to wait before retrying on a disk write
+      # error. If the queue encounters repeated errors, it will double the
+      # length of its retry interval each time, up to this maximum.
+      #max_retry_interval: 30s
 
-    # The password used to encrypt the diskque with.  Default is "" which
-    # means no encryption.
-    #encryption_password: ""
+      # The password used to encrypt the diskque with.  Default is "" which
+      # means no encryption.
+      #encryption_password: ""
 
-    # Whether or not to compress the diskqueue with LZ4 compression.
-    # Default is false which means no compression.
-    #use_compression: false
+      # Whether or not to compress the diskqueue with LZ4 compression.
+      # Default is false which means no compression.
+      #use_compression: false
 
-output:
-  console:
-    enabled: true
+  output:
+    console:
+      enabled: true
 
-  elasticsearch:
-    # To use the elasticsearch output, disable the other outputs and
-    # set elasticsearch.enabled to true.
-    enabled: false
-    hosts: ["https://localhost:9200"]
-    #username: "elastic"
-    #password: "password"
+    # elasticsearch:
+      # To use the elasticsearch output, disable the other outputs and
+      # set elasticsearch.enabled to true.
+      # enabled: false
+      # hosts: ["https://localhost:9200"]
+      #username: "elastic"
+      #password: "password"
 
-    #num_workers: 3
-    #batch_size: 10000000
-    #flush_timeout: 30s
+      #num_workers: 3
+      #batch_size: 10000000
+      #flush_timeout: 30s
 
-    #retry_on_http_status: [502, 503, 504]
-    #max_retries: 5
-    #backoff.init: 1s
-    #backoff.max: 60s
+      #retry_on_http_status: [502, 503, 504]
+      #max_retries: 5
+      #backoff.init: 1s
+      #backoff.max: 60s
 
-    # This option may be convenient for local testing:
-    #ssl.verification_mode: none
+      # This option may be convenient for local testing:
+      #ssl.verification_mode: none
 
-  kafka:
-    # To use the kafka output, disable the other outputs and
-    # set kafka.enabled to true.
-    enabled: false
-    hosts: ["localhost:9092", "localhost:9093"]
-    topic: '%{[metricset][name]}'
+    # kafka:
+      # To use the kafka output, disable the other outputs and
+      # set kafka.enabled to true.
+      # enabled: false
+      # hosts: ["localhost:9092", "localhost:9093"]
+      # topic: '%{[metricset][name]}'
+      # timeout: 60s
+      # broker_timeout: 60s
+      # version: 2.6.0
+      # max_retries: 3
+      # channel_buffer_size: 1024
 
-  logstash:
-    enabled: false
-    hosts: ["localhost:5044"]
+    # logstash:
+    #   enabled: false
+    #   hosts: ["localhost:5044"]
