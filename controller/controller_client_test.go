@@ -1,7 +1,7 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
-//go:build !integration
+//go:build !integration && !windows
 
 package controller
 
@@ -88,7 +88,6 @@ func TestRemoveOutput(t *testing.T) {
 				for _, unit := range observed.Units {
 					t.Logf("current state for %s is: %s", unit.Id, unit.Message)
 				}
-
 			}
 		}
 		return nil
@@ -100,7 +99,6 @@ func TestRemoveOutput(t *testing.T) {
 	assert.True(t, restartedOutput, "gRPC input has stopped")
 	assert.True(t, outputHealthy, "input restarted")
 	assert.True(t, testStopped, "test has shut down")
-
 }
 
 func TestStopAllInputs(t *testing.T) {
@@ -190,7 +188,6 @@ func TestStopAllInputs(t *testing.T) {
 				for _, unit := range observed.Units {
 					t.Logf("current state for %s is: %s", unit.Id, unit.Message)
 				}
-
 			}
 		}
 		return nil
@@ -203,7 +200,6 @@ func TestStopAllInputs(t *testing.T) {
 	assert.True(t, newInput, "input restarted")
 	assert.True(t, testStopped, "test has shut down")
 	assert.True(t, inputRemoved, "input unit removed")
-
 }
 
 func TestChangeOutputType(t *testing.T) {
@@ -219,7 +215,8 @@ func TestChangeOutputType(t *testing.T) {
 			"type":    "elasticsearch",
 			"enabled": "true",
 			"hosts":   []interface{}{"localhost:9200"},
-		})}
+		}),
+	}
 
 	doneWaiter := &sync.WaitGroup{}
 	srvFunc := func(observed *proto.CheckinObserved) *proto.CheckinExpected {
@@ -284,7 +281,6 @@ func TestChangeOutputType(t *testing.T) {
 				for _, unit := range observed.Units {
 					t.Logf("current state for %s is: %s", unit.Id, unit.Message)
 				}
-
 			}
 		}
 		return nil
@@ -393,7 +389,6 @@ func TestAddingInputs(t *testing.T) {
 				for _, unit := range observed.Units {
 					t.Logf("current state for %s is: %s", unit.Id, unit.Message)
 				}
-
 			}
 		}
 		return nil
@@ -407,7 +402,6 @@ func TestAddingInputs(t *testing.T) {
 	assert.True(t, stoppedFirst, "stopped first unit")
 	assert.True(t, gotStopped, "units stopped")
 	assert.False(t, gotRestarted, "units restarted, they should not")
-
 }
 
 func TestBasicAgentControl(t *testing.T) {
@@ -446,7 +440,7 @@ func TestBasicAgentControl(t *testing.T) {
 			} else if unitsAreState(t, proto.State_HEALTHY, observed.Units) {
 				t.Logf("Got unit state healthy, sending STOPPED")
 				gotHealthy = true
-				//shutdown
+				// shutdown
 				unitIn.ConfigStateIdx++
 				unitIn.State = proto.State_STOPPED
 
@@ -469,7 +463,6 @@ func TestBasicAgentControl(t *testing.T) {
 				for _, unit := range observed.Units {
 					t.Logf("current state for %s is: %s", unit.Id, unit.Message)
 				}
-
 			}
 		}
 		return nil
@@ -480,7 +473,6 @@ func TestBasicAgentControl(t *testing.T) {
 	assert.True(t, gotConfig, "config state")
 	assert.True(t, gotHealthy, "healthy state")
 	assert.True(t, gotStopped, "stopped state")
-
 }
 
 func TestUnitLogChange(t *testing.T) {
@@ -521,7 +513,7 @@ func TestUnitLogChange(t *testing.T) {
 			} else if unitsAreState(t, proto.State_HEALTHY, observed.Units) && !gotHealthy {
 				t.Logf("Got unit state healthy, changing log level")
 				gotHealthy = true
-				//shutdown
+				// shutdown
 				unitOut.ConfigStateIdx++
 				unitOut.LogLevel = proto.UnitLogLevel_DEBUG
 				return &proto.CheckinExpected{
@@ -539,7 +531,6 @@ func TestUnitLogChange(t *testing.T) {
 			} else if unitsAreState(t, proto.State_HEALTHY, observed.Units) && gotHealthy {
 				// shut down
 				t.Logf("Got unit state healthy, stopping")
-				//check to see if log level has changed
 				unitOut.ConfigStateIdx++
 				unitOut.State = proto.State_STOPPED
 				return &proto.CheckinExpected{
@@ -558,7 +549,6 @@ func TestUnitLogChange(t *testing.T) {
 				for _, unit := range observed.Units {
 					t.Logf("current state for %s is: %s", unit.Id, unit.Message)
 				}
-
 			}
 		}
 		return nil
@@ -570,7 +560,6 @@ func TestUnitLogChange(t *testing.T) {
 	assert.True(t, gotHealthy, "healthy state")
 	assert.True(t, gotStopped, "stopped state")
 	assert.False(t, gotRestarted, "units restarted")
-
 }
 
 func runServerTest(t *testing.T, implFunc mock.StubServerCheckinV2, waitUntil *sync.WaitGroup, token string) {
@@ -579,7 +568,6 @@ func runServerTest(t *testing.T, implFunc mock.StubServerCheckinV2, waitUntil *s
 	srv := mock.StubServerV2{
 		CheckinV2Impl: implFunc,
 		ActionImpl: func(response *proto.ActionResponse) error {
-
 			return nil
 		},
 		ActionsChan: make(chan *mock.PerformAction, 100),
@@ -602,7 +590,6 @@ func runServerTest(t *testing.T, implFunc mock.StubServerCheckinV2, waitUntil *s
 
 	err := runController(ctx, validClient)
 	assert.NoError(t, err)
-
 }
 
 func createClient(token string, port int) client.V2 {

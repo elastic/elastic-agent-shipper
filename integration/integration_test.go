@@ -14,14 +14,15 @@ import (
 	"testing"
 	"time"
 
-	pb "github.com/elastic/elastic-agent-shipper-client/pkg/proto"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	pb "github.com/elastic/elastic-agent-shipper-client/pkg/proto"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-shipper-client/pkg/helpers"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
-	"github.com/stretchr/testify/require"
 )
 
 type TestingEnvironment struct {
@@ -30,6 +31,7 @@ type TestingEnvironment struct {
 	process    *os.Process
 	stderrFile *os.File
 	stdoutFile *os.File
+	config     string
 }
 
 func NewTestingEnvironment(t *testing.T, config string) *TestingEnvironment {
@@ -54,7 +56,7 @@ func NewTestingEnvironment(t *testing.T, config string) *TestingEnvironment {
 	stdoutFile, err := os.Create(stdoutFilename)
 	require.NoErrorf(t, err, "error creating stdout file: %s: %w", stdoutFilename, err)
 
-	args := []string{binaryFilename, "run", "-c", configFilename}
+	args := []string{binaryFilename, "run", "-d", "*", "-e", "-c", configFilename}
 	var procAttr os.ProcAttr
 	procAttr.Files = []*os.File{os.Stdin, stdoutFile, stderrFile}
 	process, err := os.StartProcess(binaryFilename, args, &procAttr)
@@ -74,14 +76,19 @@ func NewTestingEnvironment(t *testing.T, config string) *TestingEnvironment {
 		process:    process,
 		stderrFile: stderrFile,
 		stdoutFile: stdoutFile,
+		config:     config,
 	}
 
 	return env
 }
 
 func (e *TestingEnvironment) Stop() {
-	e.process.Kill()
-	e.process.Release()
+	_ = e.process.Kill()
+	_ = e.process.Release()
+	err := e.stderrFile.Close()
+	require.NoErrorf(e.t, err, "error closing stderr file: %s", err)
+	err = e.stdoutFile.Close()
+	require.NoErrorf(e.t, err, "error closing stdout file: %s", err)
 }
 
 func (e *TestingEnvironment) GetStderr() string {
@@ -159,9 +166,7 @@ func (e *TestingEnvironment) Contains(location string, match string) bool {
 }
 
 func (e *TestingEnvironment) NewClient(addr string) pb.ProducerClient {
-	opts := []grpc.DialOption{
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	}
+	opts := getDialOptions()
 	conn, err := grpc.Dial(addr, opts...)
 	require.NoErrorf(e.t, err, "Error Dialing %s: %s", addr, err)
 	e.t.Cleanup(func() { conn.Close() })
@@ -173,6 +178,8 @@ func (e *TestingEnvironment) NewClient(addr string) pb.ProducerClient {
 // t.Logf of stderr, followed by t.Logf of stdout and t.FailNow
 func (e *TestingEnvironment) Fatalf(format string, args ...interface{}) {
 	e.t.Logf(format, args...)
+
+	e.t.Logf("config:\n%s\n", e.config)
 
 	stderr := e.GetStderr()
 	e.t.Logf("stderr:\n%s\n", stderr)

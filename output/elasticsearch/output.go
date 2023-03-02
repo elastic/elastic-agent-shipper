@@ -53,7 +53,8 @@ func serializeEvent(event *messages.Event) ([]byte, error) {
 	// right place for ECS. This just translates the protobuf structure
 	// directly to json.
 	jsonWriter := &fastjson.Writer{}
-	err := fastjson.Marshal(jsonWriter, event.GetFields())
+	evt := Event{Timestamp: event.GetTimestamp(), Fields: event.GetFields()}
+	err := fastjson.Marshal(jsonWriter, &evt)
 	if err != nil {
 		return nil, fmt.Errorf("error marshalling event to json: %w", err)
 	}

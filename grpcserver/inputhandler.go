@@ -6,7 +6,6 @@ package grpcserver
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,6 +16,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	pb "github.com/elastic/elastic-agent-shipper-client/pkg/proto"
+	"github.com/elastic/elastic-agent-shipper/tools"
 )
 
 // InputHandler wraps the input side of the shipper, and is responsible for starting and stopping the gRPC endpoint
@@ -38,7 +38,7 @@ func NewGRPCServer(publisher Publisher) *InputHandler {
 
 // Start runs the shipper server according to the set configuration. This is a non-blocking call.
 func (srv *InputHandler) Start(grpcTLS credentials.TransportCredentials, endpoint string) error {
-	//TODO: only needed while we deal with the fact that we have our config coming from multiple input units
+	// TODO: only needed while we deal with the fact that we have our config coming from multiple input units
 	if srv.server != nil {
 		srv.log.Debugf("shipper gRPC already started, continuing...")
 		return nil
@@ -61,14 +61,14 @@ func (srv *InputHandler) Start(grpcTLS credentials.TransportCredentials, endpoin
 	// paranoid checking, make sure we have the base directory.
 	dir := filepath.Dir(listenAddr)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		err = os.MkdirAll(dir, 0755)
+		err = os.MkdirAll(dir, 0o755)
 		if err != nil {
 			srv.startMutex.Unlock()
 			return fmt.Errorf("could not create directory for unix socket %s: %w", dir, err)
 		}
 	}
 
-	lis, err := net.Listen("unix", listenAddr)
+	lis, err := newListener(srv.log, listenAddr)
 	if err != nil {
 		srv.startMutex.Unlock()
 		return fmt.Errorf("failed to listen on %s: %w", listenAddr, err)
@@ -84,7 +84,7 @@ func (srv *InputHandler) Start(grpcTLS credentials.TransportCredentials, endpoin
 	// Testing that the server is running and only then unlock the mutex.
 	// Otherwise if `Close` is called at the same time as `Start` it causes race condition.
 	defer srv.startMutex.Unlock()
-	con, err := net.Dial("unix", listenAddr)
+	con, err := tools.DialTestAddr(listenAddr)
 	if err != nil {
 		// this will stop the other go routine in the wait group
 		srv.server.Stop()
