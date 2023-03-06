@@ -47,7 +47,10 @@ func (srv *InputHandler) Start(grpcTLS credentials.TransportCredentials, endpoin
 	var err error
 
 	srv.log.Debugf("initializing the gRPC server...")
-	opts := []grpc.ServerOption{grpc.Creds(grpcTLS)}
+	opts := []grpc.ServerOption{
+		grpc.Creds(grpcTLS),
+		grpc.MaxRecvMsgSize(64 * (1 << 20)), // Allow RPCs of up to 64MB
+	}
 	srv.server = grpc.NewServer(opts...)
 	srv.Shipper, err = NewShipperServer(srv.publisher)
 	if err != nil {
