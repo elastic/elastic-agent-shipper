@@ -100,6 +100,7 @@ require (
 require (
 	github.com/Microsoft/go-winio v0.5.2
 	github.com/Shopify/sarama v1.27.0
+	github.com/docker/go-units v0.5.0
 	go.elastic.co/fastjson v1.1.0
 )
 

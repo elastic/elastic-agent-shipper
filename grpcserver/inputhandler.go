@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/docker/go-units"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
@@ -49,7 +50,7 @@ func (srv *InputHandler) Start(grpcTLS credentials.TransportCredentials, endpoin
 	srv.log.Debugf("initializing the gRPC server...")
 	opts := []grpc.ServerOption{
 		grpc.Creds(grpcTLS),
-		grpc.MaxRecvMsgSize(64 * (1 << 20)), // Allow RPCs of up to 64MB
+		grpc.MaxRecvMsgSize(64 * units.MiB),
 	}
 	srv.server = grpc.NewServer(opts...)
 	srv.Shipper, err = NewShipperServer(srv.publisher)
