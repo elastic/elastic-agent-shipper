@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-shipper-client/pkg/proto/messages"
 
@@ -64,11 +65,10 @@ func (r *ServerRunner) Start(cfg config.ShipperRootConfig, reportCallback elasti
 
 	r.log.Debugf("initializing monitoring ...")
 
-	r.monitoring, err = monitoring.NewFromConfig(cfg.Shipper.Monitor, r.queue)
+	r.monitoring, err = monitoring.NewFromConfig(cfg.Monitoring, cfg.LogMetrics, r.queue)
 	if err != nil {
 		return fmt.Errorf("error initializing output monitor: %w", err)
 	}
-	r.monitoring.Watch()
 
 	r.log.Debugf("monitoring is ready")
 
@@ -86,6 +86,16 @@ func (r *ServerRunner) Start(cfg config.ShipperRootConfig, reportCallback elasti
 	r.log.Debugf("output is started")
 
 	return nil
+}
+
+// QueueDiagCallback returns
+func (r *ServerRunner) QueueDiagCallback() client.DiagnosticHook {
+	if r.monitoring != nil {
+		return r.monitoring.DiagnosticsCallback()
+	}
+	return func() []byte {
+		return []byte("queue monitoring has not started")
+	}
 }
 
 // Close shuts the whole shipper server down. Can be called only once, following calls are noop.

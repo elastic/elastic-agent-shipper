@@ -1,7 +1,37 @@
 # ========================= Shipper Configuration File ========================
 
+# ================================== Monitoring ==================================
+
+  # monitoring:
+  #   # Whether metrics reporting is enabled.
+  #   enabled: true
+  #   # Metrics reporting interval.
+  #   interval: 5s
+  #   # Whether to report metrics periodically in the logs.
+  #   log: true
+  #   # exposes metrics using http
+http:
+      # enables the http endpoint
+  enabled: true
+  expvar:
+    enabled: true
+      # The HTTP endpoint will bind to this hostname, IP address, unix socket or named pipe.
+      # When using IP addresses, it is recommended to only use localhost.
+  host: localhost
+      # Port on which the HTTP endpoint will bind.
+  port: 8282
+
 # type refers to the type of output, can be console, elasticsearch, kafka or logstash
 type: console
+
+# If enabled, shipper periodically logs its internal metrics that have changed
+# in the last period. For each metric that changed, the delta from the value at
+# the beginning of the period is logged. Also, the total values for
+# all non-zero internal metrics are logged on shutdown. The default is true.
+#logging.metrics.enabled: true
+
+# The period after which to log the internal metrics. The default is 30s.
+#logging.metrics.period: 30s
 
 shipper:
 # ================================== General ==================================
@@ -90,26 +120,7 @@ shipper:
     #     nygO9KTJuUiBrLr0AHEnqko=
     #     -----END PRIVATE KEY-----
 
-# ================================== Monitoring ==================================
 
-  monitoring:
-    # Whether metrics reporting is enabled.
-    enabled: true
-    # Metrics reporting interval.
-    interval: 5s
-    # Whether to report metrics periodically in the logs.
-    log: true
-    # exposes metrics using http
-    http:
-      # enables the http endpoint
-      enabled: true
-      # The HTTP endpoint will bind to this hostname, IP address, unix socket or named pipe.
-      # When using IP addresses, it is recommended to only use localhost.
-      host: "localhost"
-      # Port on which the HTTP endpoint will bind. Default is 0 meaning feature is disabled.
-      port: 8282
-      # Name of the reported metrics object
-      name: "queue"
 
 # ================================== Queue ====================================
 

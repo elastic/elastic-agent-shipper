@@ -47,6 +47,11 @@ func LoadAndRun() error {
 func RunUnmanaged(ctx context.Context, cfg config.ShipperRootConfig) error {
 	var creds credentials.TransportCredentials
 	var err error
+	// unpack command line -E values
+	err = config.Overwrites.Unpack(&cfg)
+	if err != nil {
+		return fmt.Errorf("error unpacking CLI overwrites: %w", err)
+	}
 	if cfg.Shipper.Server.TLS.Cert != "" && cfg.Shipper.Server.TLS.Key != "" {
 		creds, err = credentials.NewServerTLSFromFile(cfg.Shipper.Server.TLS.Cert, cfg.Shipper.Server.TLS.Key)
 		if err != nil {
