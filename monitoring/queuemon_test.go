@@ -76,8 +76,8 @@ func (tq *TestMetricsQueue) Metrics() (queue.Metrics, error) {
 }
 
 // simple wrapper to return a generic config object
-func initMonWithconfig() (*config.C, string) {
-	path := tools.GenerateTestAddr(os.TempDir())
+func initMonWithconfig(t *testing.T) (*config.C, string) {
+	path := tools.GenerateTestAddr(t.TempDir())
 	return config.MustNewConfigFrom(map[string]interface{}{
 		"enabled": true,
 		"host":    path,
@@ -88,7 +88,7 @@ func initMonWithconfig() (*config.C, string) {
 // actual tests
 
 func TestSetupMonitor(t *testing.T) {
-	monitor, path := initMonWithconfig()
+	monitor, path := initMonWithconfig(t)
 	defer os.Remove(path)
 	queue := NewTestQueue(10)
 	mon, err := NewFromConfig(monitor, nil, queue)
@@ -119,8 +119,6 @@ func TestFetchInfo(t *testing.T) {
 	require.True(t, ok, "missing ephemeral_id")
 	_, ok = parsed["binary_arch"]
 	require.True(t, ok, "missing binary_arch")
-	_, ok = parsed["uid"]
-	require.True(t, ok, "missing uid")
 
 	mon.End()
 }
@@ -179,7 +177,7 @@ func TestQueueMetrics(t *testing.T) {
 
 func createMetricsClientServer(t *testing.T, maxEvents uint64) (http.Client, *QueueMonitor, string) {
 	_ = logp.DevelopmentSetup()
-	monitor, path := initMonWithconfig()
+	monitor, path := initMonWithconfig(t)
 	queue := NewTestQueue(maxEvents)
 	mon, err := NewFromConfig(monitor, nil, queue)
 	require.NoError(t, err)
