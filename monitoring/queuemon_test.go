@@ -14,7 +14,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -26,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/opt"
 	"github.com/elastic/elastic-agent-shipper/queue"
+	"github.com/elastic/elastic-agent-shipper/tools"
 )
 
 func init() {
@@ -77,10 +77,11 @@ func (tq *TestMetricsQueue) Metrics() (queue.Metrics, error) {
 
 // simple wrapper to return a generic config object
 func initMonWithconfig() (*config.C, string) {
-	path := filepath.Join(os.TempDir(), fmt.Sprintf("mon%d.sock", time.Now().Unix()))
+	path := tools.GenerateTestAddr(os.TempDir()) //filepath.Join(os.TempDir(), fmt.Sprintf("mon%d.sock", time.Now().Unix()))
+	fmt.Printf("got path: %s\n", path)
 	return config.MustNewConfigFrom(map[string]interface{}{
 		"enabled": true,
-		"host":    fmt.Sprintf("unix://%s", path),
+		"host":    path, //fmt.Sprintf("unix://%s", path),
 		"port":    "8182",
 		"timeout": "4s"}), path
 }
@@ -188,7 +189,7 @@ func createMetricsClientServer(t *testing.T, maxEvents uint64) (http.Client, *Qu
 		Timeout: time.Second * 4,
 		Transport: &http.Transport{
 			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
-				return net.Dial("unix", path)
+				return tools.DialTestAddr(path)
 			},
 		},
 	}
