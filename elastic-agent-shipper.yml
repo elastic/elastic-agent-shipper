@@ -1,15 +1,11 @@
 # ========================= Shipper Configuration File ========================
 
+
+# type refers to the type of output, can be console, elasticsearch, kafka or logstash
+type: console
+
 # ================================== Monitoring ==================================
 
-  # monitoring:
-  #   # Whether metrics reporting is enabled.
-  #   enabled: true
-  #   # Metrics reporting interval.
-  #   interval: 5s
-  #   # Whether to report metrics periodically in the logs.
-  #   log: true
-  #   # exposes metrics using http
 http:
       # enables the http endpoint
   enabled: true
@@ -20,9 +16,6 @@ http:
   host: localhost
       # Port on which the HTTP endpoint will bind.
   port: 8282
-
-# type refers to the type of output, can be console, elasticsearch, kafka or logstash
-type: console
 
 # enable or disable all self-monitoring. Defaults to true.
 # monitoring.enabled: true

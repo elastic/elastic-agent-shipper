@@ -45,12 +45,14 @@ type QueueMonitor struct {
 
 	// Count of times the queue has reached a configured limit.
 	queueLimitCount uint64
+
+	// a private monitoring namespace. The global namespace doesn't support re-registering functions, which we need with shipper's stop-start model
+	// The only downside to this is that the log reporter can't see it.
+	shipperNS monitoring.Namespaces
 }
 
-var shipperMetrics *monitoring.Registry
-
 func init() {
-	shipperMetrics = monitoring.GetNamespace("shipper").GetRegistry()
+	setupRegisterInfo(logp.L())
 }
 
 type expvarHTTPCfg struct {
@@ -61,9 +63,10 @@ type expvarHTTPCfg struct {
 func NewFromConfig(httpCfg, logCfg *config.C, target queue.MetricsSource) (*QueueMonitor, error) {
 	logger := logp.L()
 
-	mon := &QueueMonitor{target: target, log: logger}
-	monitoring.NewFunc(shipperMetrics, "shipper", mon.reportQueueMetrics, monitoring.Report)
-	setupRegisterInfo(logger)
+	mon := &QueueMonitor{target: target, log: logger, shipperNS: *monitoring.NewNamespaces()}
+	metricsReg := mon.shipperNS.Get("shipper").GetRegistry()
+
+	monitoring.NewFunc(metricsReg, "shipper", mon.reportQueueMetrics, monitoring.Report)
 
 	// create periodic reporting logger
 	reporter, err := libbeatlog.MakeReporter(beat.Info{}, logCfg)
@@ -79,7 +82,7 @@ func NewFromConfig(httpCfg, logCfg *config.C, target queue.MetricsSource) (*Queu
 			return nil, fmt.Errorf("error creating API for registry reporter: %w", err)
 		}
 
-		apiSrv.AddRoute("/shipper", api.MakeAPIHandler(monitoring.GetNamespace("shipper")))
+		apiSrv.AddRoute("/shipper", api.MakeAPIHandler(mon.shipperNS.Get("shipper")))
 
 		// re-export expvars
 		expCfg := expvarHTTPCfg{}
@@ -100,7 +103,7 @@ func NewFromConfig(httpCfg, logCfg *config.C, target queue.MetricsSource) (*Queu
 }
 
 // a callback passed to monitoring.NewFunc for reporting queue metrics
-func (mon QueueMonitor) reportQueueMetrics(_ monitoring.Mode, V monitoring.Visitor) {
+func (mon *QueueMonitor) reportQueueMetrics(_ monitoring.Mode, V monitoring.Visitor) {
 	V.OnRegistryStart()
 	defer V.OnRegistryFinished()
 
@@ -121,46 +124,8 @@ func (mon QueueMonitor) reportQueueMetrics(_ monitoring.Mode, V monitoring.Visit
 	})
 }
 
-// create the basic monitoring namespaces
-func setupRegisterInfo(logger *logp.Logger) {
-	name := "shipper"
-	version := tools.GetDefaultVersion()
-
-	//init common metrics
-	err := report.SetupMetrics(logger, name, version)
-	if err != nil {
-		logger.Errorf("error setting up basic monitoring metrics: %w", err)
-	}
-
-	infoRegistry := monitoring.GetNamespace("info").GetRegistry()
-	monitoring.NewString(infoRegistry, "version").Set(version)
-	monitoring.NewString(infoRegistry, "name").Set(name)
-	monitoring.NewString(infoRegistry, "ephemeral_id").Set(report.EphemeralID().String())
-	monitoring.NewString(infoRegistry, "binary_arch").Set(runtime.GOARCH)
-	monitoring.NewString(infoRegistry, "build_commit").Set(tools.Commit())
-	monitoring.NewTimestamp(infoRegistry, "build_time").Set(tools.BuildTime())
-
-	// Beats set this if it's an xpack build
-	// Is this implied in the shipper?
-	// monitoring.NewBool(infoRegistry, "elastic_licensed").Set(b.Info.ElasticLicensed)
-
-	// set user data
-	report.SetupInfoUserMetrics()
-
-	stateRegistry := monitoring.GetNamespace("state").GetRegistry()
-
-	// state.service
-	serviceRegistry := stateRegistry.NewRegistry("service")
-	monitoring.NewString(serviceRegistry, "version").Set(version)
-	monitoring.NewString(serviceRegistry, "name").Set(name)
-
-	// state.beat
-	beatRegistry := stateRegistry.NewRegistry("beat")
-	monitoring.NewString(beatRegistry, "name").Set(name)
-}
-
 // End closes the metrics reporter and associated interfaces.
-func (mon QueueMonitor) End() {
+func (mon *QueueMonitor) End() {
 	if mon.httpHandler != nil {
 		err := mon.httpHandler.Stop()
 		if err != nil {
@@ -222,6 +187,44 @@ func (mon *QueueMonitor) diagCallbackError(origErr error) []byte {
 		mon.log.Errorf("error marshalling error response from DiagnosticsCallback(): %s", err)
 	}
 	return jsonErr
+}
+
+// create the basic monitoring namespaces
+func setupRegisterInfo(logger *logp.Logger) {
+	name := "shipper"
+	version := tools.GetDefaultVersion()
+
+	//init common metrics
+	err := report.SetupMetrics(logger, name, version)
+	if err != nil {
+		logger.Errorf("error setting up basic monitoring metrics: %w", err)
+	}
+
+	infoRegistry := monitoring.GetNamespace("info").GetRegistry()
+	monitoring.NewString(infoRegistry, "version").Set(version)
+	monitoring.NewString(infoRegistry, "name").Set(name)
+	monitoring.NewString(infoRegistry, "ephemeral_id").Set(report.EphemeralID().String())
+	monitoring.NewString(infoRegistry, "binary_arch").Set(runtime.GOARCH)
+	monitoring.NewString(infoRegistry, "build_commit").Set(tools.Commit())
+	monitoring.NewTimestamp(infoRegistry, "build_time").Set(tools.BuildTime())
+
+	// Beats set this if it's an xpack build
+	// Is this implied in the shipper?
+	// monitoring.NewBool(infoRegistry, "elastic_licensed").Set(b.Info.ElasticLicensed)
+
+	// set user data
+	report.SetupInfoUserMetrics()
+
+	stateRegistry := monitoring.GetNamespace("state").GetRegistry()
+
+	// state.service
+	serviceRegistry := stateRegistry.NewRegistry("service")
+	monitoring.NewString(serviceRegistry, "version").Set(version)
+	monitoring.NewString(serviceRegistry, "name").Set(name)
+
+	// state.beat
+	beatRegistry := stateRegistry.NewRegistry("beat")
+	monitoring.NewString(beatRegistry, "name").Set(name)
 }
 
 // This is a wrapper to deal with the multiple queue metric "types",
