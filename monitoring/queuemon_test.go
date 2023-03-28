@@ -77,11 +77,10 @@ func (tq *TestMetricsQueue) Metrics() (queue.Metrics, error) {
 
 // simple wrapper to return a generic config object
 func initMonWithconfig() (*config.C, string) {
-	path := tools.GenerateTestAddr(os.TempDir()) //filepath.Join(os.TempDir(), fmt.Sprintf("mon%d.sock", time.Now().Unix()))
-	fmt.Printf("got path: %s\n", path)
+	path := tools.GenerateTestAddr(os.TempDir())
 	return config.MustNewConfigFrom(map[string]interface{}{
 		"enabled": true,
-		"host":    path, //fmt.Sprintf("unix://%s", path),
+		"host":    path,
 		"port":    "8182",
 		"timeout": "4s"}), path
 }
