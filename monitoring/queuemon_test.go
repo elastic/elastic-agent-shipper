@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -97,10 +98,9 @@ func TestSetupMonitor(t *testing.T) {
 }
 
 func TestFetchInfo(t *testing.T) {
-
 	var maxEvents uint64 = 10
 	client, mon, path := createMetricsClientServer(t, maxEvents)
-	defer os.Remove(path)
+	defer os.RemoveAll(filepath.Dir(path))
 
 	endpoint := fmt.Sprintf("http://unix%s", "/")
 
@@ -129,7 +129,7 @@ func TestReportedEvents(t *testing.T) {
 	var maxEvents uint64 = 10
 
 	client, mon, path := createMetricsClientServer(t, maxEvents)
-	defer os.Remove(path)
+	defer os.RemoveAll(filepath.Dir(path))
 
 	endpoint := fmt.Sprintf("http://unix%s", "/shipper")
 
