@@ -23,6 +23,7 @@ func TestUnmanaged(t *testing.T) {
 	serverAddr := tools.GenerateTestAddr(t.TempDir())
 	cfg := config.DefaultConfig()
 	cfg.Type = "console"
+	cfg.Monitoring = false
 	cfg.Shipper.Output.Console = &output.ConsoleConfig{Enabled: true}
 	cfg.Shipper.Server.Server = serverAddr
 

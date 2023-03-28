@@ -57,8 +57,9 @@ type ShipperTLS struct {
 type ShipperRootConfig struct {
 	Type       string        `config:"type"`
 	Shipper    ShipperConfig `config:"shipper"`
-	LogMetrics *config.C     `config:"logging.Metrics"`
-	Monitoring *config.C     `config:"http"`
+	LogMetrics *config.C     `config:"logging.metrics"`
+	HTTP       *config.C     `config:"http"`
+	Monitoring bool          `config:"monitoring.enabled"`
 }
 
 // ShipperConfig defines the config values stored under the `shipper` key in the fleet config
@@ -81,6 +82,7 @@ func DefaultConfig() ShipperRootConfig {
 		Shipper: ShipperConfig{
 			Queue: queue.DefaultConfig(),
 		},
+		Monitoring: true,
 	}
 }
 

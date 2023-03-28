@@ -24,6 +24,9 @@ http:
 # type refers to the type of output, can be console, elasticsearch, kafka or logstash
 type: console
 
+# enable or disable all self-monitoring. Defaults to true.
+# monitoring.enabled: true
+
 # If enabled, shipper periodically logs its internal metrics that have changed
 # in the last period. For each metric that changed, the delta from the value at
 # the beginning of the period is logged. Also, the total values for

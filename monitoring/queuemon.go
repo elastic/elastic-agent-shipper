@@ -161,10 +161,13 @@ func setupRegisterInfo(logger *logp.Logger) {
 
 // End closes the metrics reporter and associated interfaces.
 func (mon QueueMonitor) End() {
-	err := mon.httpHandler.Stop()
-	if err != nil {
-		mon.log.Errorf("error stopping HTTP handler for metrics: %s", err)
+	if mon.httpHandler != nil {
+		err := mon.httpHandler.Stop()
+		if err != nil {
+			mon.log.Errorf("error stopping HTTP handler for metrics: %s", err)
+		}
 	}
+
 	mon.logReporter.Stop()
 }
 

@@ -613,6 +613,9 @@ func basicStartingUnits(t *testing.T) (*proto.UnitExpected, *proto.UnitExpected)
 			},
 			"type":    "console",
 			"enabled": "true",
+			"monitoring": map[string]interface{}{
+				"enabled": false,
+			},
 		}),
 	})
 	unitIn := createUnitExpectedState(unitInputID, proto.UnitType_INPUT, &proto.UnitExpectedConfig{
@@ -621,6 +624,9 @@ func basicStartingUnits(t *testing.T) (*proto.UnitExpected, *proto.UnitExpected)
 				"level": "debug",
 			},
 			"server": fmt.Sprintf("/tmp/%s.sock", mock.NewID()),
+			"monitoring": map[string]interface{}{
+				"enabled": false,
+			},
 		},
 		),
 	})

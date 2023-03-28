@@ -65,9 +65,11 @@ func (r *ServerRunner) Start(cfg config.ShipperRootConfig, reportCallback elasti
 
 	r.log.Debugf("initializing monitoring ...")
 
-	r.monitoring, err = monitoring.NewFromConfig(cfg.Monitoring, cfg.LogMetrics, r.queue)
-	if err != nil {
-		return fmt.Errorf("error initializing output monitor: %w", err)
+	if cfg.Monitoring {
+		r.monitoring, err = monitoring.NewFromConfig(cfg.HTTP, cfg.LogMetrics, r.queue)
+		if err != nil {
+			return fmt.Errorf("error initializing output monitor: %w", err)
+		}
 	}
 
 	r.log.Debugf("monitoring is ready")
