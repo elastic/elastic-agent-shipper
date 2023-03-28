@@ -12,6 +12,17 @@ issues:
   # Set to 0 to disable.
   # Default: 50
   max-issues-per-linter: 0
+  exclude-rules:
+  # typecheck linter can't properly handle cgo, and can't be disabled
+    - text: "undefined"
+      linters:
+        - typecheck
+    - text: "undeclared name:"
+      linters:
+        - typecheck
+    - text: "imported but not used"
+      linters:
+        - typecheck
 
 output:
   sort-results: true
