@@ -107,7 +107,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.0
 	github.com/Shopify/sarama v1.27.0
 	github.com/docker/go-units v0.5.0
-	github.com/elastic/elastic-agent-system-metrics v0.5.1-0.20230328165325-bea3acfa41ec
+	github.com/elastic/elastic-agent-system-metrics v0.5.1-0.20230329152224-08d0843327fd
 	go.elastic.co/fastjson v1.1.0
 )
 
