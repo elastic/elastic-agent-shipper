@@ -25,11 +25,11 @@ import (
 )
 
 type queueData struct {
-	CurrentLevel      uint64
-	MaxLevel          uint64
-	IsFull            bool
-	LimitReachedCount uint64
-	UnackedRead       opt.Uint
+	CurrentLevel      uint64   `json:"current_level"`
+	MaxLevel          uint64   `json:"max_level"`
+	IsFull            bool     `json:"is_full"`
+	LimitReachedCount uint64   `json:"limit_reached_count"`
+	UnackedRead       opt.Uint `json:"unacked_read"`
 }
 
 // QueueMonitor is the main handler object for the queue monitor, and will be responsible for startup, shutdown, handling config, and persistent tracking of metrics.
@@ -104,6 +104,7 @@ func NewFromConfig(httpCfg, logCfg *config.C, target queue.MetricsSource) (*Queu
 
 // a callback passed to monitoring.NewFunc for reporting queue metrics
 func (mon *QueueMonitor) reportQueueMetrics(_ monitoring.Mode, V monitoring.Visitor) {
+	mon.log.Debugf("register called reportQueueMetrics")
 	V.OnRegistryStart()
 	defer V.OnRegistryFinished()
 

@@ -135,6 +135,6 @@ func (srv *InputHandler) Stop() {
 	}
 	err := os.Remove(srv.listenerAddress)
 	if err != nil {
-		srv.log.Debugf("error removing unix socket for grpc listener: %w", err)
+		srv.log.Debugf("error removing unix socket for grpc listener: %s", err)
 	}
 }
