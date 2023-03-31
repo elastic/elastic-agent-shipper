@@ -15,7 +15,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 
-	"github.com/elastic/elastic-agent-shipper/monitoring"
 	"github.com/elastic/elastic-agent-shipper/output"
 	"github.com/elastic/elastic-agent-shipper/queue"
 
@@ -56,15 +55,17 @@ type ShipperTLS struct {
 
 // ShipperRootConfig defines the shipper config we get from elastic-agent's output unit
 type ShipperRootConfig struct {
-	Type    string        `config:"type"`
-	Shipper ShipperConfig `config:"shipper"`
+	Type       string        `config:"type"`
+	Shipper    ShipperConfig `config:"shipper"`
+	LogMetrics *config.C     `config:"logging.metrics"`
+	HTTP       *config.C     `config:"http"`
+	Monitoring bool          `config:"monitoring.enabled"`
 }
 
 // ShipperConfig defines the config values stored under the `shipper` key in the fleet config
 type ShipperConfig struct {
-	Monitor monitoring.Config `config:"monitoring"` //Queue monitoring settings
-	Queue   queue.Config      `config:"queue"`      //Queue settings
-	Output  output.Config     `config:"output"`     //Output settings
+	Queue  queue.Config  `config:"queue"`  //Queue settings
+	Output output.Config `config:"output"` //Output settings
 	// StrictMode means that every incoming event will be validated against the
 	// list of required fields. This introduces some additional overhead but can
 	// be really handy for client developers on the debugging stage.
@@ -79,9 +80,9 @@ func DefaultConfig() ShipperRootConfig {
 	return ShipperRootConfig{
 		Type: esKey,
 		Shipper: ShipperConfig{
-			Monitor: monitoring.DefaultConfig(),
-			Queue:   queue.DefaultConfig(),
+			Queue: queue.DefaultConfig(),
 		},
+		Monitoring: true,
 	}
 }
 
@@ -130,10 +131,6 @@ func ShipperConfigFromUnitConfig(level client.UnitLogLevel, rawConfig *proto.Uni
 		return ShipperRootConfig{}, fmt.Errorf("error reading in raw map config: %w", err)
 	}
 
-	// We should merge config overwrites here from the -E flag,
-	// but the 'path.*' variables set by elastic-agent conflict with the `path` flag in the elasticsearch settings
-	// see https://github.com/elastic/elastic-agent/issues/1729
-
 	// output config is at the "root" level, so we need to unpack those manually
 	err = cfg.Unpack(&cfgObject)
 	if err != nil {
@@ -157,6 +154,12 @@ func ShipperConfigFromUnitConfig(level client.UnitLogLevel, rawConfig *proto.Uni
 		}
 	default:
 		return ShipperRootConfig{}, fmt.Errorf("error, could not find output for output key '%s'", cfgObject.Type)
+	}
+
+	// unpack overwrites specified with -E
+	err = Overwrites.Unpack(&cfgObject)
+	if err != nil {
+		return ShipperRootConfig{}, fmt.Errorf("error unpacking CLI overwrites: %w", err)
 	}
 
 	return cfgObject, nil

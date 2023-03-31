@@ -6,119 +6,135 @@ package monitoring
 
 import (
 	"encoding/json"
+	"expvar"
 	"fmt"
-	"time"
+	"runtime"
 
+	"github.com/elastic/beats/v7/libbeat/beat"
+	libbeatreporter "github.com/elastic/beats/v7/libbeat/monitoring/report"
+	libbeatlog "github.com/elastic/beats/v7/libbeat/monitoring/report/log"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-libs/api"
+	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/monitoring"
 	"github.com/elastic/elastic-agent-libs/opt"
-	"github.com/elastic/elastic-agent-shipper/monitoring/reporter"
-	"github.com/elastic/elastic-agent-shipper/monitoring/reporter/expvar"
-	"github.com/elastic/elastic-agent-shipper/monitoring/reporter/log"
 	"github.com/elastic/elastic-agent-shipper/queue"
+	"github.com/elastic/elastic-agent-shipper/tools"
+	"github.com/elastic/elastic-agent-system-metrics/report"
 )
 
-//QueueMonitor is the main handler object for the queue monitor, and will be responsible for startup, shutdown, handling config, and persistent tracking of metrics.
+type queueData struct {
+	CurrentLevel      uint64   `json:"current_level"`
+	MaxLevel          uint64   `json:"max_level"`
+	IsFull            bool     `json:"is_full"`
+	LimitReachedCount uint64   `json:"limit_reached_count"`
+	UnackedRead       opt.Uint `json:"unacked_read"`
+}
+
+// QueueMonitor is the main handler object for the queue monitor, and will be responsible for startup, shutdown, handling config, and persistent tracking of metrics.
 type QueueMonitor struct {
-	// reporters is an array of user-configured reporters
-	reporters []reporter.Reporter
-	// interval is the user-configured reporting interval
-	interval time.Duration
-	done     chan struct{}
 	// handler for the event queue
 	target queue.MetricsSource
-	log    *logp.Logger
-	// enabled is a awkward no-op if a user has disabled monitoring
-	enabled bool
+	// handler for the periodic metrics reporting in the logger
+	logReporter libbeatreporter.Reporter
+	// handler for the http server
+	httpHandler *api.Server
+
+	log *logp.Logger
 
 	// Count of times the queue has reached a configured limit.
 	queueLimitCount uint64
+
+	// a private monitoring namespace. The global namespace doesn't support re-registering functions, which we need with shipper's stop-start model
+	// The only downside to this is that the log reporter can't see it.
+	shipperNS monitoring.Namespaces
 }
 
-//Config is the intermediate struct representation of the queue monitor config
-type Config struct {
-	LogOutput    bool          `config:"logs"`
-	ExpvarOutput expvar.Config `config:"http"`
-	Interval     time.Duration `config:"interval"`
-	Enabled      bool          `config:"enabled"`
+func init() {
+	setupRegisterInfo(logp.L())
 }
 
-// DefaultConfig returns the default settings for the queue monitor
-func DefaultConfig() Config {
-	return Config{
-		ExpvarOutput: expvar.Config{
-			Enabled: false,
-			Port:    8080,
-			Host:    "localhost",
-			Name:    "queue",
-		},
-		LogOutput: true,
-		Enabled:   true,
-		Interval:  time.Second * 30,
-	}
+type expvarHTTPCfg struct {
+	Enabled bool `config:"expvar.enabled"`
 }
 
 // NewFromConfig creates a new queue monitor from a pre-filled config struct.
-func NewFromConfig(cfg Config, target queue.MetricsSource) (*QueueMonitor, error) {
-	// the queue == nil is largely a shim to make things not panic while we wait for the queues to get hooked up.
-	if !cfg.Enabled || target == nil {
-		return &QueueMonitor{enabled: true}, nil
+func NewFromConfig(httpCfg, logCfg *config.C, target queue.MetricsSource) (*QueueMonitor, error) {
+	logger := logp.L()
+
+	mon := &QueueMonitor{target: target, log: logger, shipperNS: *monitoring.NewNamespaces()}
+	metricsReg := mon.shipperNS.Get("shipper").GetRegistry()
+
+	monitoring.NewFunc(metricsReg, "shipper", mon.reportQueueMetrics, monitoring.Report)
+
+	// create periodic reporting logger
+	reporter, err := libbeatlog.MakeReporter(beat.Info{}, logCfg)
+	if err != nil {
+		return nil, fmt.Errorf("error making log reporter: %w", err)
 	}
-	//init reporters
-	reporters := initReporters(cfg)
-	return &QueueMonitor{
-		interval:  cfg.Interval,
-		target:    target,
-		done:      make(chan struct{}),
-		log:       logp.L(),
-		reporters: reporters,
-	}, nil
+	mon.logReporter = reporter
+
+	if httpCfg.Enabled() {
+		logger.Debugf("starting http monitoring")
+		apiSrv, err := api.NewWithDefaultRoutes(logger, httpCfg, monitoring.GetNamespace)
+		if err != nil {
+			return nil, fmt.Errorf("error creating API for registry reporter: %w", err)
+		}
+
+		apiSrv.AddRoute("/shipper", api.MakeAPIHandler(mon.shipperNS.Get("shipper")))
+
+		// re-export expvars
+		expCfg := expvarHTTPCfg{}
+		err = httpCfg.Unpack(&expCfg)
+		if err != nil {
+			return nil, fmt.Errorf("error unpacking expvar config: %w", err)
+		}
+		if expCfg.Enabled {
+			apiSrv.AddRoute("/debug/vars", expvar.Handler().ServeHTTP)
+		}
+		mon.httpHandler = apiSrv
+		go func() {
+			apiSrv.Start()
+		}()
+	}
+
+	return mon, nil
 }
 
-// Watch is a non-blocking call that starts up a queue watcher that will report metrics to a given output
-func (mon QueueMonitor) Watch() {
-	// Turn this function into a no-op if nothing is initialized.
-	if mon.enabled {
+// a callback passed to monitoring.NewFunc for reporting queue metrics
+func (mon *QueueMonitor) reportQueueMetrics(_ monitoring.Mode, V monitoring.Visitor) {
+	mon.log.Debugf("register called reportQueueMetrics")
+	V.OnRegistryStart()
+	defer V.OnRegistryFinished()
+
+	metrics, err := mon.getQueueMetrics()
+	if err != nil {
+		mon.log.Errorf("error fetching queue metrics: %w", err)
 		return
 	}
-	ticker := time.NewTicker(mon.interval)
-	go func() {
-		for {
-			select {
-			case <-mon.done:
-				return
-			case <-ticker.C:
-				//We're assuming that the `Metrics()` call from the queue won't hard-block.
-				err := mon.updateMetrics()
-				if err != nil {
-					mon.log.Errorf("Error updating metrics: %w", err)
-				}
-			}
+	monitoring.ReportNamespace(V, "queue", func() {
+		monitoring.ReportInt(V, "current_level", int64(metrics.CurrentLevel))
+		monitoring.ReportInt(V, "max_level", int64(metrics.MaxLevel))
+		monitoring.ReportBool(V, "is_full", metrics.IsFull)
+		monitoring.ReportInt(V, "limit_reached_count", int64(metrics.LimitReachedCount))
+		if metrics.UnackedRead.Exists() {
+			monitoring.ReportInt(V, "unacked_read", int64(metrics.UnackedRead.ValueOr(0)))
 		}
-	}()
+
+	})
 }
 
 // End closes the metrics reporter and associated interfaces.
-func (mon QueueMonitor) End() {
-	if mon.enabled {
-		return
+func (mon *QueueMonitor) End() {
+	if mon.httpHandler != nil {
+		err := mon.httpHandler.Stop()
+		if err != nil {
+			mon.log.Errorf("error stopping HTTP handler for metrics: %s", err)
+		}
 	}
-	mon.log.Infof("Shutting down metrics monitor...")
-	for _, out := range mon.reporters {
-		out.Close()
-	}
-	mon.done <- struct{}{}
-}
 
-// updateMetrics is responsible for fetching the metrics from the queue, calculating whatever it needs to, and sending the complete events to the output
-func (mon *QueueMonitor) updateMetrics() error {
-	metrics, err := mon.getQueueMetrics()
-	if err != nil {
-		return fmt.Errorf("error fetching queue metrics: %w", err)
-	}
-	mon.sendToReporters(metrics)
-
-	return nil
+	mon.logReporter.Stop()
 }
 
 // DiagnosticsCallback returns a function that can be sent to a V2 unit's RegisterDiagnosticHook
@@ -136,32 +152,31 @@ func (mon *QueueMonitor) DiagnosticsCallback() client.DiagnosticHook {
 	}
 }
 
-func (mon *QueueMonitor) getQueueMetrics() (reporter.QueueMetrics, error) {
+func (mon *QueueMonitor) getQueueMetrics() (queueData, error) {
 	raw, err := mon.target.Metrics()
 	if err != nil {
-		return reporter.QueueMetrics{}, fmt.Errorf("error fetching queue Metrics: %w", err)
+		return queueData{}, fmt.Errorf("error fetching queue Metrics: %w", err)
 	}
 
 	count, limit, queueIsFull, err := getLimits(raw)
 	if err != nil {
-		return reporter.QueueMetrics{}, fmt.Errorf("could not get queue metrics limits: %w", err)
+		return queueData{}, fmt.Errorf("could not get queue metrics limits: %w", err)
 	}
 
+	// ideally this should be done on the queue side, since from here, it's hard to tell from periodic updates what the true count of "limit events" are
+	// i.e, if we poll every second, and we see a full queue twice, has the queue been full for one second, or did it become full, drain, and then become full again in one second?
 	if queueIsFull {
 		mon.queueLimitCount = mon.queueLimitCount + 1
 	}
 
-	metrics := reporter.QueueMetrics{
-		CurrentLevel:      opt.UintWith(count),
-		MaxLevel:          opt.UintWith(limit),
+	return queueData{
+		CurrentLevel:      count,
+		MaxLevel:          limit,
 		IsFull:            queueIsFull,
-		LimitReachedCount: opt.UintWith(mon.queueLimitCount),
+		LimitReachedCount: mon.queueLimitCount,
 		UnackedRead:       raw.UnackedConsumedEvents,
-		// Running on a philosophy that the outputs should be dumb and unopinionated,
-		//so we're doing the type conversion here.
-		OldestActiveTimestamp: raw.OldestActiveTimestamp.String(),
-	}
-	return metrics, nil
+	}, nil
+
 }
 
 // diagcallbackError is a wrapper for handling errors in the V2 client diagnostics callback.
@@ -175,31 +190,42 @@ func (mon *QueueMonitor) diagCallbackError(origErr error) []byte {
 	return jsonErr
 }
 
-func (mon QueueMonitor) sendToReporters(metrics reporter.QueueMetrics) {
-	for _, out := range mon.reporters {
-		err := out.ReportQueueMetrics(metrics)
-		//Assuming we don't want to make this a hard error, since one broken output doesn't mean they're all broken.
-		if err != nil {
-			mon.log.Errorf("Error sending to output: %w", err)
-		}
-	}
-}
+// create the basic monitoring namespaces
+func setupRegisterInfo(logger *logp.Logger) {
+	name := "shipper"
+	version := tools.GetDefaultVersion()
 
-// Load the raw config and look for monitoring outputs to initialize.
-func initReporters(cfg Config) []reporter.Reporter {
-	outReporters := []reporter.Reporter{}
-
-	if cfg.LogOutput {
-		reporter := log.NewLoggerReporter()
-		outReporters = append(outReporters, reporter)
+	//init common metrics
+	err := report.SetupMetrics(logger, name, version)
+	if err != nil {
+		logger.Errorf("error setting up basic monitoring metrics: %w", err)
 	}
 
-	if cfg.ExpvarOutput.Enabled {
-		reporter := expvar.NewExpvarReporter(cfg.ExpvarOutput)
-		outReporters = append(outReporters, reporter)
-	}
+	infoRegistry := monitoring.GetNamespace("info").GetRegistry()
+	monitoring.NewString(infoRegistry, "version").Set(version)
+	monitoring.NewString(infoRegistry, "name").Set(name)
+	monitoring.NewString(infoRegistry, "ephemeral_id").Set(report.EphemeralID().String())
+	monitoring.NewString(infoRegistry, "binary_arch").Set(runtime.GOARCH)
+	monitoring.NewString(infoRegistry, "build_commit").Set(tools.Commit())
+	monitoring.NewTimestamp(infoRegistry, "build_time").Set(tools.BuildTime())
 
-	return outReporters
+	// Beats set this if it's an xpack build
+	// Is this implied in the shipper?
+	// monitoring.NewBool(infoRegistry, "elastic_licensed").Set(b.Info.ElasticLicensed)
+
+	// set user data
+	report.SetupInfoUserMetrics()
+
+	stateRegistry := monitoring.GetNamespace("state").GetRegistry()
+
+	// state.service
+	serviceRegistry := stateRegistry.NewRegistry("service")
+	monitoring.NewString(serviceRegistry, "version").Set(version)
+	monitoring.NewString(serviceRegistry, "name").Set(name)
+
+	// state.beat
+	beatRegistry := stateRegistry.NewRegistry("beat")
+	monitoring.NewString(beatRegistry, "name").Set(name)
 }
 
 // This is a wrapper to deal with the multiple queue metric "types",

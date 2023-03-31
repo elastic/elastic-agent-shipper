@@ -6,31 +6,39 @@
 package monitoring
 
 import (
+	"context"
 	"encoding/json"
-	"expvar"
 	"fmt"
 	"io"
 	"math/rand"
+	"net"
 	"net/http"
-	"net/http/httptest"
-	"runtime"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/beats/v7/libbeat/common"
+	"github.com/elastic/elastic-agent-libs/config"
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/opt"
-	expvarReport "github.com/elastic/elastic-agent-shipper/monitoring/reporter/expvar"
 	"github.com/elastic/elastic-agent-shipper/queue"
+	"github.com/elastic/elastic-agent-shipper/tools"
 )
 
 func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-//expvarQueue emulates what the expvar queue metrics look like on the other end
-type expvarQueue struct {
+type Shippermetrics struct {
+	Queue queueMetrics `json:"queue"`
+}
+
+// queueMetrics emulates what the queue metrics look like on the other end
+type queueMetrics struct {
 	CurrentLevel int  `json:"current_level"`
 	Maxlevel     int  `json:"max_level"`
 	IsFull       bool `json:"is_full"`
@@ -69,105 +77,82 @@ func (tq *TestMetricsQueue) Metrics() (queue.Metrics, error) {
 }
 
 // simple wrapper to return a generic config object
-func initMonWithconfig(interval int, name string) Config {
-	return Config{
-		Interval: time.Millisecond * time.Duration(interval),
-		Enabled:  true,
-		ExpvarOutput: expvarReport.Config{
-			Enabled: true,
-			Port:    0,
-			Host:    "",
-			Name:    name,
-		},
-	}
-}
-
-// fetch the expvar data from the http endpoint and return the final queue object to test the metrics outputs
-func fetchExpVars(client http.Client, endpoint string) (expvarQueue, error) {
-	resp, err := client.Get(endpoint) //nolint:noctx //this is a test, with a timeout
-	if err != nil {
-		return expvarQueue{}, fmt.Errorf("error in HTTP get: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return expvarQueue{}, fmt.Errorf("expvar endpoint did not return 200: %#v", resp)
-	}
-	httpResp, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return expvarQueue{}, fmt.Errorf("error reading response body from expvar endpoint: %w", err)
-	}
-	raw := struct {
-		Memstats runtime.MemStats
-		Cmdline  []string
-		Queue    expvarQueue
-	}{}
-	err = json.Unmarshal(httpResp, &raw)
-	if err != nil {
-		return raw.Queue, fmt.Errorf("error unmarshalling json from expvar: %w", err)
-	}
-
-	return raw.Queue, nil
-}
-
-func startTestServer() string {
-	// Start an http test server on a random port and re-register expvar's global endpoint
-	// The only part of the monitoring library this bypasses is the "regular" http test server, as we're still
-	// hitting all the code that we register via expvar
-	ts := httptest.NewUnstartedServer(nil)
-	ts.Config.Handler = expvar.Handler()
-	ts.Start()
-	return ts.URL
+func initMonWithconfig(t *testing.T) (*config.C, string) {
+	path := tools.GenerateTestAddr(t.TempDir())
+	return config.MustNewConfigFrom(map[string]interface{}{
+		"enabled": true,
+		"host":    path,
+		"port":    "8182",
+		"timeout": "4s"}), path
 }
 
 // actual tests
 
 func TestSetupMonitor(t *testing.T) {
-	monitor := initMonWithconfig(1, "test")
+	monitor, path := initMonWithconfig(t)
+	defer os.Remove(path)
 	queue := NewTestQueue(10)
-	mon, err := NewFromConfig(monitor, queue)
+	mon, err := NewFromConfig(monitor, nil, queue)
 	assert.NoError(t, err)
-	mon.Watch()
+	mon.End()
+}
+
+func TestFetchInfo(t *testing.T) {
+	var maxEvents uint64 = 10
+	client, mon, path := createMetricsClientServer(t, maxEvents)
+	defer os.RemoveAll(filepath.Dir(path))
+
+	endpoint := fmt.Sprintf("http://unix%s", "/")
+
+	rawInfo := fetchEndpointData(t, client, endpoint)
+
+	parsed := map[string]interface{}{}
+
+	err := json.Unmarshal(rawInfo, &parsed)
+	require.NoError(t, err)
+
+	t.Logf("got: %#v", parsed)
+
+	// Just make sure that we put the values in the correct place, and they exist
+	// ephemeral_id is random.
+	_, ok := parsed["ephemeral_id"]
+	require.True(t, ok, "missing ephemeral_id")
+	_, ok = parsed["binary_arch"]
+	require.True(t, ok, "missing binary_arch")
+
 	mon.End()
 }
 
 func TestReportedEvents(t *testing.T) {
-
-	monitor := initMonWithconfig(1, "queue")
-
-	var maxEvents uint64 = 10
-	queue := NewTestQueue(maxEvents)
-	mon, err := NewFromConfig(monitor, queue)
-	assert.NoError(t, err)
-	mon.Watch()
-
 	var limitCount int
 	var queueFullCount int
+	var maxEvents uint64 = 10
 
-	t.Logf("listening for events...")
-	// once we have maxEvents, we can properly
-	// use the expvar endpoint to check the output
-	client := http.Client{
-		Timeout: 5 * time.Second,
-	}
+	client, mon, path := createMetricsClientServer(t, maxEvents)
+	defer os.RemoveAll(filepath.Dir(path))
 
-	//endpoint := fmt.Sprintf("http://localhost:%d/debug/vars", port)
-	endpoint := startTestServer()
-	t.Logf("Addr: %s", endpoint)
-	// Sit and wait until we have interesting data we can test
+	endpoint := fmt.Sprintf("http://unix%s", "/shipper")
+
+	t.Logf("Addr: %s", path)
+	// Sit and wait until the queue fills up
 	for {
-		result, err := fetchExpVars(client, endpoint)
-		if err != nil {
-			t.Fatalf("Error fetching expvars: %s", err)
-		}
-		t.Logf("Got raw result: %#v", result)
-		if result.IsFull {
-			queueFullCount = result.CurrentLevel
-			limitCount = result.LimitCount
+		result := fetchEndpointData(t, client, endpoint)
 
+		raw := struct {
+			Shipper Shippermetrics
+		}{}
+		err := json.Unmarshal(result, &raw)
+		require.NoError(t, err)
+
+		if raw.Shipper.Queue.IsFull {
+			queueFullCount = raw.Shipper.Queue.CurrentLevel
+			limitCount = raw.Shipper.Queue.LimitCount
+			t.Logf("Got final result: %#v", raw.Shipper.Queue)
 			break
 		}
 
 	}
+
 	mon.End()
 
 	assert.NotZero(t, limitCount, "Got a queue full count of 0")
@@ -187,5 +172,39 @@ func TestQueueMetrics(t *testing.T) {
 	assert.Equal(t, count, fullBytes)
 	assert.Equal(t, limit, fullLimitBytes)
 	assert.True(t, isFull, true)
+
+}
+
+func createMetricsClientServer(t *testing.T, maxEvents uint64) (http.Client, *QueueMonitor, string) {
+	_ = logp.DevelopmentSetup()
+	monitor, path := initMonWithconfig(t)
+	queue := NewTestQueue(maxEvents)
+	mon, err := NewFromConfig(monitor, nil, queue)
+	require.NoError(t, err)
+
+	client := http.Client{
+		Timeout: time.Second * 4,
+		Transport: &http.Transport{
+			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+				return tools.DialTestAddr(path)
+			},
+		},
+	}
+
+	return client, mon, path
+}
+
+// fetch the expvar data from the http endpoint and return the final queue object to test the metrics outputs
+func fetchEndpointData(t *testing.T, client http.Client, endpoint string) []byte {
+	resp, err := client.Get(endpoint) //nolint:noctx //this is a test, with a timeout
+	require.NoError(t, err, "error in HTTP get")
+
+	defer resp.Body.Close()
+	require.Equal(t, 200, resp.StatusCode, "expvar endpoint did not return 200")
+
+	httpResp, err := io.ReadAll(resp.Body)
+	require.NoError(t, err, "error reading response body from expvar endpoint")
+
+	return httpResp
 
 }

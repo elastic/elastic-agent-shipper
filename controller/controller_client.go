@@ -74,6 +74,7 @@ func (c *clientHandler) startShipper(unit *client.Unit) {
 		}
 		return
 	}
+	unit.RegisterDiagnosticHook("queue", "queue metrics", "queue_metrics.json", "application/json", c.outputHandler.QueueDiagCallback())
 	_ = unit.UpdateState(client.UnitStateHealthy, "outputs initialized", nil)
 }
 

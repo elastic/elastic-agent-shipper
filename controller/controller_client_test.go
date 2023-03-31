@@ -7,6 +7,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"sync"
@@ -560,6 +561,107 @@ func TestUnitLogChange(t *testing.T) {
 	assert.True(t, gotHealthy, "healthy state")
 	assert.True(t, gotStopped, "stopped state")
 	assert.False(t, gotRestarted, "units restarted")
+}
+
+func TestDiagnostics(t *testing.T) {
+	_ = logp.DevelopmentSetup()
+	var mut sync.Mutex
+	token := mock.NewID()
+	unitOut, unitIn := basicStartingUnits(t)
+	var gotHealthy bool
+	implFunc := func(observed *proto.CheckinObserved) *proto.CheckinExpected {
+		mut.Lock()
+		defer mut.Unlock()
+		if observed.Token == token {
+			if unitsAreFailed(observed.Units) {
+				t.Logf("Got failed unit")
+				t.FailNow()
+			}
+			// initial checkin
+			if len(observed.Units) == 0 || observed.Units[0].State == proto.State_STARTING {
+				t.Logf("starting initial checkin")
+				// set log level to info
+				//gotConfig = true
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{
+						unitOut,
+						unitIn,
+					},
+				}
+			} else if unitsAreState(t, proto.State_HEALTHY, observed.Units) {
+				t.Logf("Got unit state healthy, changing log level")
+				gotHealthy = true
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{
+						unitOut,
+						unitIn,
+					},
+				}
+			}
+		}
+		return nil
+	}
+
+	srv := mock.StubServerV2{
+		CheckinV2Impl: implFunc,
+		ActionImpl: func(response *proto.ActionResponse) error {
+			return nil
+		},
+		ActionsChan: make(chan *mock.PerformAction, 100),
+		SentActions: make(map[string]*mock.PerformAction),
+	}
+
+	require.NoError(t, srv.Start())
+	t.Logf("creating client")
+	// connect with client
+	validClient := createClient(token, srv.Port)
+
+	t.Logf("starting shipper controller")
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	go func() {
+		err := runController(ctx, validClient)
+		require.NoError(t, err)
+	}()
+
+	var diagRaw []byte
+	for {
+		select {
+		case <-ctx.Done():
+			t.Fatalf("got timeout, shipper was not healthy")
+			return
+		default:
+		}
+		if gotHealthy {
+			t.Logf("units are healthy, trying diagnostics with unit %s", unitOut.Id)
+			resp, err := srv.PerformDiagnostic(unitOut.Id, proto.UnitType_OUTPUT)
+			require.NoError(t, err)
+			for _, diagItem := range resp {
+				if diagItem.Name == "queue" {
+					t.Logf("got queue data: %v", diagItem)
+					diagRaw = diagItem.Content
+				}
+			}
+			cancel()
+			break
+		}
+		time.Sleep(time.Millisecond * 300)
+	}
+
+	if len(diagRaw) == 0 {
+		t.Fatalf("queue diagnostics data was empty")
+	}
+
+	// quick check to make sure the data is actually there
+	queueData := map[string]interface{}{}
+
+	err := json.Unmarshal(diagRaw, &queueData)
+	require.NoError(t, err)
+
+	require.NotZero(t, queueData["max_level"])
+
 }
 
 func runServerTest(t *testing.T, implFunc mock.StubServerCheckinV2, waitUntil *sync.WaitGroup, token string) {

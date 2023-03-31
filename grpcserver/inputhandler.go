@@ -22,11 +22,12 @@ import (
 
 // InputHandler wraps the input side of the shipper, and is responsible for starting and stopping the gRPC endpoint
 type InputHandler struct {
-	Shipper    ShipperServer
-	publisher  Publisher
-	log        *logp.Logger
-	server     *grpc.Server
-	startMutex sync.Mutex
+	Shipper         ShipperServer
+	publisher       Publisher
+	log             *logp.Logger
+	server          *grpc.Server
+	startMutex      sync.Mutex
+	listenerAddress string
 }
 
 // NewGRPCServer returns a new gRPC handler with a reference to the output publisher
@@ -46,6 +47,7 @@ func (srv *InputHandler) Start(grpcTLS credentials.TransportCredentials, endpoin
 	}
 	listenAddr := strings.TrimPrefix(endpoint, "unix://")
 	var err error
+	srv.listenerAddress = listenAddr
 
 	srv.log.Debugf("initializing the gRPC server...")
 	opts := []grpc.ServerOption{
@@ -72,6 +74,14 @@ func (srv *InputHandler) Start(grpcTLS credentials.TransportCredentials, endpoin
 		}
 	}
 
+	// on linux, net.Listen will fail if the file already exists
+	if _, err = os.Stat(listenAddr); err == nil {
+		srv.log.Debugf("listen address %s already exists, removing", listenAddr)
+		err = os.Remove(listenAddr)
+		if err != nil {
+			return fmt.Errorf("error removing unix socket %s: %w", listenAddr, err)
+		}
+	}
 	lis, err := newListener(srv.log, listenAddr)
 	if err != nil {
 		srv.startMutex.Unlock()
@@ -122,5 +132,9 @@ func (srv *InputHandler) Stop() {
 		srv.server.GracefulStop()
 		srv.server = nil
 
+	}
+	err := os.Remove(srv.listenerAddress)
+	if err != nil {
+		srv.log.Debugf("error removing unix socket for grpc listener: %s", err)
 	}
 }
