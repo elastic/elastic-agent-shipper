@@ -83,6 +83,9 @@ func (Build) Binary() error {
 	InstallGoReleaser()
 
 	args := []string{"build", "--rm-dist", "--skip-validate"}
+	if mg.Verbose() {
+		args = append(args, "--debug")
+	}
 	// Environment variable
 	env := map[string]string{
 		"CGO_ENABLED":     devtools.EnvOrDefault("CGO_ENABLED", "0"),
