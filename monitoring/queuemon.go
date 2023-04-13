@@ -104,7 +104,6 @@ func NewFromConfig(httpCfg, logCfg *config.C, target queue.MetricsSource) (*Queu
 
 // a callback passed to monitoring.NewFunc for reporting queue metrics
 func (mon *QueueMonitor) reportQueueMetrics(_ monitoring.Mode, V monitoring.Visitor) {
-	mon.log.Debugf("register called reportQueueMetrics")
 	V.OnRegistryStart()
 	defer V.OnRegistryFinished()
 

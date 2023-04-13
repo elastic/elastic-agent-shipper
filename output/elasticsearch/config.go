@@ -6,6 +6,7 @@ package elasticsearch
 
 import (
 	"crypto/tls"
+	"math"
 	"net/http"
 	"runtime"
 	"time"
@@ -33,6 +34,7 @@ type Config struct {
 	Backoff Backoff `config:"backoff"`
 
 	// Default: 3
+	// Setting to -1 will enable infinite retry
 	MaxRetries int `config:"max_retries"`
 
 	// Default: 502, 503, 504.
@@ -121,7 +123,14 @@ func (c Config) esConfig() elasticsearch.Config {
 		// falls back on full verification.
 		tlsConfig.InsecureSkipVerify = true
 	}
+
+	if c.MaxRetries == -1 {
+		// 'infinite' retry
+		c.MaxRetries = math.MaxInt
+	}
+
 	cfg := elasticsearch.Config{
+		EnableMetrics: true,
 		Addresses:     c.Hosts,
 		Username:      c.Username,
 		Password:      c.Password,
