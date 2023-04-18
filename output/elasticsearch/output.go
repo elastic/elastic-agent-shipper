@@ -32,6 +32,7 @@ type ElasticSearchOutput struct {
 	healthWatcher ESHealthWatcher
 	watchCancel   context.CancelFunc
 	wg            sync.WaitGroup
+	callback      WatchReporter
 }
 
 // NewElasticSearch creates a new elasticsearch output
@@ -40,10 +41,10 @@ func NewElasticSearch(config *Config, reportCallback WatchReporter, queue *queue
 		config.DegradedTimeout = time.Second * 30
 	}
 	out := &ElasticSearchOutput{
-		logger:        logp.NewLogger("elasticsearch-output"),
-		config:        config,
-		queue:         queue,
-		healthWatcher: newHealthWatcher(reportCallback, config.DegradedTimeout),
+		logger:   logp.NewLogger("elasticsearch-output"),
+		config:   config,
+		queue:    queue,
+		callback: reportCallback,
 	}
 	return out
 }
@@ -63,11 +64,16 @@ func serializeEvent(event *messages.Event) ([]byte, error) {
 
 // Start the elasticsearch output
 func (es *ElasticSearchOutput) Start() error {
-	es.logger.Debugf("Starting elasticsearch output")
 	client, err := elasticsearch.NewClient(es.config.esConfig())
 	if err != nil {
 		return err
 	}
+	if es.config.MaxRetries == -1 {
+		es.logger.Debugf("starting ES output; max retry=infinite")
+	} else {
+		es.logger.Debugf("starting ES output; max retry=%d", es.config.MaxRetries)
+	}
+
 	healthTimeout := time.Second * 30
 	bi, err := esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
 		Index:         "elastic-agent-shipper-test",
@@ -85,6 +91,7 @@ func (es *ElasticSearchOutput) Start() error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	es.watchCancel = cancel
+	es.healthWatcher = newHealthWatcher(es.logger, es.callback, es.config.DegradedTimeout, client)
 	go es.healthWatcher.Watch(ctx)
 
 	es.wg.Add(1)
@@ -111,7 +118,7 @@ func (es *ElasticSearchOutput) Start() error {
 			for _, event := range events {
 				serialized, err := serializeEvent(event)
 				if err != nil {
-					es.healthWatcher.Fail(err.Error())
+					es.healthWatcher.Fail()
 					es.logger.Errorf("failed to serialize event: %v", err)
 					continue
 				}
@@ -133,13 +140,12 @@ func (es *ElasticSearchOutput) Start() error {
 						Body:   bytes.NewReader(serialized),
 						OnSuccess: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem) {
 							// TODO: update metrics
-							es.healthWatcher.Success()
 							batch.Done(1)
 						},
 						OnFailure: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem, err error) {
 							// TODO: update metrics
 							errMsg := fmt.Sprintf("err: %s cause: %s", res.Error.Reason, res.Error.Cause.Reason)
-							es.healthWatcher.Fail(errMsg)
+							es.healthWatcher.Fail()
 							es.logger.Debugf("Failed to add items: %#v", errMsg)
 							batch.Done(1)
 
@@ -147,7 +153,7 @@ func (es *ElasticSearchOutput) Start() error {
 					},
 				)
 				if err != nil {
-					es.healthWatcher.Fail(err.Error())
+					es.healthWatcher.Fail()
 					es.logger.Errorf("couldn't add to bulk index request: %v", err)
 					// This event couldn't be attempted, so mark it as finished.
 					batch.Done(1)

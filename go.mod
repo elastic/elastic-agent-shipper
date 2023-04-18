@@ -37,7 +37,6 @@ require (
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/eapache/go-xerial-snappy v0.0.0-20180814174437-776d5712da21 // indirect
 	github.com/eapache/queue v1.1.0 // indirect
-	github.com/elastic/elastic-transport-go/v8 v8.1.0 // indirect
 	github.com/elastic/go-licenser v0.4.1 // indirect
 	github.com/elastic/go-structform v0.0.10 // indirect
 	github.com/elastic/go-sysinfo v1.9.1-0.20230328042007-6dcfe88b8359 // indirect
@@ -108,6 +107,7 @@ require (
 	github.com/Shopify/sarama v1.27.0
 	github.com/docker/go-units v0.5.0
 	github.com/elastic/elastic-agent-system-metrics v0.5.1-0.20230329152224-08d0843327fd
+	github.com/elastic/elastic-transport-go/v8 v8.1.0
 	go.elastic.co/fastjson v1.1.0
 )
 
