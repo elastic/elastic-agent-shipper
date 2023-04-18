@@ -29,7 +29,6 @@ type WatchReporter func(state WatchState, msg string)
 type ESHealthWatcher struct {
 	reporter          WatchReporter
 	callbackFailCount int32
-	didFail           bool
 	failureInterval   time.Duration
 	waitInterval      time.Duration
 	esClient          ConnectionMetrics
@@ -61,7 +60,6 @@ func newHealthWatcher(log *logp.Logger, reporter WatchReporter, failureInterval 
 	return ESHealthWatcher{
 		log:             log,
 		reporter:        reporter,
-		didFail:         false,
 		failureInterval: failureInterval,
 		waitInterval:    time.Second * 5,
 		esClient:        client,
@@ -80,7 +78,7 @@ func (hw *ESHealthWatcher) Fail() {
 func (hw *ESHealthWatcher) Watch(ctx context.Context) {
 
 	// count of failures from the es transport
-	lastFail := 0
+	lastTransportFail := 0
 	// count of HTTP response codes in the fail range
 	lastResponseFailRange := 0
 	// count of HTTP response codes in the success range
@@ -109,8 +107,8 @@ func (hw *ESHealthWatcher) Watch(ctx context.Context) {
 			// calculate deltas between last run
 			respFailDelta := fails - lastResponseFailRange
 			respSuccessDelta := success - lastResponseSuccessfulRange
-			transportFailDelta := metrics.Failures - lastFail
-			cbFails := hw.callbackFailCount - lastCBFail
+			transportFailDelta := metrics.Failures - lastTransportFail
+			cbFails := atomic.LoadInt32(&hw.callbackFailCount) - lastCBFail
 
 			// the logic here is relatively simple
 			// if there have been no successful HTTP codes since the last reporting period,
@@ -134,10 +132,10 @@ func (hw *ESHealthWatcher) Watch(ctx context.Context) {
 			}
 
 			// update trackers
-			lastFail = metrics.Failures
+			lastTransportFail = metrics.Failures
 			lastResponseFailRange = fails
 			lastResponseSuccessfulRange = success
-			lastCBFail = hw.callbackFailCount
+			lastCBFail = atomic.LoadInt32(&hw.callbackFailCount)
 
 			// if we're in a test setting, send a signal telling the test
 			// we're done running through the checks, and the state can be checked
