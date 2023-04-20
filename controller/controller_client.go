@@ -55,9 +55,9 @@ func (c *clientHandler) stopShipper() {
 
 func (c *clientHandler) startShipper(unit *client.Unit) {
 	_ = unit.UpdateState(client.UnitStateConfiguring, "reading shipper config", nil)
-	_, level, unitConfig := unit.Expected()
+	expected := unit.Expected()
 
-	cfg, err := config.ShipperConfigFromUnitConfig(level, unitConfig)
+	cfg, err := config.ShipperConfigFromUnitConfig(expected.LogLevel, expected.Config)
 	if err != nil {
 		c.reportError("error configuring shipper", err, unit)
 		if c.grpcServer != nil {
@@ -85,14 +85,14 @@ func (c *clientHandler) updateShipperOutput(unit *client.Unit) {
 		return
 	}
 	c.log.Debugf("updating output unit %s", unit.ID())
-	state, _, _ := unit.Expected()
+	expected := unit.Expected()
 
 	c.units.UpdateUnit(unit)
-	if state == client.UnitStateHealthy { // config update, so restart
+	if expected.State == client.UnitStateHealthy { // config update, so restart
 		_ = unit.UpdateState(client.UnitStateStopping, "shipper is restarting", nil)
 		c.stopShipper()
 		c.startShipper(unit)
-	} else if state == client.UnitStateStopped { // shut down
+	} else if expected.State == client.UnitStateStopped { // shut down
 		_ = unit.UpdateState(client.UnitStateStopping, "shipper is stopping", nil)
 		c.stopShipper()
 		_ = unit.UpdateState(client.UnitStateStopped, "shipper is stopped", nil)
@@ -139,10 +139,10 @@ func (c *clientHandler) stopGRPC() {
 
 // start an individual input stream
 func (c *clientHandler) addInput(unit *client.Unit) {
-	_, _, cfg := unit.Expected()
+	expected := unit.Expected()
 	// decode the gRPC config used by the shipper
 	conn := config.ShipperConnectionConfig{}
-	cfgObj, err := libcfg.NewConfigFrom(cfg.Source.AsMap())
+	cfgObj, err := libcfg.NewConfigFrom(expected.Config.Source.AsMap())
 	if err != nil {
 		c.reportError("error creating config object", err, unit)
 		return
@@ -166,11 +166,11 @@ func (c *clientHandler) addInput(unit *client.Unit) {
 // called when we get a UnitUpdated for an input
 func (c *clientHandler) updateInput(unit *client.Unit) {
 	c.log.Debugf("updating input unit %s", unit.ID())
-	state, _, _ := unit.Expected()
+	expected := unit.Expected()
 
 	// For now, assume the gRPC config is static, don't update the server when we get input updates
 	c.units.UpdateUnit(unit)
-	if state == client.UnitStateStopped {
+	if expected.State == client.UnitStateStopped {
 		_ = unit.UpdateState(client.UnitStateStopped, "unit has stopped", nil)
 	}
 
@@ -185,8 +185,8 @@ func (c *clientHandler) updateInput(unit *client.Unit) {
 // handle the UnitChangedAdded event from the V2 API
 func (c *clientHandler) handleUnitAdded(unit *client.Unit) {
 	unitType := unit.Type()
-	state, logLvl, _ := unit.Expected()
-	c.log.Infof("Got unit added for ID %s (%s/%s)", unit.ID(), state.String(), logLvl.String())
+	expected := unit.Expected()
+	c.log.Infof("Got unit added for ID %s (%s/%s)", unit.ID(), expected.State.String(), expected.LogLevel.String())
 	c.units.AddUnit(unit)
 	if unitType == client.UnitTypeOutput {
 		c.startShipper(unit)
@@ -198,14 +198,14 @@ func (c *clientHandler) handleUnitAdded(unit *client.Unit) {
 
 // handle the UnitChangedModified event from the V2 API
 func (c *clientHandler) handleUnitUpdated(unit *client.Unit) {
-	state, logLvl, cfg := unit.Expected()
-	c.log.Infof("Got unit updated for ID %s (%s/%s)", unit.ID(), state.String(), logLvl.String())
+	expected := unit.Expected()
+	c.log.Infof("Got unit updated for ID %s (%s/%s)", unit.ID(), expected.State.String(), expected.LogLevel.String())
 	currentUnit := c.units.GetUnit(unit.ID(), unit.Type())
 	// check to see if only the log level needs updating. Only update if we have an output unit, since we're basically getting copies of input units,
 	// so a log level change for an input might not be for us.
-	if onlyLogLevelUpdated(cfg.Source.AsMap(), currentUnit.config, logLvl) && unit.Type() == client.UnitTypeOutput {
-		c.log.Infof("unit %s got update with only log level changing. Updating to %s", unit.ID(), config.ZapFromUnitLogLevel(logLvl))
-		logp.SetLevel(config.ZapFromUnitLogLevel(logLvl))
+	if onlyLogLevelUpdated(expected.Config.Source.AsMap(), currentUnit.config, expected.LogLevel) && unit.Type() == client.UnitTypeOutput {
+		c.log.Infof("unit %s got update with only log level changing. Updating to %s", unit.ID(), config.ZapFromUnitLogLevel(expected.LogLevel))
+		logp.SetLevel(config.ZapFromUnitLogLevel(expected.LogLevel))
 		_ = unit.UpdateState(client.UnitStateHealthy, "log level changed", nil)
 		return
 	}
@@ -220,8 +220,8 @@ func (c *clientHandler) handleUnitUpdated(unit *client.Unit) {
 
 // handle the UnitChangedRemoved event from the V2 API
 func (c *clientHandler) handleUnitRemoved(unit *client.Unit) {
-	state, logLvl, _ := unit.Expected()
-	c.log.Debugf("Got unit removed for ID %s (%s/%s)", unit.ID(), state.String(), logLvl.String())
+	expected := unit.Expected()
+	c.log.Debugf("Got unit removed for ID %s (%s/%s)", unit.ID(), expected.State.String(), expected.LogLevel.String())
 	c.units.DeleteUnit(unit)
 	// until we have a dedicated unit for gRPC, use this as a sign to shut down the input
 	if c.units.AvailableUnitCount() == 0 {
