@@ -329,11 +329,11 @@ License Version 2.0.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-client/v7
-Version: v7.0.1
+Version: v7.1.0
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-client/v7@v7.0.1/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-client/v7@v7.1.0/LICENSE.txt:
 
 ELASTIC LICENSE AGREEMENT
 
@@ -49274,11 +49274,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/text
-Version: v0.3.7
+Version: v0.3.8
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/golang.org/x/text@v0.3.7/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/text@v0.3.8/LICENSE:
 
 Copyright (c) 2009 The Go Authors. All rights reserved.
 
