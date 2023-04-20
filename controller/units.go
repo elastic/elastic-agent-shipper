@@ -38,11 +38,11 @@ func NewUnitMap() *UnitMap {
 func (c *UnitMap) AddUnit(unit *client.Unit) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
-	_, _, cfg := unit.Expected()
+	expected := unit.Expected()
 	if unit.Type() == client.UnitTypeOutput {
-		c.outputUnit = ShipperUnit{Unit: unit, config: cfg.Source.AsMap()}
+		c.outputUnit = ShipperUnit{Unit: unit, config: expected.Config.Source.AsMap()}
 	} else {
-		c.inputUnits[unit.ID()] = ShipperUnit{Unit: unit, config: cfg.Source.AsMap()}
+		c.inputUnits[unit.ID()] = ShipperUnit{Unit: unit, config: expected.Config.Source.AsMap()}
 	}
 
 }
@@ -51,17 +51,17 @@ func (c *UnitMap) AddUnit(unit *client.Unit) {
 func (c *UnitMap) UpdateUnit(unit *client.Unit) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
-	_, _, cfg := unit.Expected()
+	expected := unit.Expected()
 	if unit.Type() == client.UnitTypeInput {
 		// Probably a bug in elastic-agent if we hit this
 		current, ok := c.inputUnits[unit.ID()]
 		if !ok {
 			return
 		}
-		current.config = cfg.Source.AsMap()
+		current.config = expected.Config.Source.AsMap()
 		c.inputUnits[unit.ID()] = current
 	} else {
-		c.outputUnit.config = cfg.Source.AsMap()
+		c.outputUnit.config = expected.Config.Source.AsMap()
 	}
 }
 

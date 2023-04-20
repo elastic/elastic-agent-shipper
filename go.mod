@@ -13,7 +13,7 @@ require (
 require (
 	github.com/eapache/go-resiliency v1.2.0
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220810153818-dd118efed5a5
-	github.com/elastic/elastic-agent-client/v7 v7.0.1
+	github.com/elastic/elastic-agent-client/v7 v7.1.0
 	github.com/elastic/elastic-agent-shipper-client v0.5.1-0.20230301154434-a10074360f12
 	github.com/elastic/go-elasticsearch/v8 v8.6.0
 	github.com/elastic/go-lumber v0.1.1
@@ -90,7 +90,7 @@ require (
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/sys v0.6.0 // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
-	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/text v0.3.8 // indirect
 	golang.org/x/tools v0.1.12 // indirect
 	gopkg.in/jcmturner/aescts.v1 v1.0.1 // indirect
 	gopkg.in/jcmturner/dnsutils.v1 v1.0.1 // indirect
