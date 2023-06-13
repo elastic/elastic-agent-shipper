@@ -108,7 +108,11 @@ linters-settings:
 
   gosimple:
     # Select the Go version to target. The default is '1.13'.
+<<<<<<< HEAD
     go: "1.19.8"
+=======
+    go: "1.19.10"
+>>>>>>> 27be135 ([Automation] Bump Golang version to 1.19.10 (#313))
 
   nakedret:
     # make an issue if func has more lines of code than this setting and it has naked returns; default is 30
@@ -128,17 +132,29 @@ linters-settings:
 
   staticcheck:
     # Select the Go version to target. The default is '1.13'.
+<<<<<<< HEAD
     go: "1.19.8"
+=======
+    go: "1.19.10"
+>>>>>>> 27be135 ([Automation] Bump Golang version to 1.19.10 (#313))
     checks: ["all"]
 
   stylecheck:
     # Select the Go version to target. The default is '1.13'.
+<<<<<<< HEAD
     go: "1.19.8"
+=======
+    go: "1.19.10"
+>>>>>>> 27be135 ([Automation] Bump Golang version to 1.19.10 (#313))
     checks: ["all"]
 
   unused:
     # Select the Go version to target. The default is '1.13'.
+<<<<<<< HEAD
     go: "1.19.8"
+=======
+    go: "1.19.10"
+>>>>>>> 27be135 ([Automation] Bump Golang version to 1.19.10 (#313))
 
   gosec:
     excludes:
