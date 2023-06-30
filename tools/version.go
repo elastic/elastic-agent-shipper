@@ -4,4 +4,4 @@
 
 package tools
 
-const DefaultBeatVersion = "8.8.2"
+const DefaultBeatVersion = "8.8.3"
