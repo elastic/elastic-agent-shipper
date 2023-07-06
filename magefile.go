@@ -3,7 +3,6 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //go:build mage
-// +build mage
 
 package main
 
@@ -24,16 +23,17 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/magefile/mage/mg"
+	"github.com/magefile/mage/sh"
+
 	"github.com/elastic/elastic-agent-libs/dev-tools/mage"
 	"github.com/elastic/elastic-agent-libs/dev-tools/mage/gotool"
 	devtools "github.com/elastic/elastic-agent-shipper/dev-tools/common"
 	"github.com/elastic/elastic-agent-shipper/tools"
-	"github.com/magefile/mage/mg"
-	"github.com/magefile/mage/sh"
 )
 
 const (
-	GoreleaserRepo   = "github.com/goreleaser/goreleaser@v1.6.3"
+	GoreleaserRepo   = "github.com/goreleaser/goreleaser@v1.19.1"
 	platformsEnvName = "PLATFORMS"
 	specFileName     = devtools.ProjectName + ".spec.yml"
 	configFileName   = devtools.ProjectName + ".yml"
