@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent-shipper
 
-go 1.19
+go 1.20
 
 require (
 	github.com/elastic/elastic-agent-libs v0.3.5-0.20230323214151-3aab752a0cc7
