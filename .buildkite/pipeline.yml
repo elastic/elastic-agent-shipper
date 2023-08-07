@@ -17,7 +17,7 @@ steps:
       SNAPSHOT: true
     command:
       - ".buildkite/scripts/build.sh"
-      - ".buildkite/sctipst/test.sh"
+      - ".buildkite/scripts/test.sh"
     agents:
       image: golang:${GO_VERSION}
       cpu: "8"
