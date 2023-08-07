@@ -8,3 +8,14 @@ steps:
       image: golang:${GO_VERSION}
       cpu: "8"
       memory: "4G"
+
+  - label: ":linux: Test"
+    env:
+      SNAPSHOT: true
+    command:
+      - ".buildkite/scripts/build.sh"
+      - ".buildkite/sctipst/test.sh"
+    agents:
+      image: golang:${GO_VERSION}
+      cpu: "8"
+      memory: "4G"
