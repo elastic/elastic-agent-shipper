@@ -4,3 +4,4 @@ set -euo pipefail
 
 echo "--- Test"
 ls -l
+mage test
