@@ -22,3 +22,13 @@ steps:
       image: golang:${GO_VERSION}
       cpu: "8"
       memory: "4G"
+
+  - label: ":win: Test"
+    env:
+      SNAPSHOT: true
+    command:
+      - ".buildkite/scripts/build.ps1"
+      - ".buildkite/scripts/test.ps1"
+    agents:
+      provider: "gcp"
+      image: "family/ci-windows-2019"
