@@ -32,3 +32,23 @@ steps:
     agents:
       provider: "gcp"
       image: "family/ci-windows-2019"
+
+  - label: ":buildkite: Publish Snapshot"
+    env:
+      SNAPSHOT: true
+    command:
+      - ".buildkite/scripts/publish-snapshot.ps1"
+    agents:
+      image: golang:${GO_VERSION}
+      cpu: "8"
+      memory: "4G"
+
+  - label: ":buildkite: Publish Release"
+    env:
+      SNAPSHOT: true # TODO should be false
+  - label: ":buildkite: DRA Snapshot"
+    env:
+      SNAPSHOT: true
+  - label: ":buildkite: DRA Staging"
+    env:
+      SNAPSHOT: true # TODO should be false
