@@ -1,5 +1,54 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 
+env:
+  SETUP_MAGE_VERSION: '1.14.0'
+
 steps:
-  - label: "Example test"
-    command: echo "Hello!"
+  - label: ":buildkite: Check"
+    command:
+      - ".buildkite/scripts/check.sh"
+    agents:
+      image: golang:${GO_VERSION}
+      cpu: "8"
+      memory: "4G"
+
+  - label: ":linux: Test"
+    env:
+      SNAPSHOT: true
+    command:
+      - ".buildkite/scripts/build.sh"
+      - ".buildkite/scripts/test.sh"
+    agents:
+      image: golang:${GO_VERSION}
+      cpu: "8"
+      memory: "4G"
+
+  - label: ":win: Test"
+    env:
+      SNAPSHOT: true
+    command:
+      - ".buildkite/scripts/build.ps1"
+      - ".buildkite/scripts/test.ps1"
+    agents:
+      provider: "gcp"
+      image: "family/ci-windows-2019"
+
+  - label: ":buildkite: Publish Snapshot"
+    env:
+      SNAPSHOT: true
+    command:
+      - ".buildkite/scripts/publish-snapshot.ps1"
+    agents:
+      image: golang:${GO_VERSION}
+      cpu: "8"
+      memory: "4G"
+
+  - label: ":buildkite: Publish Release"
+    env:
+      SNAPSHOT: true # TODO should be false
+  - label: ":buildkite: DRA Snapshot"
+    env:
+      SNAPSHOT: true
+  - label: ":buildkite: DRA Staging"
+    env:
+      SNAPSHOT: true # TODO should be false
