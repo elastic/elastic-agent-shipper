@@ -1,6 +1,6 @@
 # elastic-agent-shipper
 
-> :warning: The Elastic agent data shipper is under active development, and will be available as an opt-in beta feature in an upcoming Elastic agent release.
+> :warning: Development of the Elastic Agent data shipper has been paused. The functionality it intended to provide will be implemented in other ways.
 
 Data shipper for the Elastic Agent - a single, unified way to add monitoring for logs, metrics, and
 other types of data to a host.
